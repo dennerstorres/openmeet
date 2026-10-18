@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-18 — CSP da POC e restos do template — Grok
+A CSP de distribuição deixa a API local, `wss`, `blob:` e `mediastream:`. O comando `greet` e a permissão `opener:default` saíram. `cargo check` do shell exit 0. A janela não foi reaberta. M01–M12 continuam NOT_RUN.
+
 ### 2026-10-18 — desconexão mostra o motivo — Grok
 Falha recuperável fica em `reconnecting`. Falha fatal fica em `fatal` com o `DisconnectReason`. Sair fica em `disconnected` com `CLIENT_INITIATED`. `pnpm --filter @openmeet/media test` 14 pass, build e `pnpm --filter @openmeet/desktop typecheck` exit 0. A janela não foi clicada. M01–M12 continuam NOT_RUN.
 
