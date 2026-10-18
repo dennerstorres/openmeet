@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-18 — tauri build sem instalador — Grok
+O release gerou `apps/desktop/src-tauri/target/release/openmeet-desktop.exe`. O MSI não saiu: o download do WiX parou em `timeout: global`. Não é CI PASS nem pacote instalável. M01–M12 continuam NOT_RUN.
+
 ### 2026-10-18 — CSP da POC e restos do template — Grok
 A CSP de distribuição deixa a API local, `wss`, `blob:` e `mediastream:`. O comando `greet` e a permissão `opener:default` saíram. `cargo check` do shell exit 0. A janela não foi reaberta. M01–M12 continuam NOT_RUN.
 
