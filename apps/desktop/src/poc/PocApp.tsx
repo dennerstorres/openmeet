@@ -6,6 +6,7 @@ import { TrackView } from "./TrackView";
 
 const idleSnapshot: PocSnapshot = {
   phase: "idle",
+  disconnectReason: null,
   tiles: [],
   participants: [],
   diagnostics: [],
@@ -105,6 +106,7 @@ export function PocApp() {
         <p>Fase de prova. Áudio, câmera e tela só contam depois do teste manual.</p>
         <p>
           Estado: <strong>{snapshot.phase}</strong>
+          {snapshot.disconnectReason ? ` · ${snapshot.disconnectReason}` : ""}
         </p>
       </header>
 

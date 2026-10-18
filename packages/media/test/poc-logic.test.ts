@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { DisconnectReason, Room, RoomEvent } from "livekit-client";
 import { describeMediaError, mediaActionError, sanitizeDiagnostic } from "../src/diagnostics.js";
 import { LiveKitPocSession, shouldAttachPlayback } from "../src/session.js";
-import { nextPhase } from "../src/phase.js";
+import { classifyDisconnect, nextPhase, type ConnectionPhase } from "../src/phase.js";
 import { collectTrackReports, readDisplaySurface, summarizeRtcStats, toStatLike } from "../src/stats.js";
 
 test("local microphone is not played back on this PC", () => {
@@ -17,6 +18,53 @@ test("connection phase shows reconnect and latches fatal until a new attempt", (
   assert.equal(nextPhase("connecting", "disconnected"), "fatal");
   assert.equal(nextPhase("fatal", "disconnected"), "fatal");
   assert.equal(nextPhase("fatal", "connect_started"), "connecting");
+});
+
+test("recoverable, fatal and leave stay distinct from the idle phase", async () => {
+  let phase: ConnectionPhase = "idle";
+  phase = nextPhase(phase, "connect_started");
+  phase = nextPhase(phase, "connected");
+  assert.equal(phase, "connected");
+  assert.equal(nextPhase(phase, "reconnecting"), "reconnecting");
+
+  const timedOut = classifyDisconnect(DisconnectReason.CONNECTION_TIMEOUT, false);
+  const duplicate = classifyDisconnect(DisconnectReason.DUPLICATE_IDENTITY, false);
+  const leave = classifyDisconnect(DisconnectReason.CLIENT_INITIATED, true);
+  assert.equal(timedOut.reason, "CONNECTION_TIMEOUT");
+  assert.equal(duplicate.reason, "DUPLICATE_IDENTITY");
+  assert.equal(leave.reason, "CLIENT_INITIATED");
+  assert.equal(nextPhase(phase, timedOut.event), "fatal");
+  assert.equal(nextPhase(phase, duplicate.event), "fatal");
+  assert.equal(nextPhase(phase, leave.event), "disconnected");
+
+  async function connectedSession(): Promise<{ room: Room; session: LiveKitPocSession }> {
+    const room = new Room();
+    room.connect = (async () => undefined) as Room["connect"];
+    const session = new LiveKitPocSession({ room });
+    assert.equal(session.snapshot().phase, "idle");
+    assert.equal(session.snapshot().disconnectReason, null);
+    await session.connect("ws://127.0.0.1:7880", "unit-test-token");
+    assert.equal(session.snapshot().phase, "connected");
+    return { room, session };
+  }
+
+  const recoverable = await connectedSession();
+  recoverable.room.emit(RoomEvent.Reconnecting);
+  assert.equal(recoverable.session.snapshot().phase, "reconnecting");
+  assert.equal(recoverable.session.snapshot().disconnectReason, null);
+
+  const fatal = await connectedSession();
+  fatal.room.emit(RoomEvent.Disconnected, DisconnectReason.CONNECTION_TIMEOUT);
+  assert.equal(fatal.session.snapshot().phase, "fatal");
+  assert.equal(fatal.session.snapshot().disconnectReason, "CONNECTION_TIMEOUT");
+
+  const exited = await connectedSession();
+  exited.room.disconnect = (async () => {
+    exited.room.emit(RoomEvent.Disconnected, DisconnectReason.CLIENT_INITIATED);
+  }) as Room["disconnect"];
+  await exited.session.disconnect();
+  assert.equal(exited.session.snapshot().phase, "disconnected");
+  assert.equal(exited.session.snapshot().disconnectReason, "CLIENT_INITIATED");
 });
 
 test("stats summary reads loss, jitter and nominated RTT", () => {

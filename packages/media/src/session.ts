@@ -1,6 +1,15 @@
-import { Room, RoomEvent, Track, type LocalTrackPublication, type RemoteParticipant, type RemoteTrack, type RemoteTrackPublication } from "livekit-client";
+import {
+  DisconnectReason,
+  Room,
+  RoomEvent,
+  Track,
+  type LocalTrackPublication,
+  type RemoteParticipant,
+  type RemoteTrack,
+  type RemoteTrackPublication,
+} from "livekit-client";
 import { describeMediaError, mediaActionError, sanitizeDiagnostic, type DiagnosticEvent } from "./diagnostics.js";
-import { nextPhase, type ConnectionPhase } from "./phase.js";
+import { classifyDisconnect, nextPhase, type ConnectionPhase } from "./phase.js";
 import { collectTrackReports, emptyStats, readDisplaySurface, readUserAgent, summarizeRtcStats, type RtcSnapshot } from "./stats.js";
 
 export type DeviceKind = "audioinput" | "audiooutput" | "videoinput";
@@ -27,6 +36,7 @@ export interface TrackTile {
 
 export interface PocSnapshot {
   phase: ConnectionPhase;
+  disconnectReason: string | null;
   tiles: TrackTile[];
   participants: string[];
   diagnostics: DiagnosticEvent[];
@@ -65,16 +75,19 @@ function readTrackDisplaySurface(track: Track): string | null {
 }
 
 export class LiveKitPocSession {
-  private readonly room = new Room();
+  private readonly room: Room;
   private readonly tiles = new Map<string, TrackTile>();
   private readonly listeners = new Set<Listener>();
   private readonly diagnostics: DiagnosticEvent[] = [];
   private readonly secrets: string[] = [];
   private readonly appVersion: string | null;
   private phase: ConnectionPhase = "idle";
+  private disconnectReason: string | null = null;
+  private explicitLeave = false;
   private stats: RtcSnapshot;
 
-  constructor(options?: { appVersion?: string }) {
+  constructor(options?: { appVersion?: string; room?: Room }) {
+    this.room = options?.room ?? new Room();
     this.appVersion = options?.appVersion ?? null;
     this.stats = { ...emptyStats(), userAgent: readUserAgent(), appVersion: this.appVersion };
     this.room.on(RoomEvent.Reconnecting, () => {
@@ -87,12 +100,16 @@ export class LiveKitPocSession {
     });
     this.room.on(RoomEvent.Reconnected, () => {
       this.phase = nextPhase(this.phase, "reconnected");
+      this.disconnectReason = null;
       this.note("info", "reconnected");
     });
-    this.room.on(RoomEvent.Disconnected, () => {
-      this.phase = nextPhase(this.phase, "disconnected");
+    this.room.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
+      const outcome = classifyDisconnect(reason, this.explicitLeave);
+      this.explicitLeave = false;
+      this.phase = nextPhase(this.phase, outcome.event);
+      this.disconnectReason = outcome.reason;
       this.tiles.clear();
-      this.note("info", "disconnected");
+      this.note("info", `disconnected: ${outcome.reason}`);
     });
     this.room.on(RoomEvent.MediaDevicesError, (error: Error) => {
       this.note("error", describeMediaError(error));
@@ -133,6 +150,7 @@ export class LiveKitPocSession {
     const local = this.room.localParticipant;
     return {
       phase: this.phase,
+      disconnectReason: this.disconnectReason,
       tiles: [...this.tiles.values()],
       participants: [local.identity, ...[...this.room.remoteParticipants.values()].map((participant) => participant.identity)].filter(
         (identity) => identity.length > 0,
@@ -147,6 +165,8 @@ export class LiveKitPocSession {
 
   async connect(url: string, token: string): Promise<void> {
     this.secrets.push(token);
+    this.explicitLeave = false;
+    this.disconnectReason = null;
     this.phase = nextPhase(this.phase, "connect_started");
     this.emit();
     try {
@@ -161,6 +181,7 @@ export class LiveKitPocSession {
   }
 
   async disconnect(): Promise<void> {
+    this.explicitLeave = true;
     await this.room.disconnect(true);
   }
 

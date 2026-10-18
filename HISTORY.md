@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-18 — desconexão mostra o motivo — Grok
+Falha recuperável fica em `reconnecting`. Falha fatal fica em `fatal` com o `DisconnectReason`. Sair fica em `disconnected` com `CLIENT_INITIATED`. `pnpm --filter @openmeet/media test` 14 pass, build e `pnpm --filter @openmeet/desktop typecheck` exit 0. A janela não foi clicada. M01–M12 continuam NOT_RUN.
+
 ### 2026-10-18 — diagnóstico lê o relatório da faixa — Grok
 O resumo mostra candidato `host`, `srflx` ou `relay`, fps e resolução de saída, `displaySurface`, `userAgent` e a versão do app. O jitter guardado é o pior. O RTT é o do par nominado com maior atraso. A sessão chama `getRTCStatsReport()` da faixa. `pnpm --filter @openmeet/media test` 13 pass, build e `pnpm --filter @openmeet/desktop typecheck` exit 0. A janela não foi clicada. M01–M12 continuam NOT_RUN.
 
