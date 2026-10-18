@@ -15,6 +15,8 @@
 | M11 | 5 PCs/clients | Teste 60 min com câmera e voz | — | — | NOT_RUN |
 | M12 | API | Token sem permissão negado | — | — | NOT_RUN |
 
+**Gates:** G2 cobre M01–M10 e os itens do ADR 0004 (dev e build, Windows 10 e 11, vários monitores, minimizar/restaurar, parar e republicar, permissão negada). M11 é G4. M12 é G3. Nenhum caso está PASS.
+
 **Métricas mínimas:** WebView2 version, app version, LiveKit version, Windows build, rede, RTT, jitter, packet loss, fps/resolução, qualidade percebida, uso CPU/RAM e log sanitizado.
 
 **Se execução não ocorreu:** não preencher colunas como PASS; usar WAITING_VALIDATION na tarefa dependente.
