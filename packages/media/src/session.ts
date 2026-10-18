@@ -1,7 +1,7 @@
 import { Room, RoomEvent, Track, type LocalTrackPublication, type RemoteParticipant, type RemoteTrack, type RemoteTrackPublication } from "livekit-client";
 import { describeMediaError, mediaActionError, sanitizeDiagnostic, type DiagnosticEvent } from "./diagnostics.js";
 import { nextPhase, type ConnectionPhase } from "./phase.js";
-import { emptyStats, summarizeRtcStats, type RtcSnapshot, type StatLike } from "./stats.js";
+import { collectTrackReports, emptyStats, readDisplaySurface, readUserAgent, summarizeRtcStats, type RtcSnapshot } from "./stats.js";
 
 export type DeviceKind = "audioinput" | "audiooutput" | "videoinput";
 
@@ -53,31 +53,15 @@ function sourceName(source: Track.Source): TrackTile["source"] {
   }
 }
 
-function toStatLike(stat: RTCStats): StatLike {
-  const record = stat as RTCStats & {
-    packetsLost?: number;
-    jitter?: number;
-    currentRoundTripTime?: number;
-    nominated?: boolean;
-    state?: string;
-  };
-  const like: StatLike = { type: stat.type };
-  if (typeof record.packetsLost === "number") {
-    like.packetsLost = record.packetsLost;
+function readTrackDisplaySurface(track: Track): string | null {
+  if (track.source !== Track.Source.ScreenShare) {
+    return null;
   }
-  if (typeof record.jitter === "number") {
-    like.jitter = record.jitter;
+  try {
+    return readDisplaySurface(track.mediaStreamTrack.getSettings());
+  } catch {
+    return null;
   }
-  if (typeof record.currentRoundTripTime === "number") {
-    like.currentRoundTripTime = record.currentRoundTripTime;
-  }
-  if (typeof record.nominated === "boolean") {
-    like.nominated = record.nominated;
-  }
-  if (typeof record.state === "string") {
-    like.state = record.state;
-  }
-  return like;
 }
 
 export class LiveKitPocSession {
@@ -86,10 +70,13 @@ export class LiveKitPocSession {
   private readonly listeners = new Set<Listener>();
   private readonly diagnostics: DiagnosticEvent[] = [];
   private readonly secrets: string[] = [];
+  private readonly appVersion: string | null;
   private phase: ConnectionPhase = "idle";
-  private stats: RtcSnapshot = emptyStats();
+  private stats: RtcSnapshot;
 
-  constructor() {
+  constructor(options?: { appVersion?: string }) {
+    this.appVersion = options?.appVersion ?? null;
+    this.stats = { ...emptyStats(), userAgent: readUserAgent(), appVersion: this.appVersion };
     this.room.on(RoomEvent.Reconnecting, () => {
       this.phase = nextPhase(this.phase, "reconnecting");
       this.note("info", "reconnecting");
@@ -216,29 +203,40 @@ export class LiveKitPocSession {
   }
 
   async refreshStats(): Promise<RtcSnapshot> {
-    const manager = this.room.engine.pcManager;
-    if (!manager) {
-      this.stats = emptyStats();
-      this.emit();
-      return this.stats;
+    const tracks = this.statsTracks();
+    let displaySurface: string | null = null;
+    for (const track of tracks) {
+      const surface = readTrackDisplaySurface(track);
+      if (surface) {
+        displaySurface = surface;
+      }
     }
-    let reports: Array<RTCStatsReport | undefined>;
+    const context = { displaySurface, userAgent: readUserAgent(), appVersion: this.appVersion };
     try {
-      reports = await Promise.all([manager.publisher.getStats(), manager.subscriber?.getStats()]);
+      const stats = await collectTrackReports(tracks);
+      this.stats = summarizeRtcStats(stats, context);
     } catch {
-      this.stats = emptyStats();
-      this.emit();
-      return this.stats;
+      this.stats = { ...emptyStats(), ...context };
     }
-    const stats: StatLike[] = [];
-    for (const report of reports) {
-      report?.forEach((item) => {
-        stats.push(toStatLike(item));
-      });
-    }
-    this.stats = summarizeRtcStats(stats);
     this.emit();
     return this.stats;
+  }
+
+  private statsTracks(): Track[] {
+    const tracks: Track[] = [];
+    for (const publication of this.room.localParticipant.getTrackPublications()) {
+      if (publication.track) {
+        tracks.push(publication.track);
+      }
+    }
+    for (const participant of this.room.remoteParticipants.values()) {
+      for (const publication of participant.getTrackPublications()) {
+        if (publication.track) {
+          tracks.push(publication.track);
+        }
+      }
+    }
+    return tracks;
   }
 
   private async toggle(action: () => Promise<unknown>, label: string): Promise<void> {

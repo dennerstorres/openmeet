@@ -1,5 +1,6 @@
 import { parseApiBase, parseIdentity, parseJoinResponse, parsePastedJoin, parseRoomName, PocInputError } from "@openmeet/shared";
-import { describeMediaError, LiveKitPocSession, mediaActionError, type DeviceKind, type DeviceOption, type PocSnapshot } from "@openmeet/media";
+import { describeMediaError, emptyStats, LiveKitPocSession, mediaActionError, type DeviceKind, type DeviceOption, type PocSnapshot } from "@openmeet/media";
+import desktopPackage from "../../package.json";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { TrackView } from "./TrackView";
 
@@ -8,7 +9,7 @@ const idleSnapshot: PocSnapshot = {
   tiles: [],
   participants: [],
   diagnostics: [],
-  stats: { available: false, packetsLost: null, jitterMs: null, rttMs: null },
+  stats: emptyStats(),
   microphone: false,
   camera: false,
   screen: false,
@@ -27,7 +28,7 @@ export function PocApp() {
   const [pending, setPending] = useState(false);
 
   function session(): LiveKitPocSession {
-    sessionRef.current ??= new LiveKitPocSession();
+    sessionRef.current ??= new LiveKitPocSession({ appVersion: desktopPackage.version });
     return sessionRef.current;
   }
 
@@ -170,7 +171,15 @@ export function PocApp() {
 
       <section>
         <h2>Participantes</h2>
-        {snapshot.participants.length === 0 ? <p>Ninguém na sala.</p> : <ul>{snapshot.participants.map((person) => <li key={person}>{person}</li>)}</ul>}
+        {snapshot.participants.length === 0 ? (
+          <p>Ninguém na sala.</p>
+        ) : (
+          <ul>
+            {snapshot.participants.map((person) => (
+              <li key={person}>{person}</li>
+            ))}
+          </ul>
+        )}
         <div className="tiles">
           {snapshot.tiles.map((tile) => (
             <TrackView key={tile.id} tile={tile} />
@@ -180,9 +189,14 @@ export function PocApp() {
 
       <section>
         <h2>Métricas</h2>
+        <p>
+          {snapshot.stats.userAgent ?? "user agent indisponível"} · app {snapshot.stats.appVersion ?? "—"}
+        </p>
         {snapshot.stats.available ? (
           <p>
-            perda {snapshot.stats.packetsLost ?? "—"} · jitter {snapshot.stats.jitterMs ?? "—"} ms · RTT {snapshot.stats.rttMs ?? "—"} ms
+            perda {snapshot.stats.packetsLost ?? "—"} · jitter {snapshot.stats.jitterMs ?? "—"} ms · RTT {snapshot.stats.rttMs ?? "—"} ms · candidato{" "}
+            {snapshot.stats.candidateType ?? "—"} · saída {snapshot.stats.outboundWidth ?? "—"}x{snapshot.stats.outboundHeight ?? "—"} @{" "}
+            {snapshot.stats.outboundFps ?? "—"} fps · superfície {snapshot.stats.displaySurface ?? "—"}
           </p>
         ) : (
           <p>Métricas ainda não disponíveis.</p>

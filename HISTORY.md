@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-18 — diagnóstico lê o relatório da faixa — Grok
+O resumo mostra candidato `host`, `srflx` ou `relay`, fps e resolução de saída, `displaySurface`, `userAgent` e a versão do app. O jitter guardado é o pior. O RTT é o do par nominado com maior atraso. A sessão chama `getRTCStatsReport()` da faixa. `pnpm --filter @openmeet/media test` 13 pass, build e `pnpm --filter @openmeet/desktop typecheck` exit 0. A janela não foi clicada. M01–M12 continuam NOT_RUN.
+
 ### 2026-10-18 — erro de mídia aparece na tela — Grok
 Microfone, câmera e tela mostram o erro no banner e travam o botão enquanto a ação está pendente. Cancelar o seletor de tela diz `NotAllowedError: permissão negada ou seleção cancelada`. `refreshStats` não rejeita mais a cada 5 s se o peer connection fechou. `pnpm --filter @openmeet/media test` 7 pass, build e `pnpm --filter @openmeet/desktop typecheck` exit 0. A janela não foi clicada. M01–M12 continuam NOT_RUN.
 

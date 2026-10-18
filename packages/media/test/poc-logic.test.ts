@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { describeMediaError, mediaActionError, sanitizeDiagnostic } from "../src/diagnostics.js";
-import { shouldAttachPlayback } from "../src/session.js";
+import { LiveKitPocSession, shouldAttachPlayback } from "../src/session.js";
 import { nextPhase } from "../src/phase.js";
-import { summarizeRtcStats } from "../src/stats.js";
+import { collectTrackReports, readDisplaySurface, summarizeRtcStats, toStatLike } from "../src/stats.js";
 
 test("local microphone is not played back on this PC", () => {
   assert.equal(shouldAttachPlayback({ media: "audio", local: true }), false);
@@ -26,7 +26,94 @@ test("stats summary reads loss, jitter and nominated RTT", () => {
     { type: "candidate-pair", nominated: false, currentRoundTripTime: 0.9 },
     { type: "candidate-pair", nominated: true, currentRoundTripTime: 0.04 },
   ]);
-  assert.deepEqual(summary, { available: true, packetsLost: 5, jitterMs: 10, rttMs: 40 });
+  assert.equal(summary.available, true);
+  assert.equal(summary.packetsLost, 5);
+  assert.equal(summary.jitterMs, 20);
+  assert.equal(summary.rttMs, 40);
+  assert.equal(summary.candidateType, null);
+});
+
+test("stats summary reports the selected candidate, outbound video and client context", () => {
+  const summary = summarizeRtcStats(
+    [
+      { type: "inbound-rtp", packetsLost: 1, jitter: 0.004 },
+      { type: "inbound-rtp", packetsLost: 1, jitter: 0.051 },
+      { type: "candidate-pair", nominated: true, currentRoundTripTime: 0.03, localCandidateId: "host-1" },
+      { type: "local-candidate", id: "host-1", candidateType: "host" },
+      { type: "candidate-pair", nominated: true, currentRoundTripTime: 0.18, localCandidateId: "relay-1" },
+      { type: "local-candidate", id: "relay-1", candidateType: "relay" },
+      { type: "candidate-pair", nominated: false, currentRoundTripTime: 0.9, localCandidateId: "srflx-ignored" },
+      { type: "local-candidate", id: "srflx-ignored", candidateType: "srflx" },
+      { type: "outbound-rtp", kind: "video", framesPerSecond: 15, frameWidth: 640, frameHeight: 360 },
+      { type: "outbound-rtp", kind: "video", framesPerSecond: 24.2, frameWidth: 1280, frameHeight: 720 },
+      { type: "outbound-rtp", kind: "audio", framesPerSecond: 50, frameWidth: 1, frameHeight: 1 },
+    ],
+    { displaySurface: "monitor", userAgent: "TestAgent/1", appVersion: "0.1.0" },
+  );
+  assert.equal(summary.jitterMs, 51);
+  assert.equal(summary.rttMs, 180);
+  assert.equal(summary.candidateType, "relay");
+  assert.equal(summary.outboundFps, 24);
+  assert.equal(summary.outboundWidth, 1280);
+  assert.equal(summary.outboundHeight, 720);
+  assert.equal(summary.displaySurface, "monitor");
+  assert.equal(summary.userAgent, "TestAgent/1");
+  assert.equal(summary.appVersion, "0.1.0");
+});
+
+test("stats summary reports host and srflx on the nominated pair", () => {
+  for (const candidateType of ["host", "srflx"] as const) {
+    const summary = summarizeRtcStats([
+      { type: "candidate-pair", nominated: true, currentRoundTripTime: 0.02, localCandidateId: "local" },
+      { type: "local-candidate", id: "local", candidateType },
+    ]);
+    assert.equal(summary.candidateType, candidateType);
+    assert.equal(summary.rttMs, 20);
+  }
+});
+
+test("display surface comes from the screen track settings", () => {
+  assert.equal(readDisplaySurface({ displaySurface: "window" }), "window");
+  assert.equal(readDisplaySurface({ displaySurface: "monitor" }), "monitor");
+  assert.equal(readDisplaySurface({}), null);
+});
+
+test("track stats keep candidate and outbound fields", () => {
+  const outbound = toStatLike({ type: "outbound-rtp", kind: "video", framesPerSecond: 30, frameWidth: 1920, frameHeight: 1080, id: "out" });
+  assert.equal(outbound.framesPerSecond, 30);
+  assert.equal(outbound.frameWidth, 1920);
+  assert.equal(outbound.frameHeight, 1080);
+  const pair = toStatLike({ type: "candidate-pair", nominated: true, currentRoundTripTime: 0.05, localCandidateId: "c1" });
+  assert.equal(pair.nominated, true);
+  assert.equal(pair.localCandidateId, "c1");
+  assert.equal(toStatLike({ type: "local-candidate", id: "c1", candidateType: "srflx" }).candidateType, "srflx");
+});
+
+test("a closed track report does not reject the stats refresh", async () => {
+  const report = new Map<string, { type: string; packetsLost: number; jitter: number }>([["in", { type: "inbound-rtp", packetsLost: 4, jitter: 0.03 }]]);
+  const stats = await collectTrackReports([
+    {
+      getRTCStatsReport: async () => {
+        throw new Error("pc closed");
+      },
+    },
+    { getRTCStatsReport: async () => report },
+  ]);
+  const summary = summarizeRtcStats(stats, { displaySurface: "window", userAgent: "TestAgent/1", appVersion: "0.1.0" });
+  assert.equal(summary.available, true);
+  assert.equal(summary.packetsLost, 4);
+  assert.equal(summary.jitterMs, 30);
+  assert.equal(summary.displaySurface, "window");
+  assert.equal(summary.appVersion, "0.1.0");
+});
+
+test("a new session refreshes stats from track reports", async () => {
+  const session = new LiveKitPocSession({ appVersion: "0.1.0" });
+  const stats = await session.refreshStats();
+  assert.equal(stats.available, false);
+  assert.equal(stats.appVersion, "0.1.0");
+  assert.equal(stats.candidateType, null);
+  assert.equal(stats.jitterMs, null);
 });
 
 test("stats stay unavailable when the report has no media fields", () => {
