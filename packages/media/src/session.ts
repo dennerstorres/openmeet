@@ -7,6 +7,7 @@ import {
   type RemoteParticipant,
   type RemoteTrack,
   type RemoteTrackPublication,
+  type TrackPublication,
 } from "livekit-client";
 import { describeMediaError, mediaActionError, sanitizeDiagnostic, type DiagnosticEvent } from "./diagnostics.js";
 import { classifyDisconnect, nextPhase, type ConnectionPhase } from "./phase.js";
@@ -37,12 +38,17 @@ export function shouldAttachPlayback(tile: Pick<TrackTile, "media" | "local">): 
   return tile.media !== "audio" || !tile.local;
 }
 
+export function shouldShowLiveVideo(tile: Pick<TrackTile, "media" | "muted">): boolean {
+  return tile.media === "video" && !tile.muted;
+}
+
 export interface TrackTile {
   id: string;
   identity: string;
   source: "microphone" | "camera" | "screen" | "screen-audio" | "unknown";
   media: "audio" | "video";
   local: boolean;
+  muted: boolean;
   attach: (element: HTMLMediaElement) => void;
   detach: (element: HTMLMediaElement) => void;
 }
@@ -135,6 +141,12 @@ export class LiveKitPocSession {
     this.room.on(RoomEvent.TrackUnsubscribed, (_track: RemoteTrack, publication: RemoteTrackPublication) => {
       this.tiles.delete(publication.trackSid);
       this.emit();
+    });
+    this.room.on(RoomEvent.TrackMuted, (publication: TrackPublication) => {
+      this.setTrackMuted(publication.trackSid, true);
+    });
+    this.room.on(RoomEvent.TrackUnmuted, (publication: TrackPublication) => {
+      this.setTrackMuted(publication.trackSid, false);
     });
     this.room.on(RoomEvent.LocalTrackPublished, (publication: LocalTrackPublication) => {
       if (publication.track) {
@@ -303,17 +315,32 @@ export class LiveKitPocSession {
     }
   }
 
+  upsertTile(tile: TrackTile): void {
+    this.tiles.set(tile.id, tile);
+    this.emit();
+  }
+
+  setTrackMuted(trackSid: string, muted: boolean): void {
+    const current = this.tiles.get(trackSid);
+    if (!current) {
+      return;
+    }
+    this.tiles.set(trackSid, { ...current, muted });
+    this.emit();
+  }
+
   private rememberTrack(track: Track, id: string, identity: string, local: boolean): void {
     if (track.kind !== Track.Kind.Audio && track.kind !== Track.Kind.Video) {
       return;
     }
     const media = track.kind === Track.Kind.Audio ? "audio" : "video";
-    this.tiles.set(id, {
+    this.upsertTile({
       id,
       identity,
       source: sourceName(track.source),
       media,
       local,
+      muted: track.isMuted,
       attach: (element) => {
         track.attach(element);
       },
@@ -321,7 +348,6 @@ export class LiveKitPocSession {
         track.detach(element);
       },
     });
-    this.emit();
   }
 
   private emit(): void {

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { DisconnectReason, Room, RoomEvent } from "livekit-client";
 import { describeMediaError, mediaActionError, sanitizeDiagnostic } from "../src/diagnostics.js";
-import { LiveKitPocSession, shouldAttachPlayback } from "../src/session.js";
+import { LiveKitPocSession, shouldAttachPlayback, shouldShowLiveVideo } from "../src/session.js";
 import { classifyDisconnect, nextPhase, type ConnectionPhase } from "../src/phase.js";
 import { collectTrackReports, readDisplaySurface, summarizeRtcStats, toStatLike } from "../src/stats.js";
 
@@ -25,6 +25,29 @@ test("device list shows labels after permission, refreshes, and marks the active
   assert.equal(refreshed[1]?.label, "Headset");
   assert.equal(refreshed[1]?.active, true);
   assert.equal(session.snapshot().devices[1]?.active, true);
+});
+
+test("a muted remote camera is not left as a live frame", () => {
+  const session = new LiveKitPocSession();
+  assert.equal(session.snapshot().tiles.length, 0);
+  const noop = () => undefined;
+  session.upsertTile({
+    id: "cam",
+    identity: "win-b",
+    source: "camera",
+    media: "video",
+    local: false,
+    muted: false,
+    attach: noop,
+    detach: noop,
+  });
+  assert.equal(shouldShowLiveVideo(session.snapshot().tiles[0]!), true);
+  session.setTrackMuted("cam", true);
+  assert.equal(session.snapshot().tiles[0]?.muted, true);
+  assert.equal(shouldShowLiveVideo(session.snapshot().tiles[0]!), false);
+  session.setTrackMuted("cam", false);
+  assert.equal(session.snapshot().tiles[0]?.muted, false);
+  assert.equal(shouldShowLiveVideo(session.snapshot().tiles[0]!), true);
 });
 
 test("local microphone is not played back on this PC", () => {

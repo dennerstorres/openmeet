@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react";
-import { shouldAttachPlayback, type TrackTile } from "@openmeet/media";
+import { shouldAttachPlayback, shouldShowLiveVideo, type TrackTile } from "@openmeet/media";
 
 export function TrackView({ tile }: { tile: TrackTile }) {
   const ref = useRef<HTMLVideoElement | HTMLAudioElement>(null);
@@ -21,6 +21,14 @@ export function TrackView({ tile }: { tile: TrackTile }) {
       <figure>
         <figcaption>{label}</figcaption>
         <p>sem retorno neste PC</p>
+      </figure>
+    );
+  }
+  if (tile.media === "video" && !shouldShowLiveVideo(tile)) {
+    return (
+      <figure>
+        <figcaption>{label}</figcaption>
+        <p>vídeo pausado</p>
       </figure>
     );
   }

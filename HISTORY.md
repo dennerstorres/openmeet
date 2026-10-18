@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-18 — câmera remota muda quando silencia — Grok
+`TrackMuted` e `TrackUnmuted` atualizam o tile. Câmera silenciada deixa de ser quadro ao vivo e a tela mostra `vídeo pausado`. `pnpm --filter @openmeet/media test` 16 pass, build e typecheck do desktop exit 0. A janela não foi clicada. M01–M12 continuam NOT_RUN.
+
 ### 2026-10-18 — dispositivos mostram rótulo e o ativo — Grok
 Depois da permissão, o rótulo aparece. Sem permissão, a lista diz `permissão pendente`. A lista atualiza no `MediaDevicesChanged` e marca o dispositivo ativo. `pnpm --filter @openmeet/media test` 15 pass, build e typecheck do desktop exit 0. A janela não foi clicada. M01–M12 continuam NOT_RUN.
 

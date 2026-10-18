@@ -1,5 +1,5 @@
 export { describeMediaError, mediaActionError, sanitizeDiagnostic } from "./diagnostics.js";
-export { LiveKitPocSession, shouldAttachPlayback } from "./session.js";
+export { LiveKitPocSession, shouldAttachPlayback, shouldShowLiveVideo } from "./session.js";
 export { emptyStats, summarizeRtcStats } from "./stats.js";
 export { nextPhase } from "./phase.js";
 export type { DiagnosticEvent } from "./diagnostics.js";
