@@ -23,7 +23,7 @@ Conferir `http://127.0.0.1:7880`. Parar com `docker compose -f infra/livekit/doc
 ## Como duas pessoas testam
 
 1. Copie `.env.example` para `.env` fora do Git. Preencha a chave e o segredo que o processo local do LiveKit mostrar. Ponha `POC_JOIN=1`.
-2. Suba o compose e o servidor: `pnpm --filter @openmeet/server dev`.
+2. Suba o compose e o servidor: `pnpm --filter @openmeet/server dev`. Esse comando lê o `.env` da raiz. Variável que já estiver no terminal continua valendo.
 3. Abra dois clientes Windows, com identidades diferentes e a mesma sala. O segundo precisa de outra máquina, ou de um build já instalado: o `tauri dev` usa a porta 1420 com `strictPort`. Nesse outro PC, deixa o token colado e a URL `wss`. O token sai só no primeiro PC. Com `POC_JOIN=1`, o servidor recusa subir se `HOST` não for loopback, e o join recusa IP ou `Host` que não sejam `127.0.0.1` ou `localhost`.
 4. Ligue microfone e câmera dos dois lados. Compartilhe um monitor, pare, compartilhe uma janela e pare.
 5. Derrube a rede por 5 segundos e anote se o estado vai a `reconnecting` e volta.

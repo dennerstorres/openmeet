@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-18 — servidor lê o .env da raiz — Grok
+`pnpm --filter @openmeet/server dev` e `start` usam `node --env-file-if-exists=../../.env`. Arquivo ausente não impede a subida. Variável já definida no terminal não é trocada. `pnpm --filter @openmeet/server test` 10 pass. O processo que aponta para o VPS não foi reiniciado. M01–M12 continuam NOT_RUN.
+
 ### 2026-10-18 — join do POC só em loopback — Grok
 Com `POC_JOIN=1`, `HOST` fora de loopback impede o boot. A rota não é registrada quando o POC está desligado. Pedido com IP ou `Host` de fora responde 404 e não emite token. `pnpm --filter @openmeet/server test` 9 pass e typecheck exit 0. A API que já estava em `127.0.0.1:3000` recarregou: join local 200 para `wss://livekit.dennerstorres.dev`, `Host` estranho 404. M01–M12 continuam NOT_RUN.
 
