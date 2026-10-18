@@ -10,6 +10,7 @@ const idleSnapshot: PocSnapshot = {
   tiles: [],
   participants: [],
   diagnostics: [],
+  devices: [],
   stats: emptyStats(),
   microphone: false,
   camera: false,
@@ -19,7 +20,6 @@ const idleSnapshot: PocSnapshot = {
 export function PocApp() {
   const sessionRef = useRef<LiveKitPocSession | null>(null);
   const [snapshot, setSnapshot] = useState<PocSnapshot>(idleSnapshot);
-  const [devices, setDevices] = useState<DeviceOption[]>([]);
   const [apiBase, setApiBase] = useState("http://127.0.0.1:3000");
   const [room, setRoom] = useState("poc");
   const [identity, setIdentity] = useState("");
@@ -60,7 +60,7 @@ export function PocApp() {
       const pasted = pastedToken.trim();
       const join = pasted.length > 0 ? parsePastedJoin(signalUrl, pasted) : await requestJoin(apiBase, room, identity);
       await session().connect(join.url, join.token);
-      setDevices(await session().listDevices());
+      await session().refreshDevices();
     } catch (caught) {
       setError(caught instanceof PocInputError ? caught.code : caught instanceof Error ? caught.message : "connect_failed");
     }
@@ -68,7 +68,7 @@ export function PocApp() {
 
   async function refreshDevices() {
     try {
-      setDevices(await session().listDevices());
+      await session().refreshDevices();
     } catch (caught) {
       setError(describeMediaError(caught));
     }
@@ -166,9 +166,9 @@ export function PocApp() {
         <button type="button" onClick={() => void refreshDevices()}>
           Atualizar dispositivos
         </button>
-        <DeviceSelect label="Entrada" kind="audioinput" devices={devices} onChange={onDevice} />
-        <DeviceSelect label="Saída" kind="audiooutput" devices={devices} onChange={onDevice} />
-        <DeviceSelect label="Câmera" kind="videoinput" devices={devices} onChange={onDevice} />
+        <DeviceSelect label="Entrada" kind="audioinput" devices={snapshot.devices} onChange={onDevice} />
+        <DeviceSelect label="Saída" kind="audiooutput" devices={snapshot.devices} onChange={onDevice} />
+        <DeviceSelect label="Câmera" kind="videoinput" devices={snapshot.devices} onChange={onDevice} />
       </section>
 
       <section>
@@ -248,10 +248,12 @@ function DeviceSelect({
   onChange: (kind: DeviceKind, deviceId: string) => Promise<void>;
 }) {
   const options = devices.filter((device) => device.kind === kind);
+  const active = options.find((device) => device.active);
   return (
     <label>
       {label}
       <select
+        value={active?.deviceId ?? ""}
         onChange={(event) => {
           void onChange(kind, event.currentTarget.value);
         }}
@@ -259,7 +261,7 @@ function DeviceSelect({
         <option value="">padrão</option>
         {options.map((device) => (
           <option key={device.deviceId} value={device.deviceId}>
-            {device.label}
+            {device.active ? `${device.label} (ativo)` : device.label}
           </option>
         ))}
       </select>

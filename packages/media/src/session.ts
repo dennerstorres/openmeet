@@ -18,6 +18,19 @@ export interface DeviceOption {
   deviceId: string;
   label: string;
   kind: DeviceKind;
+  active: boolean;
+}
+
+export function buildDeviceList(
+  found: Array<{ deviceId: string; label: string; kind: DeviceKind }>,
+  activeIds: Partial<Record<DeviceKind, string | undefined>>,
+): DeviceOption[] {
+  return found.map((device) => ({
+    deviceId: device.deviceId,
+    label: device.label.length > 0 ? device.label : "permissão pendente",
+    kind: device.kind,
+    active: device.deviceId.length > 0 && activeIds[device.kind] === device.deviceId,
+  }));
 }
 
 export function shouldAttachPlayback(tile: Pick<TrackTile, "media" | "local">): boolean {
@@ -40,6 +53,7 @@ export interface PocSnapshot {
   tiles: TrackTile[];
   participants: string[];
   diagnostics: DiagnosticEvent[];
+  devices: DeviceOption[];
   stats: RtcSnapshot;
   microphone: boolean;
   camera: boolean;
@@ -84,6 +98,7 @@ export class LiveKitPocSession {
   private phase: ConnectionPhase = "idle";
   private disconnectReason: string | null = null;
   private explicitLeave = false;
+  private devices: DeviceOption[] = [];
   private stats: RtcSnapshot;
 
   constructor(options?: { appVersion?: string; room?: Room }) {
@@ -136,6 +151,11 @@ export class LiveKitPocSession {
     this.room.on(RoomEvent.ParticipantDisconnected, () => {
       this.emit();
     });
+    this.room.on(RoomEvent.MediaDevicesChanged, () => {
+      void this.refreshDevices().catch((error: unknown) => {
+        this.note("error", describeMediaError(error));
+      });
+    });
   }
 
   subscribe(listener: Listener): () => void {
@@ -156,6 +176,7 @@ export class LiveKitPocSession {
         (identity) => identity.length > 0,
       ),
       diagnostics: [...this.diagnostics],
+      devices: [...this.devices],
       stats: this.stats,
       microphone: local.isMicrophoneEnabled,
       camera: local.isCameraEnabled,
@@ -187,36 +208,48 @@ export class LiveKitPocSession {
 
   async setMicrophone(enabled: boolean): Promise<void> {
     await this.toggle(() => this.room.localParticipant.setMicrophoneEnabled(enabled), "microphone");
+    await this.refreshDevices();
   }
 
   async setCamera(enabled: boolean): Promise<void> {
     await this.toggle(() => this.room.localParticipant.setCameraEnabled(enabled), "camera");
+    await this.refreshDevices();
   }
 
   async setScreenShare(enabled: boolean): Promise<void> {
     await this.toggle(() => this.room.localParticipant.setScreenShareEnabled(enabled, { audio: false }), "screen");
   }
 
-  async listDevices(): Promise<DeviceOption[]> {
+  applyDeviceList(
+    found: Array<{ deviceId: string; label: string; kind: DeviceKind }>,
+    activeIds: Partial<Record<DeviceKind, string | undefined>>,
+  ): DeviceOption[] {
+    this.devices = buildDeviceList(found, activeIds);
+    this.emit();
+    return this.devices;
+  }
+
+  async refreshDevices(): Promise<DeviceOption[]> {
     const kinds: DeviceKind[] = ["audioinput", "audiooutput", "videoinput"];
-    const devices: DeviceOption[] = [];
+    const found: Array<{ deviceId: string; label: string; kind: DeviceKind }> = [];
+    const activeIds: Partial<Record<DeviceKind, string | undefined>> = {};
     for (const kind of kinds) {
-      const found = await Room.getLocalDevices(kind, false);
-      for (const device of found) {
-        devices.push({
-          deviceId: device.deviceId,
-          label: device.label.length > 0 ? device.label : device.deviceId,
-          kind,
-        });
+      activeIds[kind] = this.room.getActiveDevice(kind);
+      const listed = await Room.getLocalDevices(kind, false);
+      for (const device of listed) {
+        found.push({ deviceId: device.deviceId, label: device.label, kind });
       }
     }
-    return devices;
+    return this.applyDeviceList(found, activeIds);
   }
 
   async selectDevice(kind: DeviceKind, deviceId: string): Promise<void> {
     try {
       const switched = await this.room.switchActiveDevice(kind, deviceId);
       this.note(switched ? "info" : "error", switched ? `device selected: ${kind}` : `device switch failed: ${kind}`);
+      if (switched) {
+        await this.refreshDevices();
+      }
     } catch (error) {
       this.note("error", describeMediaError(error));
       throw error;

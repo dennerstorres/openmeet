@@ -6,6 +6,27 @@ import { LiveKitPocSession, shouldAttachPlayback } from "../src/session.js";
 import { classifyDisconnect, nextPhase, type ConnectionPhase } from "../src/phase.js";
 import { collectTrackReports, readDisplaySurface, summarizeRtcStats, toStatLike } from "../src/stats.js";
 
+test("device list shows labels after permission, refreshes, and marks the active device", () => {
+  const session = new LiveKitPocSession();
+  assert.deepEqual(session.snapshot().devices, []);
+  const hidden = session.applyDeviceList([{ deviceId: "mic-1", label: "", kind: "audioinput" }], { audioinput: "mic-1" });
+  assert.equal(hidden[0]?.label, "permissão pendente");
+  assert.equal(hidden[0]?.active, true);
+
+  const refreshed = session.applyDeviceList(
+    [
+      { deviceId: "mic-1", label: "Microfone interno", kind: "audioinput" },
+      { deviceId: "mic-2", label: "Headset", kind: "audioinput" },
+    ],
+    { audioinput: "mic-2" },
+  );
+  assert.equal(refreshed[0]?.label, "Microfone interno");
+  assert.equal(refreshed[0]?.active, false);
+  assert.equal(refreshed[1]?.label, "Headset");
+  assert.equal(refreshed[1]?.active, true);
+  assert.equal(session.snapshot().devices[1]?.active, true);
+});
+
 test("local microphone is not played back on this PC", () => {
   assert.equal(shouldAttachPlayback({ media: "audio", local: true }), false);
   assert.equal(shouldAttachPlayback({ media: "audio", local: false }), true);

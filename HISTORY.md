@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-18 — dispositivos mostram rótulo e o ativo — Grok
+Depois da permissão, o rótulo aparece. Sem permissão, a lista diz `permissão pendente`. A lista atualiza no `MediaDevicesChanged` e marca o dispositivo ativo. `pnpm --filter @openmeet/media test` 15 pass, build e typecheck do desktop exit 0. A janela não foi clicada. M01–M12 continuam NOT_RUN.
+
 ### 2026-10-18 — mute do microfone continua capturando — Grok
 `stopMicTrackOnMute` permanece `false`. Desligar o microfone silencia a publicação e não para a captura. M01–M12 continuam NOT_RUN.
 
