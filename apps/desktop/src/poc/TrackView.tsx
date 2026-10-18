@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react";
-import type { TrackTile } from "@openmeet/media";
+import { shouldAttachPlayback, type TrackTile } from "@openmeet/media";
 
 export function TrackView({ tile }: { tile: TrackTile }) {
   const ref = useRef<HTMLVideoElement | HTMLAudioElement>(null);
@@ -16,6 +16,14 @@ export function TrackView({ tile }: { tile: TrackTile }) {
   }, [tile]);
 
   const label = `${tile.local ? "local" : tile.identity} ${tile.source}`;
+  if (!shouldAttachPlayback(tile)) {
+    return (
+      <figure>
+        <figcaption>{label}</figcaption>
+        <p>sem retorno neste PC</p>
+      </figure>
+    );
+  }
   if (tile.media === "audio") {
     return (
       <figure>

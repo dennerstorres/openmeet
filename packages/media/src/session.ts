@@ -11,6 +11,10 @@ export interface DeviceOption {
   kind: DeviceKind;
 }
 
+export function shouldAttachPlayback(tile: Pick<TrackTile, "media" | "local">): boolean {
+  return tile.media !== "audio" || !tile.local;
+}
+
 export interface TrackTile {
   id: string;
   identity: string;

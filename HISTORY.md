@@ -1,5 +1,11 @@
 # HISTORY — registro cronológico
 
+### 2026-10-18 — microfone local sem retorno — Grok
+Achado A2: a faixa local de áudio não gera mais `<audio>`. `shouldAttachPlayback` recusa áudio local e mantém o áudio remoto. `pnpm --filter @openmeet/media test` 6 pass. `pnpm --filter @openmeet/media build` e `pnpm --filter @openmeet/desktop typecheck` exit 0. A janela não foi clicada. M01–M12 continuam NOT_RUN.
+
+### 2026-10-18 — win-b connected na mesma sala do VPS — Grok
+Operador confirmou Estado `connected` no outro PC. Log 20:09:38Z: `win-b` (`PA_UVaVaTfk9Rxc`) entrou em `poc` (`RM_4HqoVhrthNKj`) com `numParticipants` 1. 20:09:39Z: `participant active`, `connectionType` `udp`, candidato local na porta 7882. Dois clientes. M01–M12 continuam NOT_RUN.
+
 ### 2026-10-18 — campo de token colado no POC — Grok
 `PocApp` entra com token colado e URL `wss` quando o campo Token não está vazio. Vazio, segue o `POST` local. `parsePastedJoin` recusa `ws` público. `pnpm --filter @openmeet/shared test` 7 pass. `pnpm --filter @openmeet/shared build` e `pnpm --filter @openmeet/desktop typecheck` exit 0. A janela Tauri não foi clicada daqui. M01–M12 continuam NOT_RUN.
 

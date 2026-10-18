@@ -1,8 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { describeMediaError, sanitizeDiagnostic } from "../src/diagnostics.js";
+import { shouldAttachPlayback } from "../src/session.js";
 import { nextPhase } from "../src/phase.js";
 import { summarizeRtcStats } from "../src/stats.js";
+
+test("local microphone is not played back on this PC", () => {
+  assert.equal(shouldAttachPlayback({ media: "audio", local: true }), false);
+  assert.equal(shouldAttachPlayback({ media: "audio", local: false }), true);
+  assert.equal(shouldAttachPlayback({ media: "video", local: true }), true);
+});
 
 test("connection phase shows reconnect and latches fatal until a new attempt", () => {
   assert.equal(nextPhase("connected", "reconnecting"), "reconnecting");
