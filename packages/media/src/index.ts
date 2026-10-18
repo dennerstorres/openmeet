@@ -1,4 +1,4 @@
-export { describeMediaError, sanitizeDiagnostic } from "./diagnostics.js";
+export { describeMediaError, mediaActionError, sanitizeDiagnostic } from "./diagnostics.js";
 export { LiveKitPocSession, shouldAttachPlayback } from "./session.js";
 export { emptyStats, summarizeRtcStats } from "./stats.js";
 export { nextPhase } from "./phase.js";

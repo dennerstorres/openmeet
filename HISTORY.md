@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-18 — erro de mídia aparece na tela — Grok
+Microfone, câmera e tela mostram o erro no banner e travam o botão enquanto a ação está pendente. Cancelar o seletor de tela diz `NotAllowedError: permissão negada ou seleção cancelada`. `refreshStats` não rejeita mais a cada 5 s se o peer connection fechou. `pnpm --filter @openmeet/media test` 7 pass, build e `pnpm --filter @openmeet/desktop typecheck` exit 0. A janela não foi clicada. M01–M12 continuam NOT_RUN.
+
 ### 2026-10-18 — servidor lê o .env da raiz — Grok
 `pnpm --filter @openmeet/server dev` e `start` usam `node --env-file-if-exists=../../.env`. Arquivo ausente não impede a subida. Variável já definida no terminal não é trocada. `pnpm --filter @openmeet/server test` 10 pass. O processo que aponta para o VPS não foi reiniciado. M01–M12 continuam NOT_RUN.
 

@@ -1,5 +1,5 @@
 import { Room, RoomEvent, Track, type LocalTrackPublication, type RemoteParticipant, type RemoteTrack, type RemoteTrackPublication } from "livekit-client";
-import { describeMediaError, sanitizeDiagnostic, type DiagnosticEvent } from "./diagnostics.js";
+import { describeMediaError, mediaActionError, sanitizeDiagnostic, type DiagnosticEvent } from "./diagnostics.js";
 import { nextPhase, type ConnectionPhase } from "./phase.js";
 import { emptyStats, summarizeRtcStats, type RtcSnapshot, type StatLike } from "./stats.js";
 
@@ -222,7 +222,14 @@ export class LiveKitPocSession {
       this.emit();
       return this.stats;
     }
-    const reports = await Promise.all([manager.publisher.getStats(), manager.subscriber?.getStats()]);
+    let reports: Array<RTCStatsReport | undefined>;
+    try {
+      reports = await Promise.all([manager.publisher.getStats(), manager.subscriber?.getStats()]);
+    } catch {
+      this.stats = emptyStats();
+      this.emit();
+      return this.stats;
+    }
     const stats: StatLike[] = [];
     for (const report of reports) {
       report?.forEach((item) => {
@@ -239,7 +246,7 @@ export class LiveKitPocSession {
       await action();
       this.note("info", `${label} updated`);
     } catch (error) {
-      this.note("error", describeMediaError(error));
+      this.note("error", mediaActionError(label, error));
       throw error;
     }
   }

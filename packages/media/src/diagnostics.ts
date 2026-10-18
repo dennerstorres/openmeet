@@ -17,6 +17,14 @@ export function sanitizeDiagnostic(message: string, secrets: readonly string[] =
   return sanitized.slice(0, 300);
 }
 
+export function mediaActionError(action: string, error: unknown): string {
+  const described = describeMediaError(error);
+  if (action === "screen" && described.startsWith("NotAllowedError")) {
+    return "NotAllowedError: permissão negada ou seleção cancelada";
+  }
+  return described;
+}
+
 export function describeMediaError(error: unknown): string {
   if (typeof error === "object" && error !== null && "name" in error && "message" in error) {
     const name = error.name;

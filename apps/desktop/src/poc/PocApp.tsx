@@ -1,5 +1,5 @@
 import { parseApiBase, parseIdentity, parseJoinResponse, parsePastedJoin, parseRoomName, PocInputError } from "@openmeet/shared";
-import { LiveKitPocSession, type DeviceKind, type DeviceOption, type PocSnapshot } from "@openmeet/media";
+import { describeMediaError, LiveKitPocSession, mediaActionError, type DeviceKind, type DeviceOption, type PocSnapshot } from "@openmeet/media";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { TrackView } from "./TrackView";
 
@@ -24,6 +24,7 @@ export function PocApp() {
   const [signalUrl, setSignalUrl] = useState("wss://livekit.dennerstorres.dev");
   const [pastedToken, setPastedToken] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   function session(): LiveKitPocSession {
     sessionRef.current ??= new LiveKitPocSession();
@@ -39,7 +40,11 @@ export function PocApp() {
       return;
     }
     const timer = window.setInterval(() => {
-      void session().refreshStats();
+      void session()
+        .refreshStats()
+        .catch((caught: unknown) => {
+          setError(describeMediaError(caught));
+        });
     }, 5000);
     return () => {
       window.clearInterval(timer);
@@ -60,7 +65,23 @@ export function PocApp() {
   }
 
   async function refreshDevices() {
-    setDevices(await session().listDevices());
+    try {
+      setDevices(await session().listDevices());
+    } catch (caught) {
+      setError(describeMediaError(caught));
+    }
+  }
+
+  async function runMedia(action: "microphone" | "camera" | "screen", work: () => Promise<void>) {
+    setPending(true);
+    setError(null);
+    try {
+      await work();
+    } catch (caught) {
+      setError(mediaActionError(action, caught));
+    } finally {
+      setPending(false);
+    }
   }
 
   async function onDevice(kind: DeviceKind, deviceId: string) {
@@ -70,7 +91,7 @@ export function PocApp() {
     try {
       await session().selectDevice(kind, deviceId);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "device_failed");
+      setError(describeMediaError(caught));
     }
   }
 
@@ -130,13 +151,13 @@ export function PocApp() {
 
       <section>
         <h2>Controles</h2>
-        <button type="button" disabled={!connected} onClick={() => void session().setMicrophone(!snapshot.microphone)}>
+        <button type="button" disabled={!connected || pending} onClick={() => void runMedia("microphone", () => session().setMicrophone(!snapshot.microphone))}>
           Microfone {snapshot.microphone ? "ligado" : "desligado"}
         </button>
-        <button type="button" disabled={!connected} onClick={() => void session().setCamera(!snapshot.camera)}>
+        <button type="button" disabled={!connected || pending} onClick={() => void runMedia("camera", () => session().setCamera(!snapshot.camera))}>
           Câmera {snapshot.camera ? "ligada" : "desligada"}
         </button>
-        <button type="button" disabled={!connected} onClick={() => void session().setScreenShare(!snapshot.screen)}>
+        <button type="button" disabled={!connected || pending} onClick={() => void runMedia("screen", () => session().setScreenShare(!snapshot.screen))}>
           {snapshot.screen ? "Parar compartilhamento" : "Compartilhar tela"}
         </button>
         <button type="button" onClick={() => void refreshDevices()}>

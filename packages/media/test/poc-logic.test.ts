@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { describeMediaError, sanitizeDiagnostic } from "../src/diagnostics.js";
+import { describeMediaError, mediaActionError, sanitizeDiagnostic } from "../src/diagnostics.js";
 import { shouldAttachPlayback } from "../src/session.js";
 import { nextPhase } from "../src/phase.js";
 import { summarizeRtcStats } from "../src/stats.js";
@@ -38,6 +38,12 @@ test("diagnostics drop JWTs and configured secrets", () => {
   assert.equal(message.includes("eyJ"), false);
   assert.equal(message.includes("unit-test-secret"), false);
   assert.match(message, /\[redacted-jwt\]/);
+});
+
+test("screen denial says the picker may have been cancelled", () => {
+  const error = { name: "NotAllowedError", message: "Permission denied" };
+  assert.equal(mediaActionError("screen", error), "NotAllowedError: permissão negada ou seleção cancelada");
+  assert.equal(mediaActionError("microphone", error), "NotAllowedError: Permission denied");
 });
 
 test("media errors keep name and message only", () => {
