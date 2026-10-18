@@ -12,6 +12,9 @@ M11 fica no G4. M12 fica no G3.
 ## Observação
 Não concluir fase por implementação superficial ou mocks. Dependências externas e validações reais precisam de evidência ou status WAITING_VALIDATION.
 
+## Mute do microfone
+`stopMicTrackOnMute` permanece `false`. Desligar o microfone é mute de publicação: a captura continua e o indicador do Windows pode ficar aceso. A faixa não é parada de propósito.
+
 ## Execução 2026-10-18
 F02-01 IMPLEMENTED: compose em `infra/livekit/docker-compose.yml` subiu `livekit/livekit-server:v1.13.10` em `127.0.0.1:7880` (HTTP 200) e o container foi removido.
 

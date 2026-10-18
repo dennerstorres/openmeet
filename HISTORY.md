@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-18 — mute do microfone continua capturando — Grok
+`stopMicTrackOnMute` permanece `false`. Desligar o microfone silencia a publicação e não para a captura. M01–M12 continuam NOT_RUN.
+
 ### 2026-10-18 — G2 fecha em M01–M10 — Grok
 G2 passa a ser M01–M10 mais os itens do ADR 0004. M11 fica no G4 e M12 no G3. Nenhum caso virou PASS. Sem GO/NO-GO. M01–M12 continuam NOT_RUN.
 
