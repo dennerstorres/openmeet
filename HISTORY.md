@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-18 — o que ainda não rodou — Grok
+M01–M12 continuam NOT_RUN. Não houve mídia nos dois PCs: microfone nos dois sentidos, câmera, tela e janela no segundo PC. M4, a permissão ao vivo num perfil limpo do app empacotado, não rodou. O Claude não deu GO nem NO-GO. F02-06 segue BLOCKED. F03+ segue PENDING.
+
 ### 2026-10-18 — câmera remota muda quando silencia — Grok
 `TrackMuted` e `TrackUnmuted` atualizam o tile. Câmera silenciada deixa de ser quadro ao vivo e a tela mostra `vídeo pausado`. `pnpm --filter @openmeet/media test` 16 pass, build e typecheck do desktop exit 0. A janela não foi clicada. M01–M12 continuam NOT_RUN.
 
