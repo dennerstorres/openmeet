@@ -1,0 +1,24 @@
+{
+  "name": "@openmeet/server",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test test/health.test.ts test/poc-join.test.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.3.1",
+    "@openmeet/shared": "workspace:*",
+    "fastify": "^5.12.7",
+    "livekit-server-sdk": "^2.19.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3"
+  }
+}

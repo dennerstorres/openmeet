@@ -1,0 +1,30 @@
+{
+  "name": "openmeet",
+  "private": true,
+  "version": "0.0.0",
+  "description": "OpenMeet monorepo. Codename; not a published application.",
+  "packageManager": "pnpm@10.30.2",
+  "engines": {
+    "node": ">=24.18.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "scripts": {
+    "test": "pnpm --filter @openmeet/shared build && node --test scripts/workspace.test.mjs && pnpm -r --if-present test",
+    "lint": "eslint .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm --filter @openmeet/shared --filter @openmeet/media build && pnpm -r --if-present typecheck",
+    "build": "pnpm -r --if-present build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.13.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "typescript-eslint": "^8.71.2"
+  }
+}

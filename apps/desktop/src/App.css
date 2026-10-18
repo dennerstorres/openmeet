@@ -1,0 +1,62 @@
+:root {
+  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  color: #14213d;
+  background: #f4f1ea;
+}
+
+body {
+  margin: 0;
+}
+
+.poc {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+form,
+section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 20px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+  padding: 8px;
+}
+
+.token {
+  flex-basis: 100%;
+}
+
+textarea {
+  width: min(100%, 520px);
+  min-height: 72px;
+}
+
+video {
+  width: 280px;
+  background: #111;
+}
+
+.error {
+  color: #9b2226;
+}
+
+.tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}

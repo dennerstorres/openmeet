@@ -1,0 +1,1 @@
+Revise o diff desta branch como arquiteto e segurança, consultando AGENTS.md, SPEC.md, docs/adr, orchestration/QUALITY_GATES.md e PLAN.md. Não altere arquivos salvo solicitação explícita. Entregue achados com severidade, localização, causa, correção proposta, testes faltantes e decisão APPROVE/CHANGES_REQUIRED/BLOCKED. Não infira aprovação de POC sem matriz preenchida.

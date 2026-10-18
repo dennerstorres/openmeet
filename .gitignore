@@ -1,0 +1,16 @@
+node_modules/
+dist/
+target/
+.env
+.env.*
+!.env.example
+*.log
+coverage/
+.DS_Store
+*.pem
+*.key
+.ssh-key
+*.p12
+*.pfx
+*.db
+!.gitkeep

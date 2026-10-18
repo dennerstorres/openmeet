@@ -1,0 +1,1 @@
+Faça code review da branch atual em relação à base. Leia AGENTS.md, PLAN.md, SPEC.md e orchestration/QUALITY_GATES.md. Foque em bugs reais, autorização, ciclo de vida de tracks WebRTC e regressões. Cite arquivo/linha, passos de reprodução, impacto e teste. Não altere código; classifique APPROVE/CHANGES_REQUIRED/BLOCKED. Diferencie testes executados de sugestões.
