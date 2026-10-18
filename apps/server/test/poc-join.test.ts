@@ -25,6 +25,35 @@ test("POC join stays hidden unless it is explicitly enabled", async () => {
   });
   assert.equal(response.statusCode, 404);
   assert.equal(response.body.includes(apiSecret), false);
+  assert.equal(response.body.includes("poc_disabled"), false);
+  await app.close();
+});
+
+test("POC join refuses to boot when the bind is not loopback", async () => {
+  await assert.rejects(() => buildApp({ logger: false, env: pocEnv({ HOST: "0.0.0.0" }) }), /loopback HOST/);
+});
+
+test("POC join refuses a request that did not come from loopback", async () => {
+  const app = await buildApp({ logger: false, env: pocEnv({ HOST: "127.0.0.1" }) });
+  const remoteIp = await app.inject({
+    method: "POST",
+    url: "/api/v1/poc/join",
+    remoteAddress: "203.0.113.10",
+    headers: { host: "127.0.0.1:3000" },
+    payload: { room: "poc", identity: "win-a" },
+  });
+  assert.equal(remoteIp.statusCode, 404);
+  assert.equal(remoteIp.body.includes("eyJ"), false);
+
+  const remoteHost = await app.inject({
+    method: "POST",
+    url: "/api/v1/poc/join",
+    remoteAddress: "127.0.0.1",
+    headers: { host: "evil.example" },
+    payload: { room: "poc", identity: "win-a" },
+  });
+  assert.equal(remoteHost.statusCode, 404);
+  assert.equal(remoteHost.body.includes("eyJ"), false);
   await app.close();
 });
 
