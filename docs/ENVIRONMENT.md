@@ -37,3 +37,6 @@ pnpm build
 ```
 
 O build do desktop neste gate é o frontend Vite. O shell nativo é `cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml` com o Cargo no `PATH`. `pnpm tauri dev` abre janela e não foi usado como prova de câmera, microfone ou tela.
+
+## Senha
+Argon2id, memória 19456 KiB, 2 iterações, paralelismo 1. O resultado vai para `users.password_hash`. Refresh e bootstrap guardam SHA-256, nunca o segredo. `AUTH_SECRET` assina o access token por 15 minutos. O refresh dura 30 dias e gira a cada uso.

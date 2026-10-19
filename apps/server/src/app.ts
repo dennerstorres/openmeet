@@ -1,10 +1,12 @@
 import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance } from "fastify";
+import { registerAuth } from "./auth/routes.js";
+import type { MigrationClient } from "./db/migrate.js";
 import { registerPocJoin, type AppEnv } from "./poc-join.js";
 
 const DEV_ORIGINS = ["http://localhost:1420", "http://127.0.0.1:1420", "http://tauri.localhost", "tauri://localhost"];
 
-export async function buildApp(options?: { logger?: boolean; env?: AppEnv }): Promise<FastifyInstance> {
+export async function buildApp(options?: { logger?: boolean; env?: AppEnv; db?: MigrationClient }): Promise<FastifyInstance> {
   const env = options?.env ?? process.env;
   const app = Fastify({
     logger: options?.logger ?? {
@@ -30,6 +32,7 @@ export async function buildApp(options?: { logger?: boolean; env?: AppEnv }): Pr
     };
   });
 
+  registerAuth(app, env, options?.db);
   registerPocJoin(app, env);
   return app;
 }

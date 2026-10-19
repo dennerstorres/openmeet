@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-18 — bootstrap, login e sessão — Grok
+F03-02 ficou `IMPLEMENTED`. Bootstrap de um admin, login, refresh com rotação e logout. Senha em Argon2id (19456 KiB, 2 iterações, paralelismo 1). Sessão, bootstrap e senha ficam só como hash. `pnpm --filter @openmeet/server typecheck` exit 0. `pnpm --filter @openmeet/server test` 13 pass, fail 0, Windows, PGlite. `/health/ready` segue `not_configured`. A API no ar não recebeu banco. F03-03 não começou. M01–M12 seguem NOT_RUN. Sem GO/NO-GO.
+
 ### 2026-10-18 — schema de identidade — Grok
 F03-01 ficou `IMPLEMENTED`. SQL `apps/server/drizzle/0001_identity.sql` e o schema Drizzle cobrem usuários, sessões, salas, memberships, convites, auditoria, settings e bootstrap. Só entram hashes. `pnpm --filter @openmeet/server typecheck` exit 0. `pnpm --filter @openmeet/server test` 11 pass, fail 0, Windows. A migration rodou duas vezes no PGlite, não no VPS. `/health/ready` segue `not_configured`. F03-02 não começou. Sem commit. M01–M12 seguem NOT_RUN. Sem GO/NO-GO.
 

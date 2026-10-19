@@ -1,0 +1,169 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { PGlite } from "@electric-sql/pglite";
+import { buildApp } from "../src/app.js";
+import { applyMigrations, type MigrationClient } from "../src/db/migrate.js";
+import { hashSecret } from "../src/auth/tokens.js";
+import { signAccessToken } from "../src/auth/tokens.js";
+
+const bootstrapToken = "unit-test-bootstrap-token";
+const authSecret = "unit-test-auth-secret-do-not-leak";
+const password = "correct-horse-battery";
+
+function pgliteClient(db: PGlite): MigrationClient {
+  const client: MigrationClient = {
+    exec: async (statement) => {
+      await db.exec(statement);
+    },
+    query: async (statement, params) => {
+      const result = await db.query<Record<string, unknown>>(statement, params === undefined ? [] : [...params]);
+      return { rows: result.rows.map((row) => ({ ...row })) };
+    },
+    transaction: async (run) => {
+      await db.exec("begin");
+      try {
+        const value = await run(client);
+        await db.exec("commit");
+        return value;
+      } catch (error) {
+        await db.exec("rollback");
+        throw error;
+      }
+    },
+  };
+  return client;
+}
+
+test("auth stays unconfigured until a database and secrets exist", async () => {
+  const app = await buildApp({ logger: false });
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/v1/auth/bootstrap",
+    payload: { token: bootstrapToken, username: "admin", password, displayName: "Admin" },
+  });
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.json().error, "auth_unconfigured");
+  assert.equal(response.body.includes(bootstrapToken), false);
+  assert.equal(response.body.includes(password), false);
+  const ready = await app.inject({ method: "GET", url: "/health/ready" });
+  assert.deepEqual(ready.json(), { status: "ok", checks: { database: "not_configured" } });
+  await app.close();
+});
+
+test("bootstrap, login, refresh and logout keep only hashes", async () => {
+  const pg = new PGlite();
+  const db = pgliteClient(pg);
+  await applyMigrations(db);
+  const app = await buildApp({
+    logger: false,
+    env: { AUTH_SECRET: authSecret, BOOTSTRAP_TOKEN: bootstrapToken },
+    db,
+  });
+  try {
+    const ready = await app.inject({ method: "GET", url: "/health/ready" });
+    assert.equal(ready.json().checks.database, "not_configured");
+
+    const rejected = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/bootstrap",
+      payload: { token: "wrong-bootstrap-token-value", username: "admin", password, displayName: "Admin" },
+    });
+    assert.equal(rejected.statusCode, 401);
+    assert.equal(rejected.json().error, "bootstrap_rejected");
+
+    const weak = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/bootstrap",
+      payload: { token: bootstrapToken, username: "admin", password: "short", displayName: "Admin" },
+    });
+    assert.equal(weak.statusCode, 400);
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/bootstrap",
+      payload: { token: bootstrapToken, username: "admin", password, displayName: "Admin" },
+    });
+    assert.equal(created.statusCode, 201);
+    const session = created.json() as { accessToken: string; refreshToken: string; expiresIn: number; user: { role: string } };
+    assert.equal(session.user.role, "admin");
+    assert.equal(session.expiresIn, 900);
+    assert.equal(created.body.includes(password), false);
+    assert.equal(created.body.includes(bootstrapToken), false);
+
+    const closed = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/bootstrap",
+      payload: { token: bootstrapToken, username: "other", password, displayName: "Other" },
+    });
+    assert.equal(closed.statusCode, 409);
+
+    const stored = await db.query("select password_hash from users where username = 'admin'");
+    const passwordHash = stored.rows[0]?.password_hash;
+    assert.equal(typeof passwordHash, "string");
+    assert.equal(String(passwordHash).startsWith("$argon2id$"), true);
+    assert.equal(String(passwordHash).includes("m=19456,t=2,p=1"), true);
+    assert.equal(passwordHash === password, false);
+
+    const hashes = await db.query("select token_hash from refresh_sessions");
+    assert.equal(
+      hashes.rows.some((row) => row.token_hash === session.refreshToken),
+      false,
+    );
+    assert.equal(
+      hashes.rows.some((row) => row.token_hash === hashSecret(session.refreshToken)),
+      true,
+    );
+    const install = await db.query("select token_hash from bootstrap_tokens");
+    assert.equal(install.rows[0]?.token_hash, hashSecret(bootstrapToken));
+
+    const me = await app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: `Bearer ${session.accessToken}` } });
+    assert.equal(me.statusCode, 200);
+    assert.equal(me.json().username, "admin");
+    const anonymous = await app.inject({ method: "GET", url: "/api/v1/auth/me" });
+    assert.equal(anonymous.statusCode, 401);
+    const expired = signAccessToken(authSecret, me.json().id as string, Date.now() - 16 * 60 * 1000);
+    const stale = await app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: `Bearer ${expired}` } });
+    assert.equal(stale.statusCode, 401);
+
+    const badLogin = await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { username: "admin", password: "wrong-password-value" } });
+    assert.equal(badLogin.statusCode, 401);
+    assert.equal(badLogin.body.includes(password), false);
+    const loggedIn = await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { username: "admin", password } });
+    assert.equal(loggedIn.statusCode, 200);
+    const second = loggedIn.json() as { refreshToken: string };
+
+    const rotated = await app.inject({ method: "POST", url: "/api/v1/auth/refresh", payload: { refreshToken: second.refreshToken } });
+    assert.equal(rotated.statusCode, 200);
+    const third = rotated.json() as { refreshToken: string; accessToken: string };
+    const reused = await app.inject({ method: "POST", url: "/api/v1/auth/refresh", payload: { refreshToken: second.refreshToken } });
+    assert.equal(reused.statusCode, 401);
+    const old = await db.query("select revoked_at is not null as revoked, replaced_by from refresh_sessions where token_hash = $1", [
+      hashSecret(second.refreshToken),
+    ]);
+    assert.equal(old.rows[0]?.revoked === true || old.rows[0]?.revoked === "t", true);
+    assert.equal(typeof old.rows[0]?.replaced_by, "string");
+
+    const gone = await app.inject({ method: "POST", url: "/api/v1/auth/logout", payload: { refreshToken: third.refreshToken } });
+    assert.equal(gone.statusCode, 204);
+    const afterLogout = await app.inject({ method: "POST", url: "/api/v1/auth/refresh", payload: { refreshToken: third.refreshToken } });
+    assert.equal(afterLogout.statusCode, 401);
+
+    await db.query("update users set disabled_at = now() where username = 'admin'");
+    const blocked = await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { username: "admin", password } });
+    assert.equal(blocked.statusCode, 401);
+    const blockedMe = await app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: `Bearer ${third.accessToken}` } });
+    assert.equal(blockedMe.statusCode, 401);
+
+    const audit = await db.query("select action from audit_events order by created_at");
+    const actions = audit.rows.map((row) => row.action);
+    assert.deepEqual(actions, ["bootstrap", "login", "refresh", "logout"]);
+    const leaked = await db.query(
+      "select count(*) as n from audit_events where action like $1 or target_type like $1 or coalesce(target_id::text, '') like $1",
+      [`%${password}%`],
+    );
+    assert.equal(Number(leaked.rows[0]?.n), 0);
+  } finally {
+    await app.close();
+    await pg.close();
+  }
+});
