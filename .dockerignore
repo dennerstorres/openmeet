@@ -7,6 +7,11 @@ coverage
 **/*.log
 .env
 .env.*
+# S-19: the stack secrets by path, not only by name.
+infra/compose/.env
+infra/compose/.env.*
+**/.env
+**/.env.*
 **/*.pem
 **/*.key
 **/*.p12
