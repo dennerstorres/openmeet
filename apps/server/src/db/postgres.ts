@@ -6,28 +6,40 @@ export function redact(message: string, secret: string): string {
   return message.split(secret).join("[redacted]");
 }
 
+function parameters(params: readonly unknown[] | undefined): never[] {
+  return params === undefined ? [] : ([...params] as never[]);
+}
+
+function reservedClient(tx: postgres.TransactionSql): MigrationClient {
+  return {
+    exec: async (statement) => {
+      await tx.unsafe(statement);
+    },
+    query: async (statement, params) => {
+      const rows = await tx.unsafe(statement, parameters(params));
+      return { rows: rows.map((row) => ({ ...row })) };
+    },
+    transaction: async (run) => {
+      const value = await tx.savepoint((sx) => run(reservedClient(sx)));
+      return value as never;
+    },
+  };
+}
+
 export function postgresClient(sql: ReturnType<typeof postgres>): MigrationClient {
-  const client: MigrationClient = {
+  return {
     exec: async (statement) => {
       await sql.unsafe(statement);
     },
     query: async (statement, params) => {
-      const rows = await sql.unsafe(statement, params === undefined ? [] : ([...params] as never[]));
+      const rows = await sql.unsafe(statement, parameters(params));
       return { rows: rows.map((row) => ({ ...row })) };
     },
     transaction: async (run) => {
-      await sql.unsafe("begin");
-      try {
-        const value = await run(client);
-        await sql.unsafe("commit");
-        return value;
-      } catch (error) {
-        await sql.unsafe("rollback");
-        throw error;
-      }
+      const value = await sql.begin((tx) => run(reservedClient(tx)));
+      return value as never;
     },
   };
-  return client;
 }
 
 export interface PostgresHandle {
