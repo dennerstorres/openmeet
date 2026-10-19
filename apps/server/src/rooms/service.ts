@@ -6,6 +6,7 @@ import type { MigrationClient } from "../db/migrate.js";
 import type { PublicUser } from "../auth/service.js";
 import { hashPassword } from "../auth/password.js";
 import { hashSecret } from "../auth/tokens.js";
+import type { RoomMedia } from "./media.js";
 
 export type RoomErrorCode =
   | "invalid_body"
@@ -17,7 +18,8 @@ export type RoomErrorCode =
   | "invalid_invite"
   | "room_ended"
   | "conflict"
-  | "room_unconfigured";
+  | "room_unconfigured"
+  | "media_disconnect_failed";
 
 export class RoomError extends Error {
   readonly code: RoomErrorCode;
@@ -158,14 +160,19 @@ export async function getRoom(db: MigrationClient, actor: PublicUser, id: string
   };
 }
 
-export async function endRoom(db: MigrationClient, actor: PublicUser, id: string): Promise<void> {
+export async function endRoom(db: MigrationClient, actor: PublicUser, id: string, media: RoomMedia | undefined): Promise<void> {
+  if (!media) throw new RoomError("room_unconfigured");
   const access = await loadAccess(db, actor, roomId(id));
   if (!canManage(actor, access.membership)) throw new RoomError("forbidden");
-  await db.query("update rooms set ended_at = coalesce(ended_at, now()), updated_at = now() where id = $1", [access.room.id]);
-  await db.query("insert into audit_events (actor_user_id, action, target_type, target_id) values ($1, 'room_end', 'room', $2)", [actor.id, access.room.id]);
+  const updated = await db.query("update rooms set ended_at = now(), updated_at = now() where id = $1 and ended_at is null returning id", [access.room.id]);
+  if (updated.rows.length === 1) {
+    await db.query("insert into audit_events (actor_user_id, action, target_type, target_id) values ($1, 'room_end', 'room', $2)", [actor.id, access.room.id]);
+  }
+  await disconnectMedia(() => media.closeRoom(access.room.slug));
 }
 
-export async function removeMember(db: MigrationClient, actor: PublicUser, id: string, memberId: string): Promise<void> {
+export async function removeMember(db: MigrationClient, actor: PublicUser, id: string, memberId: string, media: RoomMedia | undefined): Promise<void> {
+  if (!media) throw new RoomError("room_unconfigured");
   const access = await loadAccess(db, actor, roomId(id));
   if (!canManage(actor, access.membership)) throw new RoomError("forbidden");
   if (!UUID.test(memberId) || memberId === actor.id) throw new RoomError("forbidden");
@@ -173,8 +180,25 @@ export async function removeMember(db: MigrationClient, actor: PublicUser, id: s
     access.room.id,
     memberId,
   ]);
-  if (updated.rows.length !== 1) throw new RoomError("room_not_found");
-  await db.query("insert into audit_events (actor_user_id, action, target_type, target_id) values ($1, 'member_remove', 'user', $2)", [actor.id, memberId]);
+  if (updated.rows.length === 1) {
+    await db.query("insert into audit_events (actor_user_id, action, target_type, target_id) values ($1, 'member_remove', 'user', $2)", [actor.id, memberId]);
+  } else {
+    const existing = await db.query("select user_id from memberships where room_id = $1 and user_id = $2 and removed_at is not null", [
+      access.room.id,
+      memberId,
+    ]);
+    if (existing.rows.length !== 1) throw new RoomError("room_not_found");
+  }
+  await disconnectMedia(() => media.disconnect(access.room.slug, memberId));
+}
+
+async function disconnectMedia(run: () => Promise<void>): Promise<void> {
+  try {
+    await run();
+  } catch (error) {
+    if (error instanceof RoomError) throw error;
+    throw new RoomError("media_disconnect_failed");
+  }
 }
 
 export async function createInvite(
@@ -246,13 +270,20 @@ async function redeemInvite(db: MigrationClient, id: string, userId: string, cod
        returning id`,
       [id, hashSecret(code)],
     );
-    if (updated.rows.length !== 1) throw new RoomError("invalid_invite");
-    await tx.query(
+    const inviteId = text(updated.rows[0]?.id);
+    if (updated.rows.length !== 1 || !inviteId) throw new RoomError("invalid_invite");
+    const joined = await tx.query(
       `insert into memberships (room_id, user_id, role) values ($1, $2, 'participant')
        on conflict (room_id, user_id) do update set removed_at = null, role = 'participant'
-       where memberships.removed_at is not null`,
-      [id, userId],
+       where memberships.removed_at is not null
+         and exists (
+           select 1 from invites
+           where invites.id = $3 and invites.created_at > memberships.removed_at
+         )
+       returning user_id`,
+      [id, userId, inviteId],
     );
+    if (joined.rows.length !== 1) throw new RoomError("forbidden");
   });
 }
 

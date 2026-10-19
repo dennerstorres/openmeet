@@ -23,7 +23,7 @@ export function PocApp() {
   const [apiBase, setApiBase] = useState("http://127.0.0.1:3000");
   const [room, setRoom] = useState("poc");
   const [identity, setIdentity] = useState("");
-  const [signalUrl, setSignalUrl] = useState("wss://livekit.dennerstorres.dev");
+  const [signalUrl, setSignalUrl] = useState("ws://127.0.0.1:7880");
   const [pastedToken, setPastedToken] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);

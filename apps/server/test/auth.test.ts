@@ -61,7 +61,7 @@ test("bootstrap, login, refresh and logout keep only hashes", async () => {
   });
   try {
     const ready = await app.inject({ method: "GET", url: "/health/ready" });
-    assert.equal(ready.json().checks.database, "not_configured");
+    assert.equal(ready.json().checks.database, "ok");
 
     const rejected = await app.inject({
       method: "POST",
@@ -121,7 +121,8 @@ test("bootstrap, login, refresh and logout keep only hashes", async () => {
     assert.equal(me.json().username, "admin");
     const anonymous = await app.inject({ method: "GET", url: "/api/v1/auth/me" });
     assert.equal(anonymous.statusCode, 401);
-    const expired = signAccessToken(authSecret, me.json().id as string, Date.now() - 16 * 60 * 1000);
+    const missingSession = "00000000-0000-4000-8000-000000000001";
+    const expired = signAccessToken(authSecret, me.json().id as string, missingSession, Date.now() - 16 * 60 * 1000);
     const stale = await app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: `Bearer ${expired}` } });
     assert.equal(stale.statusCode, 401);
 
@@ -130,11 +131,13 @@ test("bootstrap, login, refresh and logout keep only hashes", async () => {
     assert.equal(badLogin.body.includes(password), false);
     const loggedIn = await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { username: "admin", password } });
     assert.equal(loggedIn.statusCode, 200);
-    const second = loggedIn.json() as { refreshToken: string };
+    const second = loggedIn.json() as { refreshToken: string; accessToken: string };
 
     const rotated = await app.inject({ method: "POST", url: "/api/v1/auth/refresh", payload: { refreshToken: second.refreshToken } });
     assert.equal(rotated.statusCode, 200);
     const third = rotated.json() as { refreshToken: string; accessToken: string };
+    const rotatedAccess = await app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: `Bearer ${second.accessToken}` } });
+    assert.equal(rotatedAccess.statusCode, 401);
     const reused = await app.inject({ method: "POST", url: "/api/v1/auth/refresh", payload: { refreshToken: second.refreshToken } });
     assert.equal(reused.statusCode, 401);
     const old = await db.query("select revoked_at is not null as revoked, replaced_by from refresh_sessions where token_hash = $1", [
@@ -148,11 +151,12 @@ test("bootstrap, login, refresh and logout keep only hashes", async () => {
     const afterLogout = await app.inject({ method: "POST", url: "/api/v1/auth/refresh", payload: { refreshToken: third.refreshToken } });
     assert.equal(afterLogout.statusCode, 401);
 
-    // Review reproduction: logout revokes refresh, but the access token remains usable.
     const accessAfterLogout = await app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: `Bearer ${third.accessToken}` } });
-    assert.equal(accessAfterLogout.statusCode, 200, "F03-04 A3: access token survives logout");
+    assert.equal(accessAfterLogout.statusCode, 401);
+    const otherSession = await app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: `Bearer ${session.accessToken}` } });
+    assert.equal(otherSession.statusCode, 200);
 
-    for (const token of ["invalid", `${third.accessToken}tampered`, signAccessToken("another-instance-secret", me.json().id as string)]) {
+    for (const token of ["invalid", `${third.accessToken}tampered`, signAccessToken("another-instance-secret", me.json().id as string, missingSession)]) {
       const invalid = await app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: `Bearer ${token}` } });
       assert.equal(invalid.statusCode, 401);
     }
@@ -168,7 +172,7 @@ test("bootstrap, login, refresh and logout keep only hashes", async () => {
     await db.query("update users set disabled_at = now() where username = 'admin'");
     const blocked = await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { username: "admin", password } });
     assert.equal(blocked.statusCode, 401);
-    const blockedMe = await app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: `Bearer ${third.accessToken}` } });
+    const blockedMe = await app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: `Bearer ${session.accessToken}` } });
     assert.equal(blockedMe.statusCode, 401);
 
     const audit = await db.query("select action from audit_events order by created_at");

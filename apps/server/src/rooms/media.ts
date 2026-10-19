@@ -1,0 +1,82 @@
+import { RoomServiceClient, ServerError } from "livekit-server-sdk";
+import type { AppEnv } from "../poc-join.js";
+
+export interface RoomMedia {
+  disconnect(room: string, identity: string): Promise<void>;
+  closeRoom(room: string): Promise<void>;
+}
+
+interface LiveKitRooms {
+  listParticipants(room: string): Promise<{ identity: string }[]>;
+  removeParticipant(room: string, identity: string, options?: { revokeTokenTs?: bigint }): Promise<void>;
+  deleteRoom(room: string): Promise<void>;
+}
+
+function isAbsent(error: unknown): boolean {
+  return error instanceof ServerError && error.status === 404;
+}
+
+export function roomMedia(client: LiveKitRooms, now = () => Date.now()): RoomMedia {
+  const revokeAt = () => BigInt(Math.floor(now() / 1000));
+
+  return {
+    async disconnect(room, identity) {
+      try {
+        await client.removeParticipant(room, identity, { revokeTokenTs: revokeAt() });
+      } catch (error) {
+        if (!isAbsent(error)) throw error;
+      }
+    },
+    async closeRoom(room) {
+      let people: { identity: string }[] = [];
+      try {
+        people = await client.listParticipants(room);
+      } catch (error) {
+        if (!isAbsent(error)) throw error;
+      }
+      for (const person of people) {
+        if (person.identity.length === 0) continue;
+        try {
+          await client.removeParticipant(room, person.identity, { revokeTokenTs: revokeAt() });
+        } catch (error) {
+          if (!isAbsent(error)) throw error;
+        }
+      }
+      try {
+        await client.deleteRoom(room);
+      } catch (error) {
+        if (!isAbsent(error)) throw error;
+      }
+    },
+  };
+}
+
+export function liveKitHttpHost(signalUrl: string): string {
+  const url = new URL(signalUrl);
+  if (url.protocol === "wss:") url.protocol = "https:";
+  else if (url.protocol === "ws:") url.protocol = "http:";
+  else if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("unsupported signal protocol");
+  return url.origin;
+}
+
+export function liveKitRoomMedia(env: AppEnv): RoomMedia | undefined {
+  const apiKey = env.LIVEKIT_API_KEY;
+  const apiSecret = env.LIVEKIT_API_SECRET;
+  const signalUrl = env.LIVEKIT_URL;
+  if (!apiKey || !apiSecret || !signalUrl) return undefined;
+  let host: string;
+  try {
+    host = liveKitHttpHost(signalUrl);
+  } catch {
+    return undefined;
+  }
+  const client = new RoomServiceClient(host, apiKey, apiSecret);
+  return roomMedia({
+    listParticipants: async (room) => {
+      const people = await client.listParticipants(room);
+      return people.map((person) => ({ identity: person.identity }));
+    },
+    removeParticipant: (room, identity, options) => client.removeParticipant(room, identity, options),
+    deleteRoom: (room) => client.deleteRoom(room),
+  });
+}

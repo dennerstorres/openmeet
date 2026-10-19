@@ -14,9 +14,13 @@ test("server scripts load the repo .env and keep variables already set", () => {
   const file = join(dir, ".env");
   writeFileSync(file, "POC_JOIN=1\nFROM_FILE=file\n");
   try {
-    const loaded = spawnSync(process.execPath, ["--env-file-if-exists=" + file, "-e", "process.stdout.write((process.env.POC_JOIN ?? '') + '|' + (process.env.FROM_FILE ?? ''))"], {
-      encoding: "utf8",
-    });
+    const loaded = spawnSync(
+      process.execPath,
+      ["--env-file-if-exists=" + file, "-e", "process.stdout.write((process.env.POC_JOIN ?? '') + '|' + (process.env.FROM_FILE ?? ''))"],
+      {
+        encoding: "utf8",
+      },
+    );
     assert.equal(loaded.status, 0);
     assert.equal(loaded.stdout, "1|file");
 

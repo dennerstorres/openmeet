@@ -13,4 +13,8 @@ test("Tauri identifier matches the instance-local desktop app", () => {
   assert.equal(config.identifier, "com.openmeet.desktop");
   assert.equal(config.productName, "OpenMeet");
   assert.equal(config.build.devUrl, "http://localhost:1420");
+  const connect = config.app.security.csp["connect-src"];
+  assert.match(connect, /\bhttps:/);
+  assert.match(connect, /\bwss:/);
+  assert.equal(connect.includes("dennerstorres"), false);
 });

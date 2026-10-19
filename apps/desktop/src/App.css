@@ -60,3 +60,25 @@ video {
   flex-wrap: wrap;
   gap: 12px;
 }
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  max-width: 420px;
+}
+
+.rooms {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rooms li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid #d9d3c7;
+}

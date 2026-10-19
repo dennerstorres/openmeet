@@ -5,6 +5,7 @@ import { TokenVerifier } from "livekit-server-sdk";
 import { buildApp } from "../src/app.js";
 import { hashSecret } from "../src/auth/tokens.js";
 import { applyMigrations, type MigrationClient } from "../src/db/migrate.js";
+import type { RoomMedia } from "../src/rooms/media.js";
 import type { FastifyInstance } from "fastify";
 
 const bootstrapToken = "unit-test-bootstrap-token";
@@ -67,7 +68,16 @@ test("invite join issues a room-scoped token and hides the invite code", async (
     LIVEKIT_API_KEY: apiKey,
     LIVEKIT_API_SECRET: apiSecret,
   };
-  const app = await buildApp({ logger: false, env, db });
+  const mediaCalls: string[] = [];
+  const media: RoomMedia = {
+    disconnect: async (room, identity) => {
+      mediaCalls.push(`disconnect ${room} ${identity}`);
+    },
+    closeRoom: async (room) => {
+      mediaCalls.push(`close ${room}`);
+    },
+  };
+  const app = await buildApp({ logger: false, env, db, media });
   const offline = await buildApp({ logger: false, env: { AUTH_SECRET: authSecret, BOOTSTRAP_TOKEN: bootstrapToken }, db });
   try {
     const created = await app.inject({
@@ -226,21 +236,46 @@ test("invite join issues a room-scoped token and hides the invite code", async (
       payload: { expiresInMinutes: 30, maxUses: 2 },
     });
     assert.equal(reusable.statusCode, 201);
-    const reusableCode = (reusable.json() as { code: string }).code;
+    const reusableBody = reusable.json() as { id: string; code: string };
 
     const removed = await app.inject({ method: "DELETE", url: `/api/v1/rooms/${roomId}/members/${memberId}`, headers: auth(adminToken) });
     assert.equal(removed.statusCode, 204);
+    assert.equal(mediaCalls.includes(`disconnect sala ${memberId}`), true);
     const blocked = await app.inject({ method: "POST", url: `/api/v1/rooms/${roomId}/join`, headers: auth(memberToken), payload: {} });
     assert.equal(blocked.statusCode, 403);
-    // Review reproduction, not acceptance: a valid invite restores a removed membership.
-    const restored = await app.inject({ method: "POST", url: `/api/v1/rooms/${roomId}/join`, headers: auth(memberToken), payload: { code: reusableCode } });
-    assert.equal(restored.statusCode, 200, "F03-04 A4: removed member can redeem an existing invite");
+    const restored = await app.inject({
+      method: "POST",
+      url: `/api/v1/rooms/${roomId}/join`,
+      headers: auth(memberToken),
+      payload: { code: reusableBody.code },
+    });
+    assert.equal(restored.statusCode, 403);
+    assert.equal(restored.json().error, "forbidden");
+    const stillRemoved = await db.query("select removed_at is not null as removed from memberships where room_id = $1 and user_id = $2", [roomId, memberId]);
+    assert.equal(stillRemoved.rows[0]?.removed === true || stillRemoved.rows[0]?.removed === "t", true);
+    const spent = await db.query("select use_count from invites where id = $1", [reusableBody.id]);
+    assert.equal(spent.rows[0]?.use_count, 0);
+    const readmit = await app.inject({
+      method: "POST",
+      url: `/api/v1/rooms/${roomId}/invites`,
+      headers: auth(adminToken),
+      payload: { expiresInMinutes: 30 },
+    });
+    assert.equal(readmit.statusCode, 201);
+    const back = await app.inject({
+      method: "POST",
+      url: `/api/v1/rooms/${roomId}/join`,
+      headers: auth(memberToken),
+      payload: { code: (readmit.json() as { code: string }).code },
+    });
+    assert.equal(back.statusCode, 200);
     const ended = await app.inject({ method: "PATCH", url: `/api/v1/rooms/${roomId}`, headers: auth(adminToken), payload: { ended: true } });
     assert.equal(ended.statusCode, 204);
+    assert.equal(mediaCalls.includes("close sala"), true);
     const closed = await app.inject({ method: "POST", url: `/api/v1/rooms/${roomId}/join`, headers: auth(adminToken), payload: {} });
     assert.equal(closed.statusCode, 403);
     assert.equal(closed.json().error, "room_ended");
-    // The previously issued JWT remains cryptographically valid; this does not test a live SFU.
+    // The previously issued JWT remains cryptographically valid. The SFU adapter was invoked; this still does not prove a live room.
     const stillValid = await new TokenVerifier(apiKey, apiSecret).verify(body.token);
     assert.equal(stillValid.video?.roomJoin, true);
     const preflight = await app.inject({
@@ -248,7 +283,10 @@ test("invite join issues a room-scoped token and hides the invite code", async (
       url: `/api/v1/rooms/${roomId}`,
       headers: { origin: "http://localhost:1420", "access-control-request-method": "PATCH" },
     });
-    assert.equal(preflight.headers["access-control-allow-methods"], "GET, POST", "F03-04 M1: browser cannot PATCH/DELETE");
+    const allow = String(preflight.headers["access-control-allow-methods"]);
+    for (const method of ["GET", "POST", "PATCH", "DELETE"]) {
+      assert.equal(allow.includes(method), true, method);
+    }
 
     const audit = await db.query("select action from audit_events");
     const blob = audit.rows.map((row) => String(row.action)).join(" ");
@@ -257,6 +295,62 @@ test("invite join issues a room-scoped token and hides the invite code", async (
   } finally {
     await app.close();
     await offline.close();
+    await pg.close();
+  }
+});
+
+test("a failed SFU disconnect stays revoked and the retry reaches the SFU again", async () => {
+  const pg = new PGlite();
+  const db = pgliteClient(pg);
+  await applyMigrations(db);
+  let fail = true;
+  let closes = 0;
+  const media: RoomMedia = {
+    disconnect: async () => {},
+    closeRoom: async () => {
+      closes += 1;
+      if (fail) throw new Error("sfu down");
+    },
+  };
+  const app = await buildApp({
+    logger: false,
+    env: {
+      AUTH_SECRET: authSecret,
+      BOOTSTRAP_TOKEN: bootstrapToken,
+      LIVEKIT_URL: "ws://127.0.0.1:7880",
+      LIVEKIT_API_KEY: apiKey,
+      LIVEKIT_API_SECRET: apiSecret,
+    },
+    db,
+    media,
+  });
+  try {
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/bootstrap",
+      payload: { token: bootstrapToken, username: "admin", password: adminPassword, displayName: "Admin" },
+    });
+    assert.equal(created.statusCode, 201);
+    const adminToken = (created.json() as { accessToken: string }).accessToken;
+    const roomResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/rooms",
+      headers: auth(adminToken),
+      payload: { name: "Sala", slug: "sala", kind: "persistent" },
+    });
+    assert.equal(roomResponse.statusCode, 201);
+    const roomId = (roomResponse.json() as { id: string }).id;
+    const failed = await app.inject({ method: "PATCH", url: `/api/v1/rooms/${roomId}`, headers: auth(adminToken), payload: { ended: true } });
+    assert.equal(failed.statusCode, 502);
+    assert.equal(failed.json().error, "media_disconnect_failed");
+    const ended = await db.query("select ended_at is not null as ended from rooms where id = $1", [roomId]);
+    assert.equal(ended.rows[0]?.ended === true || ended.rows[0]?.ended === "t", true);
+    fail = false;
+    const retry = await app.inject({ method: "PATCH", url: `/api/v1/rooms/${roomId}`, headers: auth(adminToken), payload: { ended: true } });
+    assert.equal(retry.statusCode, 204);
+    assert.equal(closes, 2);
+  } finally {
+    await app.close();
     await pg.close();
   }
 });

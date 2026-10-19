@@ -26,7 +26,9 @@
 - Sem master account global; cada instalação é independente.
 - Proteger bootstrap inicial com token de instalação de uso único ou mecanismo equivalente, não página aberta indefinidamente.
 - Segredos de aplicação em env/secret store, não versionar credenciais.
-- Refresh token rotativo e revogável; armazenamento seguro nativo após avaliação de plugin e permissões.
+- Refresh token rotativo e revogável. O access token aponta para essa sessão e deixa de valer no logout e na rotação. O armazenamento nativo do refresh ainda não existe: ele fica só na memória da janela.
+- Encerrar a sala ou remover um membro grava a decisão e pede ao LiveKit para desconectar. Se o SFU falhar, a API responde 502 e a decisão no banco permanece.
+- Login e bootstrap têm limite de tentativas. `TRUST_PROXY=1` considera só o primeiro hop encaminhado.
 - Sem E2EE declarado no MVP; proteger signaling, REST e media transport; limitar retenção de logs.
 - TLS nas interfaces públicas; TURN UDP/TCP/TLS conforme rede; portas de mídia não são proxy HTTP tradicional.
 
@@ -36,9 +38,10 @@
 - Troca de áudio de saída, dispositivo Bluetooth e minimização do app.
 - Captura de áudio do sistema está fora do MVP; não misturar com captura visual.
 
-## Endpoints v1 propostos
-`GET /health/live`, `GET /health/ready`, `GET /api/v1/instance`,
-`POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`,
-`GET|POST /api/v1/rooms`, `GET|PATCH|DELETE /api/v1/rooms/:id`, `POST /api/v1/rooms/:id/join`, `POST /api/v1/rooms/:id/invites`,
-`GET /api/v1/admin/users`, `PATCH /api/v1/admin/users/:id`.
-Endpoints finais deverão ser versionados em OpenAPI e testados.
+## Endpoints v1
+Existem: `GET /health/live`, `GET /health/ready`, `GET /api/v1/instance`,
+`POST /api/v1/auth/bootstrap`, `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`,
+`POST /api/v1/admin/users`, `GET|POST /api/v1/rooms`, `GET /api/v1/rooms/:id`, `PATCH /api/v1/rooms/:id`,
+`DELETE /api/v1/rooms/:id/members/:userId`, `POST /api/v1/rooms/:id/invites`, `DELETE /api/v1/rooms/:id/invites/:inviteId`,
+`POST /api/v1/rooms/:id/join`. `POST /api/v1/poc/join` só existe com `POC_JOIN=1` e só em loopback.
+Ainda não existem: `DELETE /api/v1/rooms/:id`, `GET /api/v1/admin/users`, `PATCH /api/v1/admin/users/:id`. `packages/shared` ainda não publica OpenAPI.

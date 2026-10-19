@@ -15,6 +15,7 @@ import {
   RoomError,
   type RoomErrorCode,
 } from "./service.js";
+import type { RoomMedia } from "./media.js";
 
 const AUTH_STATUS: Record<AuthErrorCode, number> = {
   auth_unconfigured: 503,
@@ -27,6 +28,7 @@ const AUTH_STATUS: Record<AuthErrorCode, number> = {
   invalid_credentials: 401,
   invalid_session: 401,
   unauthorized: 401,
+  rate_limited: 429,
 };
 
 const ROOM_STATUS: Record<RoomErrorCode, number> = {
@@ -40,6 +42,7 @@ const ROOM_STATUS: Record<RoomErrorCode, number> = {
   room_ended: 403,
   conflict: 409,
   room_unconfigured: 503,
+  media_disconnect_failed: 502,
 };
 
 function configuredSecret(env: AppEnv): string | undefined {
@@ -82,7 +85,7 @@ function param(request: FastifyRequest, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
-export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationClient | undefined): void {
+export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationClient | undefined, media: RoomMedia | undefined): void {
   async function caller(request: FastifyRequest): Promise<PublicUser> {
     const secret = configuredSecret(env);
     if (!db || !secret) throw new AuthError("auth_unconfigured");
@@ -155,7 +158,7 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
       if (typeof request.body !== "object" || request.body === null || !("ended" in request.body) || request.body.ended !== true) {
         throw new RoomError("invalid_body");
       }
-      await endRoom(db, actor, param(request, "id"));
+      await endRoom(db, actor, param(request, "id"), media);
       return reply.code(204).header("cache-control", "no-store").send();
     } catch (error) {
       return sendError(request, reply, error);
@@ -166,7 +169,7 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
     try {
       const actor = await caller(request);
       if (!db) throw new AuthError("auth_unconfigured");
-      await removeMember(db, actor, param(request, "id"), param(request, "userId"));
+      await removeMember(db, actor, param(request, "id"), param(request, "userId"), media);
       return reply.code(204).header("cache-control", "no-store").send();
     } catch (error) {
       return sendError(request, reply, error);

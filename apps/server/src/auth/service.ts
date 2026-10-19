@@ -12,7 +12,8 @@ export type AuthErrorCode =
   | "bootstrap_closed"
   | "invalid_credentials"
   | "invalid_session"
-  | "unauthorized";
+  | "unauthorized"
+  | "rate_limited";
 
 export class AuthError extends Error {
   readonly code: AuthErrorCode;
@@ -131,7 +132,7 @@ async function startSession(db: MigrationClient, secret: string, user: StoredUse
   }
   await audit(db, user.id, action);
   return {
-    accessToken: signAccessToken(secret, user.id),
+    accessToken: signAccessToken(secret, user.id, sessionId),
     refreshToken,
     expiresIn: ACCESS_TOKEN_TTL_SECONDS,
     user: publicUser(user),
@@ -143,10 +144,12 @@ export async function bootstrapAdmin(
   secret: string,
   expectedToken: string,
   input: { token: string; username: string; password: string; displayName: string },
+  allow: (() => boolean) | undefined = undefined,
 ): Promise<SessionBody> {
   const username = parseUsername(input.username);
   const displayName = parseDisplayName(input.displayName);
   const password = parsePassword(input.password);
+  if (allow && !allow()) throw new AuthError("rate_limited");
   if (!secretsMatch(input.token, expectedToken)) throw new AuthError("bootstrap_rejected");
   const passwordHash = await hashPassword(password);
   try {
@@ -177,9 +180,16 @@ function sqlState(error: unknown): string {
   return typeof error === "object" && error !== null && "code" in error && typeof error.code === "string" ? error.code : "";
 }
 
-export async function login(db: MigrationClient, secret: string, usernameInput: string, password: string): Promise<SessionBody> {
+export async function login(
+  db: MigrationClient,
+  secret: string,
+  usernameInput: string,
+  password: string,
+  allow: (() => boolean) | undefined = undefined,
+): Promise<SessionBody> {
   const username = parseUsername(usernameInput);
   if (password.length === 0 || password.length > 128) throw new AuthError("invalid_credentials");
+  if (allow && !allow()) throw new AuthError("rate_limited");
   const existing = await findUser(db, username);
   const encoded = existing?.passwordHash ?? (await dummyPasswordHash());
   const matches = await verifyPassword(encoded, password);
@@ -221,9 +231,16 @@ export async function logout(db: MigrationClient, refreshToken: string): Promise
 }
 
 export async function currentUser(db: MigrationClient, secret: string, accessToken: string): Promise<PublicUser> {
-  const userId = readAccessToken(secret, accessToken);
-  if (!userId) throw new AuthError("unauthorized");
-  const user = await findUserById(db, userId);
+  const claims = readAccessToken(secret, accessToken);
+  if (!claims) throw new AuthError("unauthorized");
+  const found = await db.query(
+    `select revoked_at is not null as revoked, expires_at <= now() as expired
+     from refresh_sessions where id = $1 and user_id = $2`,
+    [claims.sessionId, claims.userId],
+  );
+  const row = found.rows[0];
+  if (!row || isTrue(row.revoked) || isTrue(row.expired)) throw new AuthError("unauthorized");
+  const user = await findUserById(db, claims.userId);
   if (!user || user.disabled) throw new AuthError("unauthorized");
   return publicUser(user);
 }

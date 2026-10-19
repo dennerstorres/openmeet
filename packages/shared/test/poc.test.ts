@@ -18,12 +18,15 @@ test("API base allows loopback HTTP and any HTTPS host", () => {
 });
 
 test("API base rejects remote HTTP and credentialed URLs are still parsed without being logged", () => {
-  assert.throws(() => parseApiBase("http://203.0.113.10:3000"), (error: unknown) => {
-    assert.ok(error instanceof PocInputError);
-    assert.equal(error.code, "invalid_api_base");
-    assert.equal(error.message.includes("203.0.113.10"), false);
-    return true;
-  });
+  assert.throws(
+    () => parseApiBase("http://203.0.113.10:3000"),
+    (error: unknown) => {
+      assert.ok(error instanceof PocInputError);
+      assert.equal(error.code, "invalid_api_base");
+      assert.equal(error.message.includes("203.0.113.10"), false);
+      return true;
+    },
+  );
 });
 
 test("signal URL normalizes loopback HTTP and rejects public ws", () => {

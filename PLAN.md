@@ -14,8 +14,8 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F03-01 | Identidade | Schema e migrations Postgres | F02-01 | IMPLEMENTED | Grok | G3 |
 | F03-02 | Identidade | Bootstrap/admin, login e sessões seguras | F03-01 | IMPLEMENTED | Grok | G3 |
 | F03-03 | Identidade | Rooms, convites, RBAC e token LiveKit | F03-02 | IMPLEMENTED | Grok | G3 |
-| F03-04 | Identidade | Testes de abuso e auth | F03-03 | BLOCKED | Codex review | G3 |
-| F04-01 | Reuniões | UI de instância, salas, reunião | F03-03 | PENDING | Grok | G4 |
+| F03-04 | Identidade | Testes de abuso e auth | F03-03 | IMPLEMENTED | Codex review | G3 |
+| F04-01 | Reuniões | UI de instância, salas, reunião | F03-03 | IMPLEMENTED | Grok | G4 |
 | F04-02 | Reuniões | Controles de volume/mute/câmera | F04-01 | PENDING | Grok | G4 |
 | F04-03 | Reuniões | Compartilhamento e layouts | F04-01 | PENDING | Grok | G4 |
 | F04-04 | Reuniões | E2E 5 participantes e persistência | F04-02,F04-03 | PENDING | Codex review | G4 |
@@ -32,11 +32,15 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 
 ## Estado em 2026-10-18
 
-Nenhuma tarefa está `DONE`. F01-01–F01-04, F02-01 e F03-01–F03-03 estão `IMPLEMENTED`. A revisão do F01-04 achou um problema alto na CSP do desktop, que pede ADR antes do F04-01. F03-04 está `BLOCKED` pela revisão do Codex. F02-02–F02-05 seguem `WAITING_VALIDATION` e foram para o fim do plano: M01–M12 continuam `NOT_RUN`. F02-06 segue `BLOCKED`, sem GO e sem NO-GO. Salas e auth rodaram no PGlite; a API no ar não conecta no banco. O aceite final e o F08 continuam dependendo da evidência de dois PCs. Se esse teste falhar, para e registra alternativa. Não marcar GO.
+Nenhuma tarefa está `DONE`. F01-01–F01-04, F02-01, F03-01–F03-04 e F04-01 estão `IMPLEMENTED`. O ADR 0005 abre `https:` e `wss:` na CSP e tira o domínio de teste. O ADR 0006 prende o access token à sessão. F03-04 saiu de `BLOCKED`: as correções do parecer estão no código e o G3 ainda não foi reaprovado. F04-02 segue `PENDING`. F02-02–F02-05 seguem `WAITING_VALIDATION`. M01–M12 continuam `NOT_RUN`. F02-06 segue `BLOCKED`, sem GO e sem NO-GO. O aceite final e o F08 continuam dependendo da evidência de dois PCs. Se esse teste falhar, para e registra alternativa. Não marcar GO.
 
-### Revisão F03-04 — 2026-10-18
+### Revisões — correções em 2026-10-18
 
-F03-04 passou por READY e IN_PROGRESS e está BLOCKED: revisão executada, G3 não aprovado. O estado PENDING descrito acima é anterior à revisão. Quatro achados altos (banco ausente no runtime, moderação sem operação no SFU, access token após logout e readmissão por convite anterior) e dois médios estão em `docs/reviews/F03-04-parecer.md`. Testes server: 15/15; typecheck e build passaram. Reproduções de falha não equivalem a aceite. Próximo passo: correções pelo executor e nova revisão; nenhuma tarefa promovida a DONE.
+F03-04: o boot usa `DATABASE_URL` e o readiness deixa de mentir; encerrar sala e remover membro chamam o SFU e um 502 não desfaz a revogação; logout e rotação matam o access token daquela sessão; convite anterior não readmite; CORS libera PATCH e DELETE; login e bootstrap têm limite por usuário e por IP, com `TRUST_PROXY=1` para o primeiro hop. PostgreSQL externo e um SFU ao vivo não foram provados. O parecer original continua em `docs/reviews/F03-04-parecer.md`.
+
+F01-04: R1 fechado pelo ADR 0005. R2: `pnpm format:check` entrou no CI. `cargo check` fica fora do CI e continua como passo local, porque o runner não tem o Rust fixado. R3: a lista de endpoints e `GET /api/v1/instance` batem com o servidor. R4: o workflow declara `permissions: contents: read`. O pin das actions por SHA fica para o G7. R5 segue aberto nos ADRs 0001–0003.
+
+F02-06: A2, A3, A4, M1–M3, M5, M6 e B1–B4 já estavam no histórico. O handler de permissão do desktop libera microfone, câmera, tela e autoplay só na origem do app. A1, a topologia remota, continua sem autorização de deploy. M01–M12 seguem `NOT_RUN`. Sem GO.
 
 ## Regras de promoção
 - `READY`: dependências `IMPLEMENTED` ou `DONE`. O GO de F02-06 só é exigido no F08.

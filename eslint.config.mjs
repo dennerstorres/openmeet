@@ -26,7 +26,14 @@ export default defineConfig(
     },
   },
   {
-    files: ["apps/server/**/*.ts", "packages/shared/**/*.ts", "apps/desktop/vite.config.ts", "apps/desktop/test/**/*.mjs", "scripts/**/*.mjs", "eslint.config.mjs"],
+    files: [
+      "apps/server/**/*.ts",
+      "packages/shared/**/*.ts",
+      "apps/desktop/vite.config.ts",
+      "apps/desktop/test/**/*.mjs",
+      "scripts/**/*.mjs",
+      "eslint.config.mjs",
+    ],
     extends: typeScriptAndJavaScript,
     languageOptions: {
       globals: globals.node,

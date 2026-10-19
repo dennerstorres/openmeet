@@ -1,4 +1,13 @@
-export type PocErrorCode = "invalid_room" | "invalid_identity" | "invalid_api_base" | "invalid_signal_url" | "invalid_join_response" | "poc_disabled" | "poc_unconfigured";
+export type PocErrorCode =
+  | "invalid_room"
+  | "invalid_identity"
+  | "invalid_api_base"
+  | "invalid_signal_url"
+  | "invalid_join_response"
+  | "invalid_instance"
+  | "invalid_session"
+  | "poc_disabled"
+  | "poc_unconfigured";
 
 export class PocInputError extends Error {
   readonly code: PocErrorCode;

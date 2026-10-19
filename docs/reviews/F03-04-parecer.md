@@ -30,3 +30,9 @@ Plataforma: Windows, PowerShell, Node v24.18.0, pnpm 10.30.2. Data: 2026-10-18.
 Sem alteração de código de produção, deploy, secrets ou serviços em execução. Sem aprovação G2 ou G3. Testes de concorrência em PostgreSQL, matriz completa de moderadores, captura de logs para sanitização, abuso sob carga e mídia em dois PCs não executados. Os adapters PGlite existentes usam BEGIN/COMMIT manuais; esta execução foi sequencial por fixture e não demonstra isolamento concorrente.
 
 Próximo passo: Grok corrigir os achados em tarefa própria, incluindo integração do banco e moderação real. Atualizar as expectativas das reproduções e reexecutar os testes; voltar para revisão de segurança e validação operacional antes de VERIFIED/DONE.
+
+## Correção posterior — 2026-10-18
+
+O executor tratou A1–A4, M1 e M2 no código. As caracterizações foram invertidas para a política segura. O boot conecta `DATABASE_URL` quando ela existe. A moderação chama o adapter do LiveKit, com revogação do token anterior, e devolve 502 se o SFU falhar sem desfazer o banco. O access token morre com a sessão que o emitiu. Convite criado antes da remoção não readmite; convite criado depois readmite. CORS aceita PATCH e DELETE. Há limite de login e bootstrap.
+
+Isto não reabre o G3. Não houve PostgreSQL externo nem cliente LiveKit real nesta correção. A1 operacional e A2 em clientes reais continuam para a próxima revisão.

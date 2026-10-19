@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { AppEnv } from "../poc-join.js";
 import type { MigrationClient } from "../db/migrate.js";
+import { clientAddress, type AttemptPolicy } from "./limit.js";
 import { AuthError, type AuthErrorCode, bootstrapAdmin, currentUser, login, logout, refreshSession } from "./service.js";
 
 const STATUS: Record<AuthErrorCode, number> = {
@@ -14,6 +15,7 @@ const STATUS: Record<AuthErrorCode, number> = {
   invalid_credentials: 401,
   invalid_session: 401,
   unauthorized: 401,
+  rate_limited: 429,
 };
 
 function configuredSecret(env: AppEnv): string | undefined {
@@ -38,6 +40,10 @@ function requireField(body: unknown, key: string): string {
   return value;
 }
 
+function headerValue(header: string | string[] | undefined): string | undefined {
+  return Array.isArray(header) ? header[0] : header;
+}
+
 function bearer(header: string | string[] | undefined): string | undefined {
   const value = Array.isArray(header) ? undefined : header;
   if (!value?.startsWith("Bearer ")) return undefined;
@@ -45,19 +51,30 @@ function bearer(header: string | string[] | undefined): string | undefined {
   return token.length > 0 ? token : undefined;
 }
 
-export function registerAuth(app: FastifyInstance, env: AppEnv, db: MigrationClient | undefined): void {
+export function registerAuth(app: FastifyInstance, env: AppEnv, db: MigrationClient | undefined, attempts: AttemptPolicy): void {
+  function address(request: { ip: string; headers: { [key: string]: string | string[] | undefined } }): string {
+    return clientAddress(request.ip, headerValue(request.headers["x-forwarded-for"]), attempts.trustProxy);
+  }
+
   app.post("/api/v1/auth/bootstrap", async (request, reply) => {
     try {
       const database = db;
       const secret = configuredSecret(env);
       const expected = configuredBootstrap(env);
       if (!database || !secret || !expected) throw new AuthError("auth_unconfigured");
-      const session = await bootstrapAdmin(database, secret, expected, {
-        token: requireField(request.body, "token"),
-        username: requireField(request.body, "username"),
-        password: requireField(request.body, "password"),
-        displayName: requireField(request.body, "displayName"),
-      });
+      const ip = address(request);
+      const session = await bootstrapAdmin(
+        database,
+        secret,
+        expected,
+        {
+          token: requireField(request.body, "token"),
+          username: requireField(request.body, "username"),
+          password: requireField(request.body, "password"),
+          displayName: requireField(request.body, "displayName"),
+        },
+        () => attempts.bootstrap.allow(`bootstrap:${ip}`, attempts.now()),
+      );
       return reply.code(201).header("cache-control", "no-store").send(session);
     } catch (error) {
       return sendAuthError(request, reply, error);
@@ -69,7 +86,13 @@ export function registerAuth(app: FastifyInstance, env: AppEnv, db: MigrationCli
       const database = db;
       const secret = configuredSecret(env);
       if (!database || !secret) throw new AuthError("auth_unconfigured");
-      const session = await login(database, secret, requireField(request.body, "username"), requireField(request.body, "password"));
+      const ip = address(request);
+      const username = requireField(request.body, "username");
+      const session = await login(database, secret, username, requireField(request.body, "password"), () => {
+        const userOk = attempts.loginUser.allow(`user:${ip}:${username}`, attempts.now());
+        const ipOk = attempts.loginIp.allow(`ip:${ip}`, attempts.now());
+        return userOk && ipOk;
+      });
       return reply.code(200).header("cache-control", "no-store").send(session);
     } catch (error) {
       return sendAuthError(request, reply, error);
