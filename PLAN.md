@@ -47,7 +47,7 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F10-09 | Segurança | Contexto de build sem o .env da stack (S-19) | F07-01 | IMPLEMENTED | Claude | G10 |
 | F10-10 | Segurança | TURN sem TLS externo e sem 5349 solto (S-20) | F07-01 | IMPLEMENTED | Claude | G10 |
 | F10-11 | Segurança | Backup cifrado e contrato de firewall (S-17) | F07-01 | IMPLEMENTED | Claude | G10 |
-| F10-12 | Segurança | Mídia e navegação só na origem do bundle (S-07, S-08) | F05-01 | READY | Grok | G10 |
+| F10-12 | Segurança | Mídia e navegação só na origem do bundle (S-07, S-08) | F05-01 | WAITING_VALIDATION | Claude | G10 |
 | F10-13 | Segurança | Capability mínima e CSP de base (S-14, S-15) | F05-01 | READY | Grok | G10 |
 | F10-14 | Segurança | Prova de mídia fora do instalador (S-13) | F05-01 | READY | Grok | G10 |
 | F10-15 | Segurança | Cofre de um slot, recusa outra origem (S-05) | F05-01 | READY | Grok | G10 |
@@ -57,6 +57,8 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F11-01 | Marca | Novo ícone do app e variantes | F07-02 | WAITING_VALIDATION | Claude | G7 |
 
 ## Estado em 2026-10-19
+
+F10-12 ficou `WAITING_VALIDATION` na branch `task/F10-12-origem`: release não dá mídia à porta 1420 e a janela recusa navegar ou abrir outra janela. Falta ver no WebView2 do instalador.
 
 F10-11 ficou `IMPLEMENTED` na branch `task/F10-11-backup`: backup cifrado com `BACKUP_KEY`, ACL no Windows e lista de portas do firewall. Ida e volta provada com Postgres descartável.
 
