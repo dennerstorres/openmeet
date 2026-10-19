@@ -1,0 +1,15 @@
+.git
+**/.git
+**/node_modules
+**/dist
+**/target
+coverage
+**/*.log
+.env
+.env.*
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+infra/compose/generated
+apps/desktop/src-tauri/target
