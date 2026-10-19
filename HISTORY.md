@@ -1,5 +1,9 @@
 # HISTORY — registro cronológico
 
+### 2026-10-19 — F10-10 TURN sem TLS externo e sem 5349 solto (S-20) — Claude
+Branch `task/F10-10-turn`, sobre `task/F10-09-dockerignore`. `renderLiveKitYaml` recusa `TURN_EXTERNAL_TLS=1` (nenhum terminador roda nesta stack) e recusa `TURN_USERNAME`/`TURN_PASSWORD`; o YAML nunca grava `external_tls` nem credencial fixa. TURN só liga com `TURN_DOMAIN` e certificado. `docker-compose.turn.yml` publica só `3478/udp`; `5349` está só em `docker-compose.turn-certs.yml`, que monta o certificado. `docs/DEPLOYMENT.md` deixou de ensinar o modo externo.
+Comandos, Windows 11: `pnpm lint` e `prettier --check` ok. `pnpm test`: scripts 21, todos pass. `docker compose config` com os três arquivos publica `3478` e `5349` só com o overlay de certificado. Não feito: TURN numa VPS real. `IMPLEMENTED`.
+
 ### 2026-10-19 — F10-09 contexto de build sem o .env da stack (S-19) — Claude
 Branch `task/F10-09-dockerignore`, sobre `task/F10-08-bootstrap`. `.dockerignore` ganhou `infra/compose/.env`, `infra/compose/.env.*`, `**/.env` e `**/.env.*`. Dockerfile sem mudança; sem allowlist e sem `--filter`, como o desenho manda. `scripts/dockerignore.test.mjs` exige os quatro padrões e nenhuma reinclusão com `!`.
 Comandos, Windows 11, Docker 29.8.1: com `infra/compose/.env`, `infra/compose/.env.local` e `apps/server/sub/.env` de mentira criados, `docker build --no-cache` com contexto na raiz e `COPY . /ctx` rodou `test ! -e` nos três e imprimiu `CONTEXT_CLEAN`; os arquivos foram apagados depois. `pnpm typecheck`, `pnpm lint` e `prettier --check` ok. `pnpm test`: scripts 21, todos pass. `IMPLEMENTED`.

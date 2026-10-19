@@ -32,7 +32,7 @@ Caddy publica 80/tcp, 443/tcp e 443/udp. Ele termina TLS nos dois domínios e en
 
 A mídia publica `7881/tcp` e `7882/udp`. Esse UDP é o mux. A faixa `50000-60000` não é usada. Cloudflare Tunnel não carrega essa mídia.
 
-TURN fica desligado até o operador escolher um modo. Com certificado próprio, gere o YAML com `TURN_DOMAIN`, `TURN_CERT_FILE` e `TURN_KEY_FILE`, e suba também `docker-compose.turn.yml` e `docker-compose.turn-certs.yml`. Com TLS terminado fora do LiveKit, use `TURN_EXTERNAL_TLS=1` e só o arquivo de portas. As portas extras são `3478/udp` e `5349/tcp`. O `5349` não toma o `443` do Caddy.
+TURN fica desligado até o operador escolher um modo. Com certificado próprio, gere o YAML com `TURN_DOMAIN`, `TURN_CERT_FILE` e `TURN_KEY_FILE`, e suba também `docker-compose.turn.yml` e `docker-compose.turn-certs.yml`. O modo `TURN_EXTERNAL_TLS=1` foi retirado (S-20): nenhum serviço desta stack termina TLS de TURN, e o gerador recusa esse valor. Usuário e senha fixos de TURN também são recusados; o LiveKit emite credencial efêmera. `docker-compose.turn.yml` publica só `3478/udp`; o `5349/tcp` só aparece com `docker-compose.turn-certs.yml`, que monta o certificado. O `5349` não toma o `443` do Caddy.
 
 `LIVEKIT_NODE_IP` é opcional. Sem ele, o LiveKit descobre o IP público. Loopback e link-local são recusados.
 

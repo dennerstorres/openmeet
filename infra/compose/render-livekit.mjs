@@ -39,25 +39,32 @@ function turnBlock(env) {
   const domain = env.TURN_DOMAIN?.trim().toLowerCase() ?? "";
   const cert = env.TURN_CERT_FILE?.trim() ?? "";
   const key = env.TURN_KEY_FILE?.trim() ?? "";
-  const external = env.TURN_EXTERNAL_TLS === "1";
-  if (domain.length === 0 && cert.length === 0 && key.length === 0 && !external) {
+  // S-20: no terminator for external TLS lives in this Compose, so that mode is refused.
+  if (env.TURN_EXTERNAL_TLS === "1") {
+    throw new Error("TURN_EXTERNAL_TLS is not available: no TLS terminator runs in this stack");
+  }
+  // Credentials stay ephemeral, issued by LiveKit from the API key. A static TURN user never enters the YAML.
+  if ((env.TURN_USERNAME ?? "").length > 0 || (env.TURN_PASSWORD ?? "").length > 0) {
+    throw new Error("static TURN credentials are not supported");
+  }
+  if (domain.length === 0 && cert.length === 0 && key.length === 0) {
     return "";
   }
   if (!hostname.test(domain)) {
     throw new Error("TURN_DOMAIN is missing or invalid");
   }
-  if (external && (cert.length > 0 || key.length > 0)) {
-    throw new Error("TURN_EXTERNAL_TLS cannot be combined with certificate files");
+  if (cert.length === 0 || key.length === 0) {
+    throw new Error("TURN requires certificate files");
   }
-  if (!external && (cert.length === 0 || key.length === 0)) {
-    throw new Error("TURN requires certificate files or TURN_EXTERNAL_TLS=1");
-  }
-  const lines = ["turn:", "  enabled: true", `  domain: ${quote(domain)}`, "  tls_port: 5349", "  udp_port: 3478"];
-  if (external) {
-    lines.push("  external_tls: true");
-  } else {
-    lines.push("  cert_file: /certs/turn.pem", "  key_file: /certs/turn.key");
-  }
+  const lines = [
+    "turn:",
+    "  enabled: true",
+    `  domain: ${quote(domain)}`,
+    "  tls_port: 5349",
+    "  udp_port: 3478",
+    "  cert_file: /certs/turn.pem",
+    "  key_file: /certs/turn.key",
+  ];
   return lines.join("\n");
 }
 

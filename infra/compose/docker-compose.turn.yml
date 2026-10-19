@@ -1,5 +1,5 @@
+# S-20: only TURN over UDP here. 5349 is published by docker-compose.turn-certs.yml, where LiveKit holds the certificate.
 services:
   livekit:
     ports:
       - "3478:3478/udp"
-      - "5349:5349"

@@ -28,31 +28,27 @@ test("production config uses the udp mux and hides the secret from errors", () =
   );
 });
 
-test("turn stays off unless the operator completes one mode", () => {
-  assert.throws(() => renderLiveKitYaml({ ...env, TURN_DOMAIN: "turn.example.com" }), /certificate files or TURN_EXTERNAL_TLS/);
-  const external = renderLiveKitYaml({ ...env, TURN_DOMAIN: "turn.example.com", TURN_EXTERNAL_TLS: "1" });
-  assert.match(external, /external_tls: true/);
-  assert.equal(external.includes("cert_file"), false);
-  assert.equal(external.includes("--dev"), false);
-  const embedded = renderLiveKitYaml({
-    ...env,
-    TURN_DOMAIN: "turn.example.com",
-    TURN_CERT_FILE: "C:\\secrets\\turn.pem",
-    TURN_KEY_FILE: "C:\\secrets\\turn.key",
-  });
+test("turn stays off unless the operator brings a certificate (S-20)", async () => {
+  const { readFile } = await import("node:fs/promises");
+  assert.throws(() => renderLiveKitYaml({ ...env, TURN_DOMAIN: "turn.example.com" }), /certificate files/);
+  assert.throws(() => renderLiveKitYaml({ ...env, TURN_DOMAIN: "turn.example.com", TURN_EXTERNAL_TLS: "1" }), /TURN_EXTERNAL_TLS is not available/);
+  assert.throws(() => renderLiveKitYaml({ ...env, TURN_EXTERNAL_TLS: "1" }), /TURN_EXTERNAL_TLS is not available/);
+  const certs = { ...env, TURN_DOMAIN: "turn.example.com", TURN_CERT_FILE: "C:\\secrets\\turn.pem", TURN_KEY_FILE: "C:\\secrets\\turn.key" };
+  for (const extra of [{ TURN_USERNAME: "relay" }, { TURN_PASSWORD: "relay-password" }]) {
+    assert.throws(() => renderLiveKitYaml({ ...certs, ...extra }), /static TURN credentials/);
+  }
+  const embedded = renderLiveKitYaml(certs);
   assert.match(embedded, /cert_file: \/certs\/turn\.pem/);
   assert.equal(embedded.includes("C:\\secrets"), false);
-  assert.throws(
-    () =>
-      renderLiveKitYaml({
-        ...env,
-        TURN_DOMAIN: "turn.example.com",
-        TURN_EXTERNAL_TLS: "1",
-        TURN_CERT_FILE: "C:\\secrets\\turn.pem",
-        TURN_KEY_FILE: "C:\\secrets\\turn.key",
-      }),
-    /cannot be combined/,
-  );
+  assert.equal(embedded.includes("external_tls"), false);
+  assert.equal(/username|password|credential/i.test(embedded.slice(embedded.indexOf("turn:"))), false);
+  assert.equal(embedded.includes("--dev"), false);
+
+  const udpOnly = await readFile(new URL("../infra/compose/docker-compose.turn.yml", import.meta.url), "utf8");
+  assert.equal(/^\s*- "?5349/m.test(udpOnly), false);
+  assert.match(udpOnly, /"3478:3478\/udp"/);
+  const withCerts = await readFile(new URL("../infra/compose/docker-compose.turn-certs.yml", import.meta.url), "utf8");
+  assert.match(withCerts, /"5349:5349"/);
 });
 
 test("node ip replaces external discovery and rejects loopback", () => {

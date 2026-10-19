@@ -45,7 +45,7 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F10-07 | Segurança | Limite só atrás do segredo do proxy (S-11) | F07-01 | WAITING_VALIDATION | Claude | G10 |
 | F10-08 | Segurança | Bootstrap sem oráculo e sem stdout (S-12) | F07-01 | WAITING_VALIDATION | Claude | G10 |
 | F10-09 | Segurança | Contexto de build sem o .env da stack (S-19) | F07-01 | IMPLEMENTED | Claude | G10 |
-| F10-10 | Segurança | TURN sem TLS externo e sem 5349 solto (S-20) | F07-01 | READY | Grok | G10 |
+| F10-10 | Segurança | TURN sem TLS externo e sem 5349 solto (S-20) | F07-01 | IMPLEMENTED | Claude | G10 |
 | F10-11 | Segurança | Backup cifrado e contrato de firewall (S-17) | F07-01 | READY | Grok | G10 |
 | F10-12 | Segurança | Mídia e navegação só na origem do bundle (S-07, S-08) | F05-01 | READY | Grok | G10 |
 | F10-13 | Segurança | Capability mínima e CSP de base (S-14, S-15) | F05-01 | READY | Grok | G10 |
@@ -57,6 +57,8 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F11-01 | Marca | Novo ícone do app e variantes | F07-02 | WAITING_VALIDATION | Claude | G7 |
 
 ## Estado em 2026-10-19
+
+F10-10 ficou `IMPLEMENTED` na branch `task/F10-10-turn`: TLS externo de TURN recusado e `5349` só com certificado.
 
 F10-09 ficou `IMPLEMENTED` na branch `task/F10-09-dockerignore`: o `.env` da stack fica fora do contexto de build, provado com `docker build` local.
 
