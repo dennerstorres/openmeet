@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-19 — instalador com o visual verde — Claude
+`main` (9e228da), branch `task/visual-verde` integrada e apagada. `pnpm --filter @openmeet/desktop exec tauri build --bundles nsis` gerou `OpenMeet_0.1.0_x64-setup.exe`, 2,02 MiB, SHA256 `299443a4a051a5128c7bebcc1d89c271d302d48107816bebf9feb1c456066285`, copiado para a Área de Trabalho. O instalador não foi aberto.
+
 ### 2026-10-19 — visual escuro com verde — Claude
 Sem branch ainda, sobre `main` (b5f6adc). Protótipo aprovado no Claude Design. `App.css` reescrito com tokens (`--bg-*`, `--accent` #15803d, `--glow` #3ddc84). Login virou um cartão com marca ao lado. Sidebar ganhou painel "Voz conectada" com Câmera/Tela e sair, e o rodapé da conta tem microfone, ensurdecer e menu de conta. A barra de controles usa botões redondos com ícones SVG (`meeting/Icons.tsx`) e `aria-label`. Fonte do sistema (Segoe UI): a CSP não deixa carregar fonte externa. Nenhuma regra de mídia mudou.
 Comandos, Windows 11: `prettier --write`, `pnpm typecheck`, `eslint apps/desktop/src`, `pnpm --filter @openmeet/desktop build` e `test` ok. Conferido no navegador (Vite :1420) contra API local, Postgres descartável e LiveKit `--dev`: login, sidebar com salas e ocupantes, painel "Voz conectada", controles redondos, Destaque/Grade e menu da conta. Não feito: janela Tauri, câmera e compartilhamento com outra pessoa. `WAITING_VALIDATION`.
