@@ -29,7 +29,7 @@ export const users = pgTable(
       .where(sql`${table.role} = 'admin'`),
     check("users_username_charset", sql`${table.username} ~ '^[A-Za-z0-9_-]{1,64}$'`),
     check("users_password_hash_present", sql`char_length(${table.passwordHash}) > 0`),
-    check("users_display_name_length", sql`char_length(${table.displayName}) between 1 and 80`),
+    check("users_display_name_safe", sql`openmeet_is_label(${table.displayName})`),
   ],
 );
 
@@ -60,7 +60,7 @@ export const servers = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (table) => [check("servers_name_length", sql`char_length(${table.name}) between 1 and 80`)],
+  (table) => [check("servers_name_safe", sql`openmeet_is_label(${table.name})`)],
 );
 
 export const serverMembers = pgTable(
@@ -127,7 +127,7 @@ export const rooms = pgTable(
   },
   (table) => [
     unique("rooms_server_slug_unique").on(table.serverId, table.slug),
-    check("rooms_name_length", sql`char_length(${table.name}) between 1 and 80`),
+    check("rooms_name_safe", sql`openmeet_is_label(${table.name})`),
     check("rooms_slug_charset", sql`${table.slug} ~ '^[A-Za-z0-9_-]{1,64}$'`),
   ],
 );

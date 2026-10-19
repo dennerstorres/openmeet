@@ -243,6 +243,7 @@ function parseRoom(value: unknown): RoomSummary {
     !UUID.test(id) ||
     name === undefined ||
     name.length > 80 ||
+    hasControlCharacter(name) ||
     slug === undefined ||
     (kind !== "persistent" && kind !== "temporary") ||
     typeof record.ended !== "boolean"
@@ -279,12 +280,35 @@ function objectRecord(value: unknown, code: "invalid_instance" | "invalid_sessio
   return Object.fromEntries(Object.entries(value));
 }
 
+/** S-21: C0, DEL, C1, line and paragraph separators, and bidi controls never reach a label. */
+export function isHiddenCharacter(code: number): boolean {
+  return (
+    code <= 0x1f ||
+    (code >= 0x7f && code <= 0x9f) ||
+    code === 0x2028 ||
+    code === 0x2029 ||
+    code === 0x061c ||
+    code === 0x200e ||
+    code === 0x200f ||
+    (code >= 0x202a && code <= 0x202e) ||
+    (code >= 0x2066 && code <= 0x2069)
+  );
+}
+
 export function hasControlCharacter(value: string): boolean {
   for (let index = 0; index < value.length; index += 1) {
-    const code = value.charCodeAt(index);
-    if (code <= 31 || code === 127) return true;
+    if (isHiddenCharacter(value.charCodeAt(index))) return true;
   }
   return false;
+}
+
+/** A display, room or server name: trimmed, 1 to 80 characters, nothing hidden. Never cleaned in silence. */
+export function parseLabel(value: string): string | undefined {
+  // Checked before trim: a trailing line break is refused, not cut.
+  if (hasControlCharacter(value)) return undefined;
+  const name = value.trim();
+  if (name.length < 1 || name.length > 80) return undefined;
+  return name;
 }
 
 function text(value: unknown): string | undefined {

@@ -36,7 +36,7 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F09-05 | Sala | Ensurdecer o áudio remoto só neste PC | F04-02 | IMPLEMENTED | Claude | G9 |
 | F09-06 | Sala | Áudio do PC opcional no compartilhamento | F04-03 | WAITING_VALIDATION | Claude | G9 |
 | F09-07 | Identidade | Login Google pelo navegador, chaves só no servidor | F03-02 | WAITING_VALIDATION | Claude | G9 |
-| F10-01 | Segurança | Recusar controle e bidi nos nomes (S-21) | F03-03 | READY | Grok | G10 |
+| F10-01 | Segurança | Recusar controle e bidi nos nomes (S-21) | F03-03 | IMPLEMENTED | Claude | G10 |
 | F10-02 | Segurança | Sala só para membro, sem username (S-01, S-10) | F03-03 | READY | Grok | G10 |
 | F10-03 | Segurança | Reuso de refresh revoga a família (S-03) | F03-02 | READY | Grok | G10 |
 | F10-04 | Segurança | Corte no SFU repetível e join na mesma trava (S-04) | F10-02 | PENDING | Grok | G10 |
@@ -57,6 +57,8 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F11-01 | Marca | Novo ícone do app e variantes | F07-02 | WAITING_VALIDATION | Claude | G7 |
 
 ## Estado em 2026-10-19
+
+F10-01 ficou `IMPLEMENTED` na branch `task/F10-01-nomes`: uma função em `packages/shared` recusa controle e bidi no nome da pessoa, da sala, do servidor e da instância. Migration `0004_display_name.sql` troca os CHECKs. Falta a revisão do G10.
 
 F11-01 ficou `WAITING_VALIDATION`: símbolo C (anel com ponto central e ponto de ao vivo) em verde #16a34a com branco. Fontes em `apps/desktop/brand/`: verde, branco no preto, preto no branco, verde no escuro e só o símbolo. Ícones do Tauri regenerados por `tauri icon`. Falta ver o ícone instalado no Windows (atalho, barra de tarefas e bandeja).
 

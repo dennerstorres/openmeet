@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { parseSignalUrl } from "@openmeet/shared";
+import { parseLabel, parseSignalUrl } from "@openmeet/shared";
 import { AccessToken } from "livekit-server-sdk";
 import type { AppEnv } from "../poc-join.js";
 import type { MigrationClient } from "../db/migrate.js";
@@ -92,8 +92,8 @@ export function serverId(value: string): string {
 }
 
 function parseName(value: string): string {
-  const name = value.trim();
-  if (name.length < 1 || name.length > 80) throw new RoomError("invalid_body");
+  const name = parseLabel(value);
+  if (name === undefined) throw new RoomError("invalid_body");
   return name;
 }
 
@@ -108,8 +108,8 @@ export async function createAccount(
 ): Promise<PublicUser> {
   if (actor.role !== "admin") throw new RoomError("forbidden");
   if (!USERNAME.test(input.username)) throw new RoomError("invalid_username");
-  const displayName = input.displayName.trim();
-  if (displayName.length < 1 || displayName.length > 80) throw new RoomError("invalid_display_name");
+  const displayName = parseLabel(input.displayName);
+  if (displayName === undefined) throw new RoomError("invalid_display_name");
   if (input.password.length < 12 || input.password.length > 128) throw new RoomError("weak_password");
   if (input.role !== "moderator" && input.role !== "participant") throw new RoomError("invalid_body");
   const passwordHash = await hashPassword(input.password);
@@ -521,6 +521,8 @@ async function issueRoomToken(env: AppEnv, room: string, userId: string, display
   const apiSecret = env.LIVEKIT_API_SECRET;
   const signalUrl = env.LIVEKIT_URL;
   if (!apiKey || !apiSecret || !signalUrl) throw new RoomError("room_unconfigured");
+  // A name stored before 0004 is never signed into the call label.
+  if (parseLabel(displayName) !== displayName) throw new RoomError("invalid_display_name");
   let url: URL;
   try {
     url = parseSignalUrl(signalUrl);

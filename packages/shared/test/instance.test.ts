@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseGoogleStart, PocInputError, canonicalInstanceUrl, parseInstanceCard, prepareInstanceRequest, readErrorCode } from "../src/index.js";
+import {
+  parseGoogleStart,
+  PocInputError,
+  canonicalInstanceUrl,
+  hasControlCharacter,
+  parseInstanceCard,
+  parseLabel,
+  prepareInstanceRequest,
+  readErrorCode,
+} from "../src/index.js";
 
 const roomId = "11111111-1111-4111-8111-111111111111";
 
@@ -109,4 +118,17 @@ test("Google start is accepted only when it points at Google's own sign-in page"
   }
   assert.throws(() => parseGoogleStart({ ...good, poll: "short" }), PocInputError);
   assert.throws(() => parseGoogleStart({ ...good, expiresIn: 99999 }), PocInputError);
+});
+
+test("parseLabel refuses C0, DEL, C1, separators and bidi without cleaning them (S-21)", () => {
+  for (const code of [0x0a, 0x7f, 0x85, 0x9f, 0x2028, 0x2029, 0x061c, 0x200e, 0x200f, 0x202a, 0x202e, 0x2066, 0x2069]) {
+    const name = `Ana${String.fromCharCode(code)}`;
+    assert.equal(parseLabel(name), undefined, code.toString(16));
+    assert.equal(hasControlCharacter(name), true, code.toString(16));
+  }
+  assert.equal(parseLabel("  João Ação  "), "João Ação");
+  assert.equal(parseLabel("á".repeat(80)), "á".repeat(80));
+  assert.equal(parseLabel("á".repeat(81)), undefined);
+  assert.equal(parseLabel("   "), undefined);
+  assert.throws(() => parseInstanceCard({ name: "Sala‮", apiVersion: "v1", bootstrapOpen: false }), PocInputError);
 });

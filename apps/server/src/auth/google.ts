@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { isHiddenCharacter } from "@openmeet/shared";
 import type { MigrationClient } from "../db/migrate.js";
 import type { AppEnv } from "../poc-join.js";
 import { hashPassword } from "./password.js";
@@ -217,22 +218,10 @@ function usernameBase(email: string): string {
   return local.length > 0 ? local : `google-${randomBytes(4).toString("hex")}`;
 }
 
-// C0, C1, line and paragraph separators, and bidi controls never reach a display name.
-function hiddenCharacter(code: number): boolean {
-  return (
-    code <= 0x1f ||
-    (code >= 0x7f && code <= 0x9f) ||
-    code === 0x2028 ||
-    code === 0x2029 ||
-    (code >= 0x202a && code <= 0x202e) ||
-    (code >= 0x2066 && code <= 0x2069)
-  );
-}
-
 function cleanName(value: string | undefined): string | undefined {
   if (value === undefined) return undefined;
   const name = [...value]
-    .filter((char) => !hiddenCharacter(char.codePointAt(0) ?? 0))
+    .filter((char) => !isHiddenCharacter(char.codePointAt(0) ?? 0))
     .join("")
     .trim();
   return name.length >= 1 && name.length <= 80 ? name : undefined;

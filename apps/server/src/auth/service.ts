@@ -1,3 +1,4 @@
+import { parseLabel } from "@openmeet/shared";
 import type { MigrationClient } from "../db/migrate.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import { ACCESS_TOKEN_TTL_SECONDS, hashSecret, newRefreshToken, readAccessToken, secretsMatch, signAccessToken } from "./tokens.js";
@@ -61,8 +62,8 @@ function parseUsername(value: string): string {
 }
 
 function parseDisplayName(value: string): string {
-  const name = value.trim();
-  if (name.length < 1 || name.length > 80) throw new AuthError("invalid_display_name");
+  const name = parseLabel(value);
+  if (name === undefined) throw new AuthError("invalid_display_name");
   return name;
 }
 

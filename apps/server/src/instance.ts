@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { parseLabel } from "@openmeet/shared";
 import type { MigrationClient } from "./db/migrate.js";
 import { googleConfig } from "./auth/google.js";
 import type { AppEnv } from "./poc-join.js";
@@ -7,18 +8,8 @@ function isTrue(value: unknown): boolean {
   return value === true || value === "t" || value === "true" || value === 1;
 }
 
-function hasControlCharacter(value: string): boolean {
-  for (let index = 0; index < value.length; index += 1) {
-    const code = value.charCodeAt(index);
-    if (code <= 31 || code === 127) return true;
-  }
-  return false;
-}
-
 export function instanceName(env: AppEnv): string {
-  const name = (env.INSTANCE_NAME ?? "").trim();
-  if (name.length < 1 || name.length > 80 || hasControlCharacter(name)) return "OpenMeet";
-  return name;
+  return parseLabel(env.INSTANCE_NAME ?? "") ?? "OpenMeet";
 }
 
 export function registerInstance(app: FastifyInstance, env: AppEnv, db: MigrationClient | undefined): void {

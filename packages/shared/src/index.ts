@@ -1,8 +1,11 @@
 export {
   canonicalInstanceUrl,
+  hasControlCharacter,
+  isHiddenCharacter,
   parseAccountSession,
   parseGoogleStart,
   parseInstanceCard,
+  parseLabel,
   parseRoomJoin,
   parsePresence,
   parseRoomList,
