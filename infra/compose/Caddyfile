@@ -1,5 +1,9 @@
 {$API_DOMAIN} {
-	reverse_proxy api:3000
+	# S-11: header_up replaces whatever the client sent. The API trusts the address only with this secret.
+	reverse_proxy api:3000 {
+		header_up X-Forwarded-For {remote_host}
+		header_up X-OpenMeet-Proxy {$PROXY_AUTH}
+	}
 }
 
 {$LIVEKIT_DOMAIN} {

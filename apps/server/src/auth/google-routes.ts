@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { MigrationClient } from "../db/migrate.js";
 import type { AppEnv } from "../poc-join.js";
 import { finishGoogleLogin, googleConfig, liveGoogleTokens, pollGoogleLogin, startGoogleLogin, type GoogleTokens } from "./google.js";
-import { clientAddress, type AttemptPolicy } from "./limit.js";
+import { clientAddress, headerValue, ProxyRejected, type AttemptPolicy } from "./limit.js";
 import { AuthError } from "./service.js";
 
 const PAGE_HEADERS = {
@@ -58,7 +58,17 @@ export function registerGoogle(
 
   app.post("/api/v1/auth/google/start", async (request, reply) => {
     if (!config || !db || !secret) return reply.code(404).send({ error: "google_unconfigured" });
-    const ip = clientAddress(request.ip, request.headers["x-forwarded-for"]?.toString(), attempts.trustProxy);
+    let ip: string;
+    try {
+      ip = clientAddress(
+        request.ip,
+        { forwarded: headerValue(request.headers["x-forwarded-for"]), proxy: headerValue(request.headers["x-openmeet-proxy"]) },
+        attempts,
+      );
+    } catch (error) {
+      if (error instanceof ProxyRejected) return reply.code(503).send({ error: "proxy_rejected" });
+      throw error;
+    }
     if (!attempts.loginIp.allow(`google:${ip}`, attempts.now())) return reply.code(429).send({ error: "rate_limited" });
     try {
       return reply

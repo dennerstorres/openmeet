@@ -45,6 +45,7 @@ const AUTH_STATUS: Record<AuthErrorCode, number> = {
   unauthorized: 401,
   rate_limited: 429,
   media_disconnect_failed: 502,
+  proxy_rejected: 503,
 };
 
 const ROOM_STATUS: Record<RoomErrorCode, number> = {

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { buildApp } from "../src/app.js";
-import { clientAddress } from "../src/auth/limit.js";
+import { clientAddress, createAttemptGate, ProxyRejected } from "../src/auth/limit.js";
 import { applyMigrations, type MigrationClient } from "../src/db/migrate.js";
 
 const bootstrapToken = "unit-test-bootstrap-token";
@@ -33,11 +33,98 @@ function pgliteClient(db: PGlite): MigrationClient {
   return client;
 }
 
-test("client address ignores a forwarded header unless the proxy is trusted", () => {
-  assert.equal(clientAddress("127.0.0.1", "203.0.113.8", false), "127.0.0.1");
-  assert.equal(clientAddress("127.0.0.1", "203.0.113.8, 10.0.0.1", true), "203.0.113.8");
-  assert.equal(clientAddress("127.0.0.1", "bad hop", true), "127.0.0.1");
-  assert.equal(clientAddress("127.0.0.1", undefined, true), "127.0.0.1");
+const proxySecret = "p".repeat(32);
+const behindProxy = { trustProxy: true, proxySecret };
+
+test("client address trusts the forwarded hop only with the proxy secret (S-11)", () => {
+  assert.equal(clientAddress("127.0.0.1", { forwarded: "203.0.113.8", proxy: undefined }, { trustProxy: false, proxySecret: undefined }), "127.0.0.1");
+  assert.equal(clientAddress("127.0.0.1", { forwarded: "203.0.113.8", proxy: proxySecret }, behindProxy), "203.0.113.8");
+  for (const headers of [
+    { forwarded: "203.0.113.8", proxy: undefined },
+    { forwarded: "203.0.113.8", proxy: "q".repeat(32) },
+    { forwarded: "203.0.113.8, 10.0.0.1", proxy: proxySecret },
+    { forwarded: "bad hop", proxy: proxySecret },
+    { forwarded: undefined, proxy: proxySecret },
+  ]) {
+    assert.throws(() => clientAddress("127.0.0.1", headers, behindProxy), ProxyRejected);
+  }
+  assert.throws(() => clientAddress("127.0.0.1", { forwarded: "203.0.113.8", proxy: "short" }, { trustProxy: true, proxySecret: "short" }), ProxyRejected);
+});
+
+test("the attempt map stops at its cap and refuses a new key instead of dropping a live one", () => {
+  const gate = createAttemptGate(2, 1_000, 4096);
+  for (let index = 0; index < 4096; index += 1) assert.equal(gate.allow(`k${index}`, 0), true);
+  assert.equal(gate.allow("extra", 10), false);
+  assert.equal(gate.allow("k0", 10), true);
+  assert.equal(gate.allow("k0", 20), false);
+  assert.equal(gate.allow("extra", 1_000), true);
+});
+
+test("login, bootstrap and refresh behind the proxy need the secret; health does not", async () => {
+  const pg = new PGlite();
+  const db = pgliteClient(pg);
+  await applyMigrations(db);
+  const app = await buildApp({
+    logger: false,
+    env: { AUTH_SECRET: authSecret, BOOTSTRAP_TOKEN: bootstrapToken, TRUST_PROXY: "1", PROXY_AUTH: proxySecret },
+    db,
+    attempts: { refreshIpLimit: 3, windowMs: 60_000 },
+  });
+  const viaProxy = (address: string) => ({ "x-forwarded-for": address, "x-openmeet-proxy": proxySecret });
+  try {
+    for (const headers of [
+      {},
+      { "x-forwarded-for": "203.0.113.8" },
+      { "x-forwarded-for": "203.0.113.8", "x-openmeet-proxy": "wrong-secret-wrong-secret-wrong-1" },
+    ]) {
+      for (const [url, payload] of [
+        ["/api/v1/auth/login", { username: "admin", password }],
+        ["/api/v1/auth/bootstrap", { token: bootstrapToken, username: "admin", password, displayName: "Admin" }],
+        ["/api/v1/auth/refresh", { refreshToken: "r".repeat(43) }],
+      ] as const) {
+        const refused = await app.inject({ method: "POST", url, headers, payload });
+        assert.equal(refused.statusCode, 503, `${url} ${JSON.stringify(headers)}`);
+        assert.deepEqual(refused.json(), { error: "proxy_rejected" });
+      }
+    }
+    assert.equal((await app.inject({ method: "GET", url: "/health/live" })).statusCode, 200);
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/bootstrap",
+      headers: viaProxy("203.0.113.8"),
+      payload: { token: bootstrapToken, username: "admin", password, displayName: "Admin" },
+    });
+    assert.equal(created.statusCode, 201);
+    let refreshToken = (created.json() as { refreshToken: string }).refreshToken;
+    for (let index = 0; index < 3; index += 1) {
+      const rotated = await app.inject({ method: "POST", url: "/api/v1/auth/refresh", headers: viaProxy("203.0.113.9"), payload: { refreshToken } });
+      assert.equal(rotated.statusCode, 200);
+      refreshToken = (rotated.json() as { refreshToken: string }).refreshToken;
+    }
+    const limited = await app.inject({ method: "POST", url: "/api/v1/auth/refresh", headers: viaProxy("203.0.113.9"), payload: { refreshToken } });
+    assert.equal(limited.statusCode, 429);
+    const otherAddress = await app.inject({ method: "POST", url: "/api/v1/auth/refresh", headers: viaProxy("198.51.100.4"), payload: { refreshToken } });
+    assert.equal(otherAddress.statusCode, 200);
+  } finally {
+    await app.close();
+    await pg.close();
+  }
+});
+
+test("one refresh token is limited on its own across addresses", async () => {
+  const pg = new PGlite();
+  const db = pgliteClient(pg);
+  await applyMigrations(db);
+  const app = await buildApp({ logger: false, env: { AUTH_SECRET: authSecret, BOOTSTRAP_TOKEN: bootstrapToken }, db, attempts: { refreshTokenLimit: 2 } });
+  try {
+    for (let index = 0; index < 2; index += 1) {
+      assert.equal((await app.inject({ method: "POST", url: "/api/v1/auth/refresh", payload: { refreshToken: "s".repeat(43) } })).statusCode, 401);
+    }
+    assert.equal((await app.inject({ method: "POST", url: "/api/v1/auth/refresh", payload: { refreshToken: "s".repeat(43) } })).statusCode, 429);
+  } finally {
+    await app.close();
+    await pg.close();
+  }
 });
 
 test("login and bootstrap attempts are limited, separated by user, and recover", async () => {
@@ -120,21 +207,21 @@ test("login and bootstrap attempts are limited, separated by user, and recover",
 
     const trusted = await buildApp({
       logger: false,
-      env: { AUTH_SECRET: authSecret, BOOTSTRAP_TOKEN: bootstrapToken, TRUST_PROXY: "1" },
+      env: { AUTH_SECRET: authSecret, BOOTSTRAP_TOKEN: bootstrapToken, TRUST_PROXY: "1", PROXY_AUTH: proxySecret },
       db,
       attempts: { loginLimit: 1, loginIpLimit: 1, windowMs: 60_000 },
     });
     const fromA = await trusted.inject({
       method: "POST",
       url: "/api/v1/auth/login",
-      headers: { "x-forwarded-for": "203.0.113.8" },
+      headers: { "x-forwarded-for": "203.0.113.8", "x-openmeet-proxy": proxySecret },
       payload: { username: "admin", password: "wrong-password-value" },
     });
     assert.equal(fromA.statusCode, 401);
     const fromB = await trusted.inject({
       method: "POST",
       url: "/api/v1/auth/login",
-      headers: { "x-forwarded-for": "203.0.113.9" },
+      headers: { "x-forwarded-for": "203.0.113.9", "x-openmeet-proxy": proxySecret },
       payload: { username: "other", password: "wrong-password-value" },
     });
     assert.equal(fromB.statusCode, 401);

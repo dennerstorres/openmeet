@@ -24,6 +24,8 @@ TURN fica desligado até o operador escolher um modo. Com certificado próprio, 
 
 `LIVEKIT_NODE_IP` é opcional. Sem ele, o LiveKit descobre o IP público. Loopback e link-local são recusados.
 
+A API não pode ganhar `ports` no Compose nem ser publicada fora do Caddy (S-11). O Caddy entrega `X-OpenMeet-Proxy` com o `PROXY_AUTH` do `.env` e reescreve `X-Forwarded-For`; um teste do repositório falha se `api` ou `postgres` publicarem porta. Uma `.env` antiga ganha `PROXY_AUTH` ao rodar `host.mjs` de novo; sem ele a API não sobe.
+
 ## Backup
 Com a stack no ar e `POSTGRES_PASSWORD` só no ambiente do processo:
 

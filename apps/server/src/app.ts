@@ -52,7 +52,7 @@ export async function buildApp(options?: {
     }
   });
 
-  const attempts = attemptPolicy(env.TRUST_PROXY === "1", options?.attempts);
+  const attempts = attemptPolicy(env.TRUST_PROXY === "1", options?.attempts, env.PROXY_AUTH);
   registerInstance(app, env, options?.db);
   registerAuth(app, env, options?.db, attempts, options?.media);
   registerGoogle(app, env, options?.db, attempts, options?.googleTokens);

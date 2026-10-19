@@ -53,3 +53,58 @@ test("host setup rejects a shared domain and a bad secret without echoing it", (
     },
   );
 });
+
+// Each service block of the Compose file, as the text under its two-space key.
+function composeServices(text) {
+  const services = new Map();
+  let current = null;
+  for (const line of text.split(/\r?\n/)) {
+    if (/^\S/.test(line)) current = null;
+    const service = /^ {2}([a-z0-9-]+):\s*$/.exec(line);
+    if (service && line.startsWith("  ") && !line.startsWith("   ")) {
+      current = service[1];
+      services.set(current, []);
+      continue;
+    }
+    if (current !== null) services.get(current).push(line);
+  }
+  return services;
+}
+
+test("the proxy secret is created once, never printed, and the API and database publish no port (S-11)", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const created = fillHostEnv({}, domains);
+  assert.match(created.PROXY_AUTH, /^[A-Za-z0-9]{32,128}$/);
+  assert.notEqual(created.PROXY_AUTH, created.AUTH_SECRET);
+  assert.equal(fillHostEnv(created, {}).PROXY_AUTH, created.PROXY_AUTH);
+  assert.throws(() => fillHostEnv({ ...created, PROXY_AUTH: "short" }, {}), /PROXY_AUTH is invalid/);
+  assert.equal(
+    publicReport({}, created).some((line) => line.includes(created.PROXY_AUTH)),
+    false,
+  );
+
+  const compose = composeServices(await readFile(new URL("../infra/compose/docker-compose.yml", import.meta.url), "utf8"));
+  for (const name of ["api", "postgres"]) {
+    const block = compose.get(name);
+    assert.ok(block, name);
+    assert.equal(
+      block.some((line) => /^ {4}ports:/.test(line)),
+      false,
+      `${name} must not publish a port`,
+    );
+  }
+  for (const name of ["api", "caddy"]) {
+    assert.equal(
+      compose.get(name).some((line) => line.includes("PROXY_AUTH: ${PROXY_AUTH:?set PROXY_AUTH}")),
+      true,
+      name,
+    );
+  }
+  const caddy = await readFile(new URL("../infra/compose/Caddyfile", import.meta.url), "utf8");
+  const apiSite = caddy.slice(caddy.indexOf("{$API_DOMAIN}"), caddy.indexOf("{$LIVEKIT_DOMAIN}"));
+  assert.match(apiSite, /header_up X-Forwarded-For \{remote_host\}/);
+  assert.match(apiSite, /header_up X-OpenMeet-Proxy \{\$PROXY_AUTH\}/);
+  assert.equal(caddy.slice(caddy.indexOf("{$LIVEKIT_DOMAIN}")).includes("PROXY_AUTH"), false);
+  const entrypoint = await readFile(new URL("../apps/server/docker-entrypoint.sh", import.meta.url), "utf8");
+  assert.match(entrypoint, /TRUST_PROXY:-0\}" = "1" \] && \[ "\$\{#PROXY_AUTH\}" -lt 32 \]/);
+});

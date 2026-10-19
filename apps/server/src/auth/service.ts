@@ -18,7 +18,8 @@ export type AuthErrorCode =
   | "invalid_session"
   | "unauthorized"
   | "rate_limited"
-  | "media_disconnect_failed";
+  | "media_disconnect_failed"
+  | "proxy_rejected";
 
 export class AuthError extends Error {
   readonly code: AuthErrorCode;
@@ -221,8 +222,14 @@ export async function login(
   });
 }
 
-export async function refreshSession(db: MigrationClient, secret: string, refreshToken: string): Promise<SessionBody> {
+export async function refreshSession(
+  db: MigrationClient,
+  secret: string,
+  refreshToken: string,
+  allow: ((tokenKey: string) => boolean) | undefined = undefined,
+): Promise<SessionBody> {
   if (refreshToken.length < 32) throw new AuthError("invalid_session");
+  if (allow && !allow(hashSecret(refreshToken))) throw new AuthError("rate_limited");
   // The family revocation must commit, so reuse is reported after the transaction instead of thrown inside it.
   const result = await db.transaction(async (tx): Promise<SessionBody | "reused" | "invalid"> => {
     const found = await tx.query("select family_id from refresh_sessions where token_hash = $1", [hashSecret(refreshToken)]);

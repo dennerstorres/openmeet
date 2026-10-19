@@ -42,7 +42,7 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F10-04 | Segurança | Corte no SFU repetível e join na mesma trava (S-04) | F10-02 | WAITING_VALIDATION | Claude | G10 |
 | F10-05 | Segurança | Desativar conta, senha, recuperação e corte no logout (S-02, S-18) | F10-03,F10-04 | WAITING_VALIDATION | Claude | G10 |
 | F10-06 | Segurança | Grant só com as fontes autorizadas (S-09) | F10-04 | IMPLEMENTED | Claude | G10 |
-| F10-07 | Segurança | Limite só atrás do segredo do proxy (S-11) | F07-01 | READY | Grok | G10 |
+| F10-07 | Segurança | Limite só atrás do segredo do proxy (S-11) | F07-01 | WAITING_VALIDATION | Claude | G10 |
 | F10-08 | Segurança | Bootstrap sem oráculo e sem stdout (S-12) | F07-01 | READY | Grok | G10 |
 | F10-09 | Segurança | Contexto de build sem o .env da stack (S-19) | F07-01 | READY | Grok | G10 |
 | F10-10 | Segurança | TURN sem TLS externo e sem 5349 solto (S-20) | F07-01 | READY | Grok | G10 |
@@ -57,6 +57,8 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F11-01 | Marca | Novo ícone do app e variantes | F07-02 | WAITING_VALIDATION | Claude | G7 |
 
 ## Estado em 2026-10-19
+
+F10-07 ficou `WAITING_VALIDATION` na branch `task/F10-07-proxy`: limite só com o segredo do Caddy, teto de chaves e limite de refresh. Falta subir a stack real e ver o Caddy entregando o cabeçalho.
 
 F10-06 ficou `IMPLEMENTED` na branch `task/F10-06-grant`: o token da sala só publica microfone, câmera, tela e áudio da tela, sem canal de dados nem admin.
 

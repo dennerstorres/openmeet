@@ -33,6 +33,8 @@ services:
       LIVEKIT_URL: ${LIVEKIT_URL:?set LIVEKIT_URL}
       BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:?set BOOTSTRAP_TOKEN}
       TRUST_PROXY: "1"
+      # S-11: shared with Caddy. The API refuses to start without 32 characters of it.
+      PROXY_AUTH: ${PROXY_AUTH:?set PROXY_AUTH}
       POC_JOIN: "0"
       # ADR 0010. Optional. Without both keys the Google button does not appear.
       API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN}
@@ -69,6 +71,7 @@ services:
     environment:
       API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN}
       LIVEKIT_DOMAIN: ${LIVEKIT_DOMAIN:?set LIVEKIT_DOMAIN}
+      PROXY_AUTH: ${PROXY_AUTH:?set PROXY_AUTH}
     ports:
       - "80:80"
       - "443:443"

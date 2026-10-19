@@ -17,6 +17,13 @@ if [ -z "${LIVEKIT_API_KEY:-}" ] || [ -z "${LIVEKIT_API_SECRET:-}" ] || [ -z "${
   exit 1
 fi
 
+# S-11: behind the proxy the login limit needs the shared proxy secret.
+PROXY_AUTH="${PROXY_AUTH:-}"
+if [ "${TRUST_PROXY:-0}" = "1" ] && [ "${#PROXY_AUTH}" -lt 32 ]; then
+  echo "PROXY_AUTH must have at least 32 characters when TRUST_PROXY=1" >&2
+  exit 1
+fi
+
 if [ "${POC_JOIN:-0}" = "1" ]; then
   echo "POC_JOIN must stay off in this stack" >&2
   exit 1

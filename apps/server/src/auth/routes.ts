@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { AppEnv } from "../poc-join.js";
 import type { MigrationClient } from "../db/migrate.js";
-import { clientAddress, type AttemptPolicy } from "./limit.js";
+import { clientAddress, headerValue, ProxyRejected, type AttemptPolicy } from "./limit.js";
 import type { RoomMedia } from "../rooms/media.js";
 import { AuthError, type AuthErrorCode, bootstrapAdmin, changePassword, currentUser, login, logout, refreshSession } from "./service.js";
 
@@ -18,6 +18,7 @@ const STATUS: Record<AuthErrorCode, number> = {
   unauthorized: 401,
   rate_limited: 429,
   media_disconnect_failed: 502,
+  proxy_rejected: 503,
 };
 
 function configuredSecret(env: AppEnv): string | undefined {
@@ -42,10 +43,6 @@ function requireField(body: unknown, key: string): string {
   return value;
 }
 
-function headerValue(header: string | string[] | undefined): string | undefined {
-  return Array.isArray(header) ? header[0] : header;
-}
-
 function bearer(header: string | string[] | undefined): string | undefined {
   const value = Array.isArray(header) ? undefined : header;
   if (!value?.startsWith("Bearer ")) return undefined;
@@ -60,8 +57,18 @@ export function registerAuth(
   attempts: AttemptPolicy,
   media: RoomMedia | undefined = undefined,
 ): void {
+  // S-11: the routes that count attempts answer 503 when the request did not come through the stack proxy.
   function address(request: { ip: string; headers: { [key: string]: string | string[] | undefined } }): string {
-    return clientAddress(request.ip, headerValue(request.headers["x-forwarded-for"]), attempts.trustProxy);
+    try {
+      return clientAddress(
+        request.ip,
+        { forwarded: headerValue(request.headers["x-forwarded-for"]), proxy: headerValue(request.headers["x-openmeet-proxy"]) },
+        attempts,
+      );
+    } catch (error) {
+      if (error instanceof ProxyRejected) throw new AuthError("proxy_rejected");
+      throw error;
+    }
   }
 
   app.post("/api/v1/auth/bootstrap", async (request, reply) => {
@@ -112,7 +119,12 @@ export function registerAuth(
       const database = db;
       const secret = configuredSecret(env);
       if (!database || !secret) throw new AuthError("auth_unconfigured");
-      const session = await refreshSession(database, secret, requireField(request.body, "refreshToken"));
+      const ip = address(request);
+      const session = await refreshSession(database, secret, requireField(request.body, "refreshToken"), (tokenKey) => {
+        const ipOk = attempts.refreshIp.allow(`refresh:${ip}`, attempts.now());
+        const tokenOk = attempts.refreshToken.allow(`refresh-token:${tokenKey}`, attempts.now());
+        return ipOk && tokenOk;
+      });
       return reply.code(200).header("cache-control", "no-store").send(session);
     } catch (error) {
       return sendAuthError(request, reply, error);

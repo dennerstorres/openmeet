@@ -13,7 +13,17 @@ const authSecret = /^[A-Za-z0-9]{32,128}$/;
 const livekitCredential = /^[A-Za-z0-9]{16,128}$/;
 const bootstrapToken = /^[A-Za-z0-9]{20,128}$/;
 const password = /^[A-Za-z0-9]{12,128}$/;
-const order = ["API_DOMAIN", "LIVEKIT_DOMAIN", "LIVEKIT_URL", "POSTGRES_PASSWORD", "AUTH_SECRET", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET", "BOOTSTRAP_TOKEN"];
+const order = [
+  "API_DOMAIN",
+  "LIVEKIT_DOMAIN",
+  "LIVEKIT_URL",
+  "POSTGRES_PASSWORD",
+  "AUTH_SECRET",
+  "PROXY_AUTH",
+  "LIVEKIT_API_KEY",
+  "LIVEKIT_API_SECRET",
+  "BOOTSTRAP_TOKEN",
+];
 
 function token(bytes) {
   return randomBytes(bytes).toString("hex");
@@ -71,6 +81,7 @@ export function fillHostEnv(existing, input) {
   env.LIVEKIT_URL = `wss://${livekitDomain}`;
   keepOrCreate(env, "POSTGRES_PASSWORD", password, token(24));
   keepOrCreate(env, "AUTH_SECRET", authSecret, token(24));
+  keepOrCreate(env, "PROXY_AUTH", authSecret, token(24));
   keepOrCreate(env, "LIVEKIT_API_KEY", livekitCredential, token(16));
   const currentSecret = env.LIVEKIT_API_SECRET?.trim() ?? "";
   if (currentSecret.length === 0) {
