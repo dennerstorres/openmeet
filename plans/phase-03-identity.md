@@ -14,5 +14,8 @@ Schema e a migration `0001_identity.sql` estão no servidor. O teste aplica esse
 ## F03-02
 Bootstrap único em `POST /api/v1/auth/bootstrap`, depois login, refresh e logout. O refresh antigo é revogado e aponta para o novo. Argon2id com memória 19456 KiB, 2 iterações e paralelismo 1. Não há página aberta de cadastro. Recuperação de conta ainda não tem endpoint: o operador troca o hash fora da API. A fase não fecha aqui.
 
+## F03-03
+Salas, convite de uso limitado, remoção de participante e encerramento. O token LiveKit sai só depois da autorização, com TTL de 10 minutos, sala única e identidade igual ao id do usuário. O código do convite não fica no banco. RBAC de abuso e a revisão do Codex continuam em F03-04. A fase não fecha aqui.
+
 ## Observação
 Não concluir fase por implementação superficial ou mocks. Dependências externas e validações reais precisam de evidência ou status WAITING_VALIDATION.

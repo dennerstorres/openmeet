@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-18 — salas, convite e token LiveKit — Grok
+F03-03 ficou `IMPLEMENTED`. Admin cria sala e conta. Convite guarda só o hash e vale uma vez. Participante entra com token de 10 minutos, sala e identidade opaca. Remoção e sala encerrada bloqueiam o join. `pnpm --filter @openmeet/server test` 15 pass, fail 0, Windows, PGlite. `/health/ready` segue `not_configured`. A API no ar não recebeu banco. F03-04 não começou. M01–M12 seguem NOT_RUN. Sem GO/NO-GO.
+
 ### 2026-10-18 — bootstrap, login e sessão — Grok
 F03-02 ficou `IMPLEMENTED`. Bootstrap de um admin, login, refresh com rotação e logout. Senha em Argon2id (19456 KiB, 2 iterações, paralelismo 1). Sessão, bootstrap e senha ficam só como hash. `pnpm --filter @openmeet/server typecheck` exit 0. `pnpm --filter @openmeet/server test` 13 pass, fail 0, Windows, PGlite. `/health/ready` segue `not_configured`. A API no ar não recebeu banco. F03-03 não começou. M01–M12 seguem NOT_RUN. Sem GO/NO-GO.
 

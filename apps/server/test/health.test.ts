@@ -23,7 +23,7 @@ test("GET /health/ready does not pretend a database exists", async () => {
 
 test("unknown routes stay closed", async () => {
   const app = await buildApp({ logger: false });
-  const response = await app.inject({ method: "GET", url: "/api/v1/rooms" });
+  const response = await app.inject({ method: "GET", url: "/api/v1/not-a-route" });
   assert.equal(response.statusCode, 404);
   await app.close();
 });
