@@ -51,12 +51,14 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F10-13 | Segurança | Capability mínima e CSP de base (S-14, S-15) | F05-01 | WAITING_VALIDATION | Claude | G10 |
 | F10-14 | Segurança | Prova de mídia fora do instalador (S-13) | F05-01 | IMPLEMENTED | Claude | G10 |
 | F10-15 | Segurança | Cofre de um slot, recusa outra origem (S-05) | F05-01 | WAITING_VALIDATION | Claude | G10 |
-| F10-16 | Segurança | Contrato visível da bandeja (S-16) | F05-01 | READY | Grok | G10 |
+| F10-16 | Segurança | Contrato visível da bandeja (S-16) | F05-01 | WAITING_VALIDATION | Claude | G10 |
 | F10-17 | Segurança | Login, refresh e logout no processo nativo (S-05, S-18) | F10-05,F10-07,F10-15 | READY | Grok | G10 |
 | F10-18 | Segurança | Salas e join no processo nativo (S-06) | F10-17 | PENDING | Grok | G10 |
 | F11-01 | Marca | Novo ícone do app e variantes | F07-02 | WAITING_VALIDATION | Claude | G7 |
 
 ## Estado em 2026-10-19
+
+F10-16 ficou `WAITING_VALIDATION` na branch `task/F10-16-bandeja`: "Fechar o OpenMeet" e "Sair da conta" separados na bandeja, aviso único ao fechar. Falta ver no instalador.
 
 F10-15 ficou `WAITING_VALIDATION` na branch `task/F10-15-cofre`: um slot só no cofre, outra origem recusada. Falta o Gerenciador de Credenciais real no instalador.
 

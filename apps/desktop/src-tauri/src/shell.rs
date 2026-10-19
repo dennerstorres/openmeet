@@ -56,10 +56,31 @@ pub(crate) struct ShellStatus {
     shortcuts: Vec<ShortcutView>,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Preferences {
+    #[serde(default)]
     shortcut_consent: bool,
+    /// S-16: the first close that hides the window says the account stays signed in. Once.
+    #[serde(default)]
+    close_notice_shown: bool,
+}
+
+const CLOSE_NOTICE: &str = "O OpenMeet continua na bandeja e a conta continua conectada neste PC. Para desconectar, use Sair da conta.";
+
+/// S-16: "Fechar o OpenMeet" leaves the process and keeps the account; "Sair da conta" signs out through the page.
+fn tray_menu<M: Manager<Wry>>(manager: &M, live: bool, microphone: bool, camera: bool) -> tauri::Result<Menu<Wry>> {
+    let show = MenuItem::with_id(manager, "show", "Mostrar", true, None::<&str>)?;
+    let microphone = MenuItem::with_id(manager, "toggle-microphone", track_label("microphone", live, microphone), true, None::<&str>)?;
+    let camera = MenuItem::with_id(manager, "toggle-camera", track_label("camera", live, camera), true, None::<&str>)?;
+    let sign_out = MenuItem::with_id(manager, "sign-out", "Sair da conta", true, None::<&str>)?;
+    let quit = MenuItem::with_id(manager, "quit", "Fechar o OpenMeet", true, None::<&str>)?;
+    Menu::with_items(manager, &[&show, &microphone, &camera, &sign_out, &quit])
+}
+
+/// Closing the window hides it unless the tray asked to quit. It never marks the app as quitting.
+fn close_hides(quitting: &AtomicBool) -> bool {
+    !quitting.load(Ordering::Relaxed)
 }
 
 pub fn shortcut_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
@@ -69,11 +90,7 @@ pub fn shortcut_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
 }
 
 pub fn install(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    let show = MenuItem::with_id(app, "show", "Mostrar", true, None::<&str>)?;
-    let microphone = MenuItem::with_id(app, "toggle-microphone", track_label("microphone", false, false), true, None::<&str>)?;
-    let camera = MenuItem::with_id(app, "toggle-camera", track_label("camera", false, false), true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Sair", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show, &microphone, &camera, &quit])?;
+    let menu = tray_menu(app, false, false, false)?;
     let icon = app.default_window_icon().cloned().ok_or("missing window icon")?;
     let quitting = Arc::new(AtomicBool::new(false));
     let tray = TrayIconBuilder::with_id("main")
@@ -84,6 +101,11 @@ pub fn install(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             "show" => show_main(app),
             "toggle-microphone" | "toggle-camera" => {
                 let _ = app.emit("shell-action", event.id.as_ref());
+            }
+            // The page runs the same sign-out as its own button; there is no second logout here.
+            "sign-out" => {
+                show_main(app);
+                let _ = app.emit("shell-action", "sign-out");
             }
             "quit" => {
                 if let Some(state) = app.try_state::<ShellState>() {
@@ -97,13 +119,20 @@ pub fn install(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let window = app.get_webview_window("main").ok_or("missing main window")?;
     let flag = Arc::clone(&quitting);
     let host = window.clone();
+    let handle = app.handle().clone();
     window.on_window_event(move |event| {
         if let WindowEvent::CloseRequested { api, .. } = event {
-            if flag.load(Ordering::Relaxed) {
+            if !close_hides(&flag) {
                 return;
             }
             api.prevent_close();
             let _ = host.hide();
+            let mut preferences = read_preferences(&handle);
+            if !preferences.close_notice_shown {
+                notify(&handle, CLOSE_NOTICE);
+                preferences.close_notice_shown = true;
+                let _ = write_preferences(&handle, &preferences);
+            }
         }
     });
     app.manage(ShellState {
@@ -189,30 +218,35 @@ fn preferences_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     Ok(directory.join("preferences.json"))
 }
 
-fn read_consent(app: &AppHandle) -> bool {
+fn read_preferences(app: &AppHandle) -> Preferences {
     let Ok(path) = preferences_path(app) else {
-        return false;
+        return Preferences::default();
     };
     let Ok(text) = std::fs::read_to_string(path) else {
-        return false;
+        return Preferences::default();
     };
-    serde_json::from_str::<Preferences>(&text)
-        .map(|preferences| preferences.shortcut_consent)
-        .unwrap_or(false)
+    serde_json::from_str::<Preferences>(&text).unwrap_or_default()
 }
 
-fn write_consent(app: &AppHandle, consent: bool) -> Result<(), String> {
+/// The file is replaced whole, so every writer starts from what is stored and keeps the other field.
+fn write_preferences(app: &AppHandle, preferences: &Preferences) -> Result<(), String> {
     let path = preferences_path(app)?;
-    let body = serde_json::to_vec(&Preferences { shortcut_consent: consent }).map_err(|_| "store_failed")?;
+    let body = serde_json::to_vec(preferences).map_err(|_| "store_failed")?;
     std::fs::write(path, body).map_err(|_| "store_failed".to_string())
 }
 
+fn read_consent(app: &AppHandle) -> bool {
+    read_preferences(app).shortcut_consent
+}
+
+fn write_consent(app: &AppHandle, consent: bool) -> Result<(), String> {
+    let mut preferences = read_preferences(app);
+    preferences.shortcut_consent = consent;
+    write_preferences(app, &preferences)
+}
+
 fn replace_menu(app: &AppHandle, live: bool, microphone: bool, camera: bool) -> Result<(), String> {
-    let show = MenuItem::with_id(app, "show", "Mostrar", true, None::<&str>).map_err(|_| "tray_failed")?;
-    let microphone = MenuItem::with_id(app, "toggle-microphone", track_label("microphone", live, microphone), true, None::<&str>).map_err(|_| "tray_failed")?;
-    let camera = MenuItem::with_id(app, "toggle-camera", track_label("camera", live, camera), true, None::<&str>).map_err(|_| "tray_failed")?;
-    let quit = MenuItem::with_id(app, "quit", "Sair", true, None::<&str>).map_err(|_| "tray_failed")?;
-    let menu = Menu::with_items(app, &[&show, &microphone, &camera, &quit]).map_err(|_| "tray_failed")?;
+    let menu = tray_menu(app, live, microphone, camera).map_err(|_| "tray_failed")?;
     let state = app.try_state::<ShellState>().ok_or("tray_unavailable")?;
     state.tray.set_menu(Some(menu)).map_err(|_| "tray_failed".to_string())
 }
@@ -478,10 +512,23 @@ mod tests {
 
     #[test]
     fn consent_starts_closed() {
-        let preferences = serde_json::from_str::<super::Preferences>("{}");
-        assert!(preferences.is_err());
-        let stored = serde_json::from_str::<super::Preferences>(r#"{"shortcutConsent":false}"#).expect("preferences");
-        assert!(!stored.shortcut_consent);
+        let empty = serde_json::from_str::<super::Preferences>("{}").expect("defaults");
+        assert!(!empty.shortcut_consent);
+        assert!(!empty.close_notice_shown);
+        let stored = serde_json::from_str::<super::Preferences>(r#"{"shortcutConsent":true}"#).expect("preferences");
+        assert!(stored.shortcut_consent);
+        assert!(!stored.close_notice_shown);
+        let both = serde_json::to_string(&super::Preferences { shortcut_consent: true, close_notice_shown: true }).expect("json");
+        assert_eq!(both, r#"{"shortcutConsent":true,"closeNoticeShown":true}"#);
+    }
+
+    #[test]
+    fn closing_the_window_hides_without_quitting() {
+        let quitting = std::sync::atomic::AtomicBool::new(false);
+        assert!(super::close_hides(&quitting));
+        assert!(!quitting.load(std::sync::atomic::Ordering::Relaxed));
+        quitting.store(true, std::sync::atomic::Ordering::Relaxed);
+        assert!(!super::close_hides(&quitting));
     }
 
     #[test]

@@ -162,6 +162,11 @@ export function MeetingApp() {
 
   const shellActionRef = useRef<(action: string) => Promise<void>>(async () => undefined);
   shellActionRef.current = async (action) => {
+    // S-16: the tray "Sair da conta" is the same sign-out as the button on the screen.
+    if (action === "sign-out") {
+      await model.signOut();
+      return;
+    }
     const kind = action === "toggle-microphone" ? "microphone" : action === "toggle-camera" ? "camera" : null;
     if (kind === null) return;
     const current = mediaRef.current;
