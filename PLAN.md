@@ -32,7 +32,7 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 
 ## Estado em 2026-10-18
 
-Nenhuma tarefa está `DONE`. F01-01–F01-04, F02-01 e F03-01–F03-03 estão `IMPLEMENTED`. F03-04 segue `PENDING` e é revisão do Codex. F02-02–F02-05 seguem `WAITING_VALIDATION` e foram para o fim do plano: M01–M12 continuam `NOT_RUN`. F02-06 segue `BLOCKED`, sem GO e sem NO-GO. Salas e auth rodaram no PGlite; a API no ar não conecta no banco. O aceite final e o F08 continuam dependendo da evidência de dois PCs. Se esse teste falhar, para e registra alternativa. Não marcar GO.
+Nenhuma tarefa está `DONE`. F01-01–F01-04, F02-01 e F03-01–F03-03 estão `IMPLEMENTED`. A revisão do F01-04 achou um problema alto na CSP do desktop, que pede ADR antes do F04-01. F03-04 está `BLOCKED` pela revisão do Codex. F02-02–F02-05 seguem `WAITING_VALIDATION` e foram para o fim do plano: M01–M12 continuam `NOT_RUN`. F02-06 segue `BLOCKED`, sem GO e sem NO-GO. Salas e auth rodaram no PGlite; a API no ar não conecta no banco. O aceite final e o F08 continuam dependendo da evidência de dois PCs. Se esse teste falhar, para e registra alternativa. Não marcar GO.
 
 ### Revisão F03-04 — 2026-10-18
 

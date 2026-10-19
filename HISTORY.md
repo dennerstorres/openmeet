@@ -1,5 +1,10 @@
 # HISTORY — registro cronológico
 
+### 2026-10-18 — revisão F01-04 — Claude
+Branch `task/F01-04-review`, base `9b5bf94`, sem commit. Parecer em `docs/reviews/F01-04-review.md`. F01-04 segue `IMPLEMENTED`: o CI nunca rodou no GitHub. `pnpm format:check` falha em 5 arquivos. A seção Senha do ENVIRONMENT confere com o código. Windows 11, Node v24.18.0, pnpm 10.30.2. Não rodou `cargo check` nem a janela.
+Achados: R1 alto, a CSP do desktop só conecta em `127.0.0.1:3000` e no domínio do VPS e impede o multi-instância do ADR 0003. R2 médio, CI sem `format:check` e sem `cargo check`. R3 médio, endpoints do ARCHITECTURE divergem do servidor e falta `GET /instance`. R4 baixo, CI sem `permissions`. R5 baixo, ADRs sem data e consequências, sem ADR do banco nem do token HMAC.
+Próximo passo: ADR da CSP/HTTP do desktop antes do F04-01. Executor corrige R2–R4. M01–M12 seguem NOT_RUN. Sem GO/NO-GO.
+
 ### 2026-10-18 — revisão F03-04 concluída com bloqueios — Codex
 Branch: `task/F03-04-auth-review`; base `d746a5eb35230b7c9806383286c45642ed20763d`, sem commit novo. Plataforma Windows/PowerShell, Node v24.18.0, pnpm 10.30.2.
 Alterados: testes auth/rooms, PLAN, plano fase 03, HISTORY; criado `docs/reviews/F03-04-parecer.md`. Nenhuma alteração em código de produção.

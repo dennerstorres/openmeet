@@ -12,4 +12,4 @@ Scripts completos passam em ambiente novo; CI verde.
 Não concluir fase por implementação superficial ou mocks. Dependências externas e validações reais precisam de evidência ou status WAITING_VALIDATION.
 
 ## Execução 2026-10-18
-F01-01 a F01-04 estão IMPLEMENTED na branch local, sem commit e sem revisão. CI existe em `.github/workflows/ci.yml` e não foi executado em remoto. Detalhe em `HISTORY.md`.
+F01-01 a F01-04 estão IMPLEMENTED. O F01-04 foi revisado pelo Claude e tem achados abertos em `docs/reviews/F01-04-review.md`. CI existe em `.github/workflows/ci.yml` e não foi executado em remoto. Detalhe em `HISTORY.md`.
