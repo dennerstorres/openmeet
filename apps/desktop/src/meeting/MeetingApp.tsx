@@ -28,6 +28,7 @@ import desktopPackage from "../../package.json";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { holdMeetingLock } from "../shell/background";
 import { CardStage } from "./Cards";
+import { IconCamera, IconClock, IconGear, IconHangUp, IconHeadphones, IconLogo, IconMic, IconPlus, IconScreen, IconSignal, IconSpeaker } from "./Icons";
 import { ShellConsent } from "../shell/ShellConsent";
 import {
   createDesktopVault,
@@ -298,6 +299,15 @@ export function MeetingApp() {
   const browsingAway = inCall && state.activeServerId !== null && state.activeServerId !== state.selectedServerId;
   const caption = screenCaption(localScreenSurface(media.tiles), media.screen);
   const isFullscreen = inCall && fullscreen && layout === "spotlight";
+  const activeServer = state.servers.find((server) => server.id === state.activeServerId);
+  const toggleMicrophone = () => void runControl("microphone", () => session().setMicrophone(!media.microphone));
+  const toggleCamera = () => void runControl("camera", () => session().setCamera(!media.camera));
+  const toggleScreen = () => void runControl("screen", () => session().setScreenShare(screenShareAction(media.screen) === "start", shareAudio));
+  const toggleDeafen = () => setDeafened((current) => !current);
+  const leaveCall = () => {
+    setMediaError(null);
+    model.leaveRoom();
+  };
 
   useEffect(() => {
     if (pinnedId !== null && pin === null) setPinnedId(null);
@@ -394,49 +404,53 @@ export function MeetingApp() {
 
   if (state.step === "instance" || state.step === "account") {
     return (
-      <main className="app-shell">
-        <aside className="rail">
-          <div className="brand-block">
-            <span className="mark">OM</span>
-            <div>
-              <strong>OpenMeet</strong>
-              <p>{state.instanceName ?? "Sem instância"}</p>
-            </div>
-          </div>
-          {state.origin ? <p className="origin">{state.origin}</p> : null}
-        </aside>
-        <section className="workspace">
-          {notice ? <p className="error">{notice}</p> : null}
-          {invitePanel}
-          {consent}
-          {state.step === "instance" ? (
-            <InstanceStep address={address} pending={state.pending} onAddress={setAddress} onConfirm={() => void model.confirmInstance(address)} />
-          ) : (
-            <AccountStep
-              bootstrapOpen={state.bootstrapOpen}
-              pending={state.pending}
-              username={username}
-              password={password}
-              displayName={displayName}
-              setupToken={setupToken}
-              onUsername={setUsername}
-              onPassword={setPassword}
-              onDisplayName={setDisplayName}
-              onSetupToken={setSetupToken}
-              onSubmit={(mode) => {
-                void model.submitAccount({ mode, username, password, displayName, token: setupToken }).then(() => {
-                  setPassword("");
-                  setSetupToken("");
-                });
-              }}
-              onChange={() => void model.changeInstance()}
-              googleLogin={state.googleLogin}
-              googleWaiting={state.googleWaiting}
-              onGoogle={() => void model.loginWithGoogle(openGoogleLogin)}
-              onCancelGoogle={() => model.cancelGoogle()}
-            />
-          )}
-        </section>
+      <main className="auth-shell">
+        <div className="auth-card">
+          <section className="auth-form">
+            <header className="auth-head">
+              <h1>{state.step === "instance" ? "Boas-vindas!" : state.bootstrapOpen ? "Criar administrador" : "Boas-vindas de volta!"}</h1>
+              <p>{state.step === "instance" ? "Informe o endereço da sua instância." : "Entre na instância para ver seus servidores."}</p>
+            </header>
+            {notice ? <p className="error">{notice}</p> : null}
+            {invitePanel}
+            {consent}
+            {state.step === "instance" ? (
+              <InstanceStep address={address} pending={state.pending} onAddress={setAddress} onConfirm={() => void model.confirmInstance(address)} />
+            ) : (
+              <AccountStep
+                bootstrapOpen={state.bootstrapOpen}
+                pending={state.pending}
+                username={username}
+                password={password}
+                displayName={displayName}
+                setupToken={setupToken}
+                onUsername={setUsername}
+                onPassword={setPassword}
+                onDisplayName={setDisplayName}
+                onSetupToken={setSetupToken}
+                onSubmit={(mode) => {
+                  void model.submitAccount({ mode, username, password, displayName, token: setupToken }).then(() => {
+                    setPassword("");
+                    setSetupToken("");
+                  });
+                }}
+                onChange={() => void model.changeInstance()}
+                googleLogin={state.googleLogin}
+                googleWaiting={state.googleWaiting}
+                onGoogle={() => void model.loginWithGoogle(openGoogleLogin)}
+                onCancelGoogle={() => model.cancelGoogle()}
+              />
+            )}
+          </section>
+          <aside className="auth-side">
+            <span className="auth-mark">
+              <IconLogo size={56} />
+            </span>
+            <strong>OpenMeet</strong>
+            <p>{state.instanceName ?? "Sem instância"}</p>
+            {state.origin ? <p className="origin">{state.origin}</p> : null}
+          </aside>
+        </div>
       </main>
     );
   }
@@ -465,7 +479,7 @@ export function MeetingApp() {
             aria-label="Criar servidor"
             onClick={() => setCreating(creating === "server" ? null : "server")}
           >
-            +
+            <IconPlus size={22} />
           </button>
         ) : null}
       </nav>
@@ -509,9 +523,9 @@ export function MeetingApp() {
                 disabled={state.pending || room.ended || room.id === state.activeRoomId}
                 onClick={() => void model.enterRoom(room.id, "")}
               >
-                <span aria-hidden="true">🔊</span>
+                {room.kind === "temporary" ? <IconClock /> : <IconSpeaker />}
                 <span className="room-name">{room.name}</span>
-                {room.ended ? <span className="badge">encerrada</span> : room.kind === "temporary" ? <span className="badge">temporária</span> : null}
+                {room.ended ? <span className="badge">encerrada</span> : room.kind === "temporary" ? <span className="sr">temporária</span> : null}
               </button>
               {(state.presence?.[room.id] ?? []).length > 0 ? (
                 <ul className="occupants" aria-label={`Na sala ${room.name}`}>
@@ -639,27 +653,88 @@ export function MeetingApp() {
             />
           </label>
         </form>
-        <footer className="account">
-          <div className="you-row">
-            <span className="avatar small" aria-hidden="true">
-              <span>{cardInitial(state.userLabel ?? "?")}</span>
-            </span>
-            <div>
-              <strong>{state.userLabel}</strong>
-              <p className="origin">{state.origin}</p>
+        {inCall ? (
+          <section className="voice-panel" aria-label="Chamada atual">
+            <div className="voice-row">
+              <span className={`voice-icon${reconnectText ? " warn" : ""}`}>
+                <IconSignal />
+              </span>
+              <div>
+                <strong className={reconnectText ? "warn" : undefined}>{reconnectText ? "Reconectando" : "Voz conectada"}</strong>
+                <p className="origin">
+                  {state.activeRoomName ?? "Reunião"} / {activeServer?.name ?? "servidor"}
+                </p>
+              </div>
+              <button type="button" className="icon-btn" aria-label="Sair da sala" title="Sair da sala" onClick={leaveCall}>
+                <IconHangUp />
+              </button>
             </div>
+            <div className="voice-actions">
+              <button type="button" className={media.camera ? "on" : ""} disabled={!controlsEnabled || controlPending} onClick={toggleCamera}>
+                <IconCamera size={18} off={!media.camera} />
+                Câmera
+              </button>
+              <button
+                type="button"
+                className={media.screen ? "on" : ""}
+                aria-pressed={media.screen}
+                disabled={!controlsEnabled || controlPending}
+                onClick={toggleScreen}
+              >
+                <IconScreen size={18} />
+                Tela
+              </button>
+            </div>
+          </section>
+        ) : null}
+        <footer className="account">
+          <span className="avatar small" aria-hidden="true">
+            <span>{cardInitial(state.userLabel ?? "?")}</span>
+          </span>
+          <div className="you-name">
+            <strong>{state.userLabel}</strong>
+            <p className="origin">{inCall ? `Em ${state.activeRoomName ?? "reunião"}` : state.origin}</p>
           </div>
-          <div className="row">
-            <button type="button" className="ghost" onClick={() => void model.reloadRooms()} disabled={state.pending}>
-              Atualizar
-            </button>
-            <button type="button" className="ghost" onClick={() => void model.signOut()} disabled={state.pending}>
-              Sair da conta
-            </button>
-            <button type="button" className="ghost" onClick={() => void model.changeInstance()}>
-              Trocar instância
-            </button>
-          </div>
+          {inCall ? (
+            <>
+              <button
+                type="button"
+                className={`icon-btn${media.microphone ? "" : " danger-text"}`}
+                aria-label={media.microphone ? "Desligar microfone" : "Ligar microfone"}
+                title={media.microphone ? "Desligar microfone" : "Ligar microfone"}
+                disabled={!controlsEnabled || controlPending}
+                onClick={toggleMicrophone}
+              >
+                <IconMic off={!media.microphone} />
+              </button>
+              <button
+                type="button"
+                className={`icon-btn${deafened ? " danger-text" : ""}`}
+                aria-label="Ensurdecer"
+                aria-pressed={deafened}
+                title={deafened ? "Voltar a ouvir as pessoas neste PC" : "Cortar o som de todos neste PC. O microfone não muda."}
+                onClick={toggleDeafen}
+              >
+                <IconHeadphones off={deafened} />
+              </button>
+            </>
+          ) : null}
+          <details className="account-menu">
+            <summary className="icon-btn" aria-label="Conta" title="Conta">
+              <IconGear />
+            </summary>
+            <div className="menu">
+              <button type="button" className="ghost" onClick={() => void model.reloadRooms()} disabled={state.pending}>
+                Atualizar
+              </button>
+              <button type="button" className="ghost" onClick={() => void model.changeInstance()}>
+                Trocar instância
+              </button>
+              <button type="button" className="ghost danger-text" onClick={() => void model.signOut()} disabled={state.pending}>
+                Sair da conta
+              </button>
+            </div>
+          </details>
         </footer>
       </aside>
 
@@ -751,37 +826,44 @@ export function MeetingApp() {
               )}
               <button
                 type="button"
-                className={media.microphone ? "on" : "off"}
+                className={`ctl${media.microphone ? "" : " off"}`}
+                aria-label={media.microphone ? "Desligar microfone" : "Ligar microfone"}
+                title={media.microphone ? "Microfone ligado" : "Microfone desligado"}
                 disabled={!controlsEnabled || controlPending}
-                onClick={() => void runControl("microphone", () => session().setMicrophone(!media.microphone))}
+                onClick={toggleMicrophone}
               >
-                Microfone {media.microphone ? "ligado" : "desligado"}
+                <IconMic size={22} off={!media.microphone} />
               </button>
               <button
                 type="button"
-                className={deafened ? "off" : ""}
-                aria-pressed={deafened}
-                title={deafened ? "Voltar a ouvir as pessoas neste PC" : "Cortar o som de todos neste PC. O microfone não muda."}
-                onClick={() => setDeafened((current) => !current)}
-              >
-                {deafened ? "Ensurdecido" : "Ensurdecer"}
-              </button>
-              <button
-                type="button"
-                className={media.camera ? "on" : "off"}
+                className={`ctl${media.camera ? " on" : ""}`}
+                aria-label={media.camera ? "Desligar câmera" : "Ligar câmera"}
+                title={media.camera ? "Câmera ligada" : "Câmera desligada"}
                 disabled={!controlsEnabled || controlPending}
-                onClick={() => void runControl("camera", () => session().setCamera(!media.camera))}
+                onClick={toggleCamera}
               >
-                Câmera {media.camera ? "ligada" : "desligada"}
+                <IconCamera size={22} off={!media.camera} />
               </button>
               <button
                 type="button"
-                className={media.screen ? "on" : ""}
+                className={`ctl${media.screen ? " on" : ""}`}
+                aria-label={media.screen ? "Parar compartilhamento" : "Compartilhar tela"}
+                title={media.screen ? "Parar compartilhamento" : "Compartilhar tela"}
                 aria-pressed={media.screen}
                 disabled={!controlsEnabled || controlPending}
-                onClick={() => void runControl("screen", () => session().setScreenShare(screenShareAction(media.screen) === "start", shareAudio))}
+                onClick={toggleScreen}
               >
-                {media.screen ? "Parar compartilhamento" : "Compartilhar tela"}
+                <IconScreen size={22} />
+              </button>
+              <button
+                type="button"
+                className={`ctl${deafened ? " off" : ""}`}
+                aria-label="Ensurdecer"
+                aria-pressed={deafened}
+                title={deafened ? "Voltar a ouvir as pessoas neste PC" : "Cortar o som de todos neste PC. O microfone não muda."}
+                onClick={toggleDeafen}
+              >
+                <IconHeadphones size={22} off={deafened} />
               </button>
               <label className="share-audio" title="Pede o som do PC junto com a imagem. Muda na próxima vez que compartilhar.">
                 <input
@@ -806,7 +888,9 @@ export function MeetingApp() {
                 </button>
               ) : (
                 <details className="more">
-                  <summary>Dispositivos e diagnóstico</summary>
+                  <summary className="ctl" aria-label="Dispositivos e diagnóstico" title="Dispositivos e diagnóstico">
+                    <IconGear size={22} />
+                  </summary>
                   <div className="more-body">
                     <DeviceSelect label="Entrada" kind="audioinput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
                     <DeviceSelect label="Saída" kind="audiooutput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
@@ -842,15 +926,9 @@ export function MeetingApp() {
                   </div>
                 </details>
               )}
-              <button
-                type="button"
-                className="danger"
-                onClick={() => {
-                  setMediaError(null);
-                  model.leaveRoom();
-                }}
-              >
-                Sair da sala
+              <span className="dock-sep" aria-hidden="true" />
+              <button type="button" className="ctl leave" aria-label="Sair da sala" title="Sair da sala" onClick={leaveCall}>
+                <IconHangUp size={24} />
               </button>
             </div>
           </>
