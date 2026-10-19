@@ -49,6 +49,7 @@ export interface TrackTile {
   media: "audio" | "video";
   local: boolean;
   muted: boolean;
+  surface?: string | null;
   attach: (element: HTMLMediaElement) => void;
   detach: (element: HTMLMediaElement) => void;
 }
@@ -316,7 +317,13 @@ export class LiveKitPocSession {
   }
 
   upsertTile(tile: TrackTile): void {
+    const previous = this.tiles.get(tile.id);
     this.tiles.set(tile.id, tile);
+    const previousSurface = previous?.source === "screen" ? previous.surface : null;
+    if (previousSurface && tile.surface && previousSurface !== tile.surface) {
+      this.note("info", `screen source changed: ${previousSurface} -> ${tile.surface}`);
+      return;
+    }
     this.emit();
   }
 
@@ -341,6 +348,7 @@ export class LiveKitPocSession {
       media,
       local,
       muted: track.isMuted,
+      surface: readTrackDisplaySurface(track),
       attach: (element) => {
         track.attach(element);
       },

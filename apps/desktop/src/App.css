@@ -51,6 +51,27 @@ video {
   background: #111;
 }
 
+.meeting {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  max-width: 960px;
+}
+
+.stage video {
+  width: min(100%, 720px);
+}
+
+.grid video {
+  width: 200px;
+}
+
+.sharing {
+  margin: 0;
+  font-weight: 600;
+}
+
 .error {
   color: #9b2226;
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react";
-import { applyPlayback, shouldAttachPlayback, shouldShowLiveVideo, type PlaybackLevel, type TrackTile } from "@openmeet/media";
+import { applyPlayback, screenSourceLabel, shouldAttachPlayback, shouldShowLiveVideo, type PlaybackLevel, type TrackTile } from "@openmeet/media";
 
 export function TrackView({ tile, playback }: { tile: TrackTile; playback?: PlaybackLevel }) {
   const ref = useRef<HTMLVideoElement | HTMLAudioElement>(null);
@@ -23,7 +23,8 @@ export function TrackView({ tile, playback }: { tile: TrackTile; playback?: Play
     applyPlayback(element, playback);
   }, [tile, playback]);
 
-  const label = `${tile.local ? "local" : tile.identity} ${tile.source}`;
+  const source = tile.source === "screen" ? screenSourceLabel(tile.surface ?? null) : tile.source;
+  const label = `${tile.local ? "local" : tile.identity} ${source}`;
   if (!shouldAttachPlayback(tile)) {
     return (
       <figure>

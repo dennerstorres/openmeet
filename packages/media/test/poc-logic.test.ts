@@ -50,6 +50,31 @@ test("a muted remote camera is not left as a live frame", () => {
   assert.equal(shouldShowLiveVideo(session.snapshot().tiles[0]!), true);
 });
 
+test("a screen keeps its source until a different one is published", () => {
+  const session = new LiveKitPocSession();
+  const noop = () => undefined;
+  const tile = {
+    id: "screen",
+    identity: "win-a",
+    source: "screen" as const,
+    media: "video" as const,
+    local: true,
+    muted: false,
+    surface: "monitor",
+    attach: noop,
+    detach: noop,
+  };
+  session.upsertTile(tile);
+  session.upsertTile({ ...tile, surface: "monitor" });
+  assert.equal(
+    session.snapshot().diagnostics.some((event) => event.message.includes("screen source changed")),
+    false,
+  );
+  session.upsertTile({ ...tile, surface: "window" });
+  const note = session.snapshot().diagnostics.at(-1);
+  assert.equal(note?.message, "screen source changed: monitor -> window");
+});
+
 test("local microphone is not played back on this PC", () => {
   assert.equal(shouldAttachPlayback({ media: "audio", local: true }), false);
   assert.equal(shouldAttachPlayback({ media: "audio", local: false }), true);

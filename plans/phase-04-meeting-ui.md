@@ -14,5 +14,8 @@ A janela padrão confirma `GET /api/v1/instance` antes de enviar senha. Login, b
 ## F04-02
 Na reunião, o microfone e a câmera ligam e desligam a publicação. O volume e o silêncio de cada áudio remoto mudam só o elemento neste PC. A falha do controle aparece na tela. A janela não foi aberta. A fase não fecha aqui.
 
+## F04-03
+A reunião tem o botão de compartilhar e o de parar. Compartilhar abre o seletor; parar encerra a publicação em vez de trocar a origem. A tela compartilhada fica em destaque e as câmeras ficam na grade. O aviso diz monitor, janela ou guia. O áudio do sistema continua desligado. A janela não foi aberta. A fase não fecha aqui.
+
 ## Observação
 Não concluir fase por implementação superficial ou mocks. Dependências externas e validações reais precisam de evidência ou status WAITING_VALIDATION.

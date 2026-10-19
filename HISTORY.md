@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-18 — compartilhamento e layout da reunião — Grok
+F04-03 ficou `IMPLEMENTED` na `main`. O botão abre o seletor ou para a publicação. A tela remota fica em destaque; a local só ocupa o destaque se ninguém mais compartilha. O aviso nomeia monitor, janela ou guia, e some ao parar. Troca silenciosa da origem entra no diagnóstico. Áudio de sistema segue desligado. `pnpm --filter @openmeet/media test` 25 pass. `pnpm --filter @openmeet/desktop typecheck` exit 0. Windows, Node v24.18.0. A janela não foi aberta. F04-04 não começou. M01–M12 seguem NOT_RUN. Sem GO/NO-GO.
+
 ### 2026-10-18 — controles de volume, mute e câmera — Grok
 F04-02 ficou `IMPLEMENTED` na `main`. O microfone e a câmera usam a publicação já existente da sessão. O volume e o silêncio de cada áudio remoto ficam no elemento local, sem pedido à API. `pnpm --filter @openmeet/media test` 19 pass. `pnpm --filter @openmeet/desktop typecheck` exit 0. Windows, Node v24.18.0. A janela não foi aberta. F04-03 não começou. M01–M12 seguem NOT_RUN. Sem GO/NO-GO.
 

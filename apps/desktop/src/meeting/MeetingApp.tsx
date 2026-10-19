@@ -1,10 +1,14 @@
 import {
+  arrangeTiles,
   DEFAULT_PLAYBACK,
-  describeMediaError,
   emptyStats,
   LiveKitPocSession,
+  localScreenSurface,
+  mediaActionError,
   nextPlayback,
   publicationControlsEnabled,
+  screenCaption,
+  screenShareAction,
   type PlaybackLevel,
   type PocSnapshot,
   type TrackTile,
@@ -114,13 +118,13 @@ export function MeetingApp() {
     setLevels((current) => ({ ...current, [id]: nextPlayback(current[id] ?? DEFAULT_PLAYBACK, patch) }));
   }
 
-  async function runControl(action: () => Promise<void>): Promise<void> {
+  async function runControl(label: string, action: () => Promise<void>): Promise<void> {
     setControlPending(true);
     setMediaError(null);
     try {
       await action();
     } catch (caught) {
-      setMediaError(describeMediaError(caught));
+      setMediaError(mediaActionError(label, caught));
     } finally {
       setControlPending(false);
     }
@@ -179,7 +183,7 @@ export function MeetingApp() {
         />
       ) : null}
       {state.step === "meeting" ? (
-        <section className="stack">
+        <section className="meeting">
           <h2>{active?.name ?? "Reunião"}</h2>
           <p>
             Estado: <strong>{media.phase}</strong>
@@ -198,19 +202,27 @@ export function MeetingApp() {
             <button
               type="button"
               disabled={!controlsEnabled || controlPending}
-              onClick={() => void runControl(() => session().setMicrophone(!media.microphone))}
+              onClick={() => void runControl("microphone", () => session().setMicrophone(!media.microphone))}
             >
               Microfone {media.microphone ? "ligado" : "desligado"}
             </button>
-            <button type="button" disabled={!controlsEnabled || controlPending} onClick={() => void runControl(() => session().setCamera(!media.camera))}>
+            <button
+              type="button"
+              disabled={!controlsEnabled || controlPending}
+              onClick={() => void runControl("camera", () => session().setCamera(!media.camera))}
+            >
               Câmera {media.camera ? "ligada" : "desligada"}
             </button>
+            <button
+              type="button"
+              aria-pressed={media.screen}
+              disabled={!controlsEnabled || controlPending}
+              onClick={() => void runControl("screen", () => session().setScreenShare(screenShareAction(media.screen) === "start"))}
+            >
+              {media.screen ? "Parar compartilhamento" : "Compartilhar tela"}
+            </button>
           </div>
-          <div className="tiles">
-            {media.tiles.map((tile) => (
-              <TileFrame key={tile.id} tile={tile} playback={levelFor(tile.id)} onChange={(patch) => changeLevel(tile.id, patch)} />
-            ))}
-          </div>
+          <MeetingStage tiles={media.tiles} sharing={media.screen} levelFor={levelFor} onChange={changeLevel} />
           <button
             type="button"
             onClick={() => {
@@ -223,6 +235,52 @@ export function MeetingApp() {
         </section>
       ) : null}
     </main>
+  );
+}
+
+function MeetingStage({
+  tiles,
+  sharing,
+  levelFor,
+  onChange,
+}: {
+  tiles: readonly TrackTile[];
+  sharing: boolean;
+  levelFor: (id: string) => PlaybackLevel;
+  onChange: (id: string, patch: Partial<PlaybackLevel>) => void;
+}) {
+  const placed = arrangeTiles(tiles);
+  const byId = new Map(tiles.map((tile) => [tile.id, tile]));
+  const stage = placed.stageId === null ? undefined : byId.get(placed.stageId);
+  const grid = placed.gridIds.flatMap((id) => {
+    const tile = byId.get(id);
+    return tile === undefined ? [] : [tile];
+  });
+  const audio = tiles.filter((tile) => tile.media === "audio");
+  const caption = screenCaption(localScreenSurface(tiles), sharing);
+  return (
+    <>
+      {caption ? <p className="sharing">{caption}. Para trocar a origem, pare e escolha de novo.</p> : null}
+      {stage ? (
+        <div className="stage">
+          <TileFrame tile={stage} playback={levelFor(stage.id)} onChange={(patch) => onChange(stage.id, patch)} />
+        </div>
+      ) : null}
+      {grid.length > 0 ? (
+        <div className="tiles grid">
+          {grid.map((tile) => (
+            <TileFrame key={tile.id} tile={tile} playback={levelFor(tile.id)} onChange={(patch) => onChange(tile.id, patch)} />
+          ))}
+        </div>
+      ) : null}
+      {audio.length > 0 ? (
+        <div className="tiles">
+          {audio.map((tile) => (
+            <TileFrame key={tile.id} tile={tile} playback={levelFor(tile.id)} onChange={(patch) => onChange(tile.id, patch)} />
+          ))}
+        </div>
+      ) : null}
+    </>
   );
 }
 

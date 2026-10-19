@@ -1,5 +1,7 @@
 export { describeMediaError, mediaActionError, sanitizeDiagnostic } from "./diagnostics.js";
 export { applyPlayback, clampVolume, DEFAULT_PLAYBACK, nextPlayback, publicationControlsEnabled } from "./playback.js";
+export { arrangeTiles, localScreenSurface, screenCaption, screenShareAction, screenSourceLabel } from "./layout.js";
+export type { LayoutTile, TilePlacement } from "./layout.js";
 export type { PlaybackLevel } from "./playback.js";
 export { LiveKitPocSession, shouldAttachPlayback, shouldShowLiveVideo } from "./session.js";
 export { emptyStats, summarizeRtcStats } from "./stats.js";
