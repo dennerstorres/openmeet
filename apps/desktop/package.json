@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/scaffold.test.mjs",
+    "test": "node --test test/scaffold.test.mjs test/bundle.test.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },

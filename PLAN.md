@@ -49,7 +49,7 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F10-11 | Segurança | Backup cifrado e contrato de firewall (S-17) | F07-01 | IMPLEMENTED | Claude | G10 |
 | F10-12 | Segurança | Mídia e navegação só na origem do bundle (S-07, S-08) | F05-01 | WAITING_VALIDATION | Claude | G10 |
 | F10-13 | Segurança | Capability mínima e CSP de base (S-14, S-15) | F05-01 | WAITING_VALIDATION | Claude | G10 |
-| F10-14 | Segurança | Prova de mídia fora do instalador (S-13) | F05-01 | READY | Grok | G10 |
+| F10-14 | Segurança | Prova de mídia fora do instalador (S-13) | F05-01 | IMPLEMENTED | Claude | G10 |
 | F10-15 | Segurança | Cofre de um slot, recusa outra origem (S-05) | F05-01 | READY | Grok | G10 |
 | F10-16 | Segurança | Contrato visível da bandeja (S-16) | F05-01 | READY | Grok | G10 |
 | F10-17 | Segurança | Login, refresh e logout no processo nativo (S-05, S-18) | F10-05,F10-07,F10-15 | PENDING | Grok | G10 |
@@ -57,6 +57,8 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F11-01 | Marca | Novo ícone do app e variantes | F07-02 | WAITING_VALIDATION | Claude | G7 |
 
 ## Estado em 2026-10-19
+
+F10-14 ficou `IMPLEMENTED` na branch `task/F10-14-prova`: a prova de mídia e o link só existem no `tauri dev`; o bundle de produção não tem nenhum dos dois.
 
 F10-13 ficou `WAITING_VALIDATION` na branch `task/F10-13-capability`: sem `core:default`, devtools negado, CSP com `base-uri none` e sem estilo inline. Falta abrir o instalador.
 

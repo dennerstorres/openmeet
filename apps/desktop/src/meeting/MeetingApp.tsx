@@ -1011,7 +1011,7 @@ function InstanceStep({
       <button type="submit" disabled={pending}>
         Confirmar instância
       </button>
-      <a href="?poc=1">Prova de mídia</a>
+      {import.meta.env.DEV ? <a href="?poc=1">Prova de mídia</a> : null}
     </form>
   );
 }

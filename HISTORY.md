@@ -1,5 +1,9 @@
 # HISTORY — registro cronológico
 
+### 2026-10-19 — F10-14 prova de mídia fora do instalador (S-13) — Claude
+Branch `task/F10-14-prova`, sobre `task/F10-13-capability`. `App.tsx` carrega `PocApp` por `lazy(import())` dentro de `import.meta.env.DEV`; o link "Prova de mídia" do formulário de instância também só existe nesse ramo. O build de produção derruba o ramo, o import e o módulo. Nenhuma webview nova, nenhum comando copiado.
+Comandos, Windows 11: `pnpm --filter @openmeet/desktop build` e o teste novo `apps/desktop/test/bundle.test.mjs` (build do Vite em pasta temporária; `PocApp`, `?poc=1`, "Prova de mídia" e `poc_unconfigured` ausentes). No `pnpm dev` (porta 1420), o link aparece e `?poc=1` abre "OpenMeet POC" sem erro no console. `pnpm typecheck`, `pnpm lint`, `prettier --check` e `pnpm test` ok (desktop 6). `IMPLEMENTED`.
+
 ### 2026-10-19 — F10-13 capability mínima e CSP de base (S-14, S-15) — Claude
 Branch `task/F10-13-capability`, sobre `task/F10-12-origem`. `capabilities/default.json` trocou `core:default` por `core:event:allow-listen`, `core:event:allow-unlisten` e `core:webview:deny-internal-toggle-devtools`, mais os comandos próprios que já existiam; sem `allow-emit`, sem `remote`. A CSP ganhou `base-uri 'none'` e `style-src 'self'`, sem `unsafe-inline`. Como o Tauri 2 usa a `csp` também no `tauri dev` quando não há `devCsp`, entrou um `devCsp` igual com `'unsafe-inline'` só no estilo, porque o Vite serve CSS em `<style>` no dev; o release não usa esse campo.
 Comandos, Windows 11: `pnpm --filter @openmeet/desktop build` ok; `dist/index.html` sem `<style>` nem `style=`, CSS em arquivo. `cargo build` e `cargo test` (10 pass) com a capability nova. `pnpm typecheck`, `pnpm lint`, `prettier --check` e `pnpm test` ok (desktop 4). Não feito: abrir o instalador e ver o estilo aplicado e o `shell-action` chegando com a capability nova. `WAITING_VALIDATION`.
