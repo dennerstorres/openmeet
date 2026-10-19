@@ -1,4 +1,14 @@
-import { emptyStats, LiveKitPocSession, type PocSnapshot } from "@openmeet/media";
+import {
+  DEFAULT_PLAYBACK,
+  describeMediaError,
+  emptyStats,
+  LiveKitPocSession,
+  nextPlayback,
+  publicationControlsEnabled,
+  type PlaybackLevel,
+  type PocSnapshot,
+  type TrackTile,
+} from "@openmeet/media";
 import { MeetingModel, type ShellSnapshot } from "@openmeet/shared";
 import desktopPackage from "../../package.json";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -66,6 +76,9 @@ export function MeetingApp() {
   const [roomSlug, setRoomSlug] = useState("");
   const [roomKind, setRoomKind] = useState("persistent");
   const [inviteCode, setInviteCode] = useState("");
+  const [levels, setLevels] = useState<Record<string, PlaybackLevel>>({});
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const [controlPending, setControlPending] = useState(false);
 
   function session(): LiveKitPocSession {
     sessionRef.current ??= new LiveKitPocSession({ appVersion: desktopPackage.version });
@@ -91,6 +104,27 @@ export function MeetingApp() {
 
   const notice = errorText(state.error);
   const active = state.rooms.find((room) => room.id === state.activeRoomId);
+  const controlsEnabled = publicationControlsEnabled(media.phase);
+
+  function levelFor(id: string): PlaybackLevel {
+    return levels[id] ?? DEFAULT_PLAYBACK;
+  }
+
+  function changeLevel(id: string, patch: Partial<PlaybackLevel>): void {
+    setLevels((current) => ({ ...current, [id]: nextPlayback(current[id] ?? DEFAULT_PLAYBACK, patch) }));
+  }
+
+  async function runControl(action: () => Promise<void>): Promise<void> {
+    setControlPending(true);
+    setMediaError(null);
+    try {
+      await action();
+    } catch (caught) {
+      setMediaError(describeMediaError(caught));
+    } finally {
+      setControlPending(false);
+    }
+  }
 
   return (
     <main className="poc">
@@ -101,6 +135,7 @@ export function MeetingApp() {
         {state.userLabel ? <p>{state.userLabel}</p> : null}
       </header>
       {notice ? <p className="error">{notice}</p> : null}
+      {mediaError ? <p className="error">{mediaError}</p> : null}
       {state.step === "instance" ? (
         <InstanceStep address={address} pending={state.pending} onAddress={setAddress} onConfirm={() => void model.confirmInstance(address)} />
       ) : null}
@@ -159,17 +194,62 @@ export function MeetingApp() {
               ))}
             </ul>
           )}
+          <div className="controls">
+            <button
+              type="button"
+              disabled={!controlsEnabled || controlPending}
+              onClick={() => void runControl(() => session().setMicrophone(!media.microphone))}
+            >
+              Microfone {media.microphone ? "ligado" : "desligado"}
+            </button>
+            <button type="button" disabled={!controlsEnabled || controlPending} onClick={() => void runControl(() => session().setCamera(!media.camera))}>
+              Câmera {media.camera ? "ligada" : "desligada"}
+            </button>
+          </div>
           <div className="tiles">
             {media.tiles.map((tile) => (
-              <TrackView key={tile.id} tile={tile} />
+              <TileFrame key={tile.id} tile={tile} playback={levelFor(tile.id)} onChange={(patch) => changeLevel(tile.id, patch)} />
             ))}
           </div>
-          <button type="button" onClick={() => model.leaveRoom()}>
+          <button
+            type="button"
+            onClick={() => {
+              setMediaError(null);
+              model.leaveRoom();
+            }}
+          >
             Sair da sala
           </button>
         </section>
       ) : null}
     </main>
+  );
+}
+
+function TileFrame({ tile, playback, onChange }: { tile: TrackTile; playback: PlaybackLevel; onChange: (patch: Partial<PlaybackLevel>) => void }) {
+  const remoteAudio = tile.media === "audio" && !tile.local;
+  return (
+    <div>
+      <TrackView tile={tile} playback={remoteAudio ? playback : undefined} />
+      {remoteAudio ? (
+        <div className="controls">
+          <button type="button" onClick={() => onChange({ heard: !playback.heard })}>
+            {playback.heard ? "Silenciar neste PC" : "Voltar a ouvir"}
+          </button>
+          <label>
+            Volume neste PC
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={Math.round(playback.volume * 100)}
+              onChange={(event) => onChange({ volume: Number(event.currentTarget.value) / 100 })}
+            />
+          </label>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

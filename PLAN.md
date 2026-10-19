@@ -16,7 +16,7 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F03-03 | Identidade | Rooms, convites, RBAC e token LiveKit | F03-02 | IMPLEMENTED | Grok | G3 |
 | F03-04 | Identidade | Testes de abuso e auth | F03-03 | IMPLEMENTED | Codex review | G3 |
 | F04-01 | Reuniões | UI de instância, salas, reunião | F03-03 | IMPLEMENTED | Grok | G4 |
-| F04-02 | Reuniões | Controles de volume/mute/câmera | F04-01 | PENDING | Grok | G4 |
+| F04-02 | Reuniões | Controles de volume/mute/câmera | F04-01 | IMPLEMENTED | Grok | G4 |
 | F04-03 | Reuniões | Compartilhamento e layouts | F04-01 | PENDING | Grok | G4 |
 | F04-04 | Reuniões | E2E 5 participantes e persistência | F04-02,F04-03 | PENDING | Codex review | G4 |
 | F05-01 | Desktop | Bandeja, atalhos, notificações, sessão | F04-04 | PENDING | Grok | G5 |
@@ -32,7 +32,7 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 
 ## Estado em 2026-10-18
 
-Nenhuma tarefa está `DONE`. F01-01–F01-04, F02-01, F03-01–F03-04 e F04-01 estão `IMPLEMENTED`. O ADR 0005 abre `https:` e `wss:` na CSP e tira o domínio de teste. O ADR 0006 prende o access token à sessão. F03-04 saiu de `BLOCKED`: as correções do parecer estão no código e o G3 ainda não foi reaprovado. F04-02 segue `PENDING`. F02-02–F02-05 seguem `WAITING_VALIDATION`. M01–M12 continuam `NOT_RUN`. F02-06 segue `BLOCKED`, sem GO e sem NO-GO. O aceite final e o F08 continuam dependendo da evidência de dois PCs. Se esse teste falhar, para e registra alternativa. Não marcar GO.
+Nenhuma tarefa está `DONE`. F01-01–F01-04, F02-01, F03-01–F03-04, F04-01 e F04-02 estão `IMPLEMENTED`. O ADR 0005 abre `https:` e `wss:` na CSP e tira o domínio de teste. O ADR 0006 prende o access token à sessão. F03-04 saiu de `BLOCKED`: as correções do parecer estão no código e o G3 ainda não foi reaprovado. F04-03 segue `PENDING`. F02-02–F02-05 seguem `WAITING_VALIDATION`. M01–M12 continuam `NOT_RUN`. F02-06 segue `BLOCKED`, sem GO e sem NO-GO. O aceite final e o F08 continuam dependendo da evidência de dois PCs. Se esse teste falhar, para e registra alternativa. Não marcar GO.
 
 ### Revisões — correções em 2026-10-18
 

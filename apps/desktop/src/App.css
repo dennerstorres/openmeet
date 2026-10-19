@@ -61,6 +61,13 @@ video {
   gap: 12px;
 }
 
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+}
+
 .stack {
   display: flex;
   flex-direction: column;

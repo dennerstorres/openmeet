@@ -1,4 +1,6 @@
 export { describeMediaError, mediaActionError, sanitizeDiagnostic } from "./diagnostics.js";
+export { applyPlayback, clampVolume, DEFAULT_PLAYBACK, nextPlayback, publicationControlsEnabled } from "./playback.js";
+export type { PlaybackLevel } from "./playback.js";
 export { LiveKitPocSession, shouldAttachPlayback, shouldShowLiveVideo } from "./session.js";
 export { emptyStats, summarizeRtcStats } from "./stats.js";
 export { nextPhase } from "./phase.js";

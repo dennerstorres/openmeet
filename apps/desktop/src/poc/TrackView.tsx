@@ -1,7 +1,7 @@
 import { useEffect, useRef, type RefObject } from "react";
-import { shouldAttachPlayback, shouldShowLiveVideo, type TrackTile } from "@openmeet/media";
+import { applyPlayback, shouldAttachPlayback, shouldShowLiveVideo, type PlaybackLevel, type TrackTile } from "@openmeet/media";
 
-export function TrackView({ tile }: { tile: TrackTile }) {
+export function TrackView({ tile, playback }: { tile: TrackTile; playback?: PlaybackLevel }) {
   const ref = useRef<HTMLVideoElement | HTMLAudioElement>(null);
 
   useEffect(() => {
@@ -14,6 +14,14 @@ export function TrackView({ tile }: { tile: TrackTile }) {
       tile.detach(element);
     };
   }, [tile]);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || !playback) {
+      return;
+    }
+    applyPlayback(element, playback);
+  }, [tile, playback]);
 
   const label = `${tile.local ? "local" : tile.identity} ${tile.source}`;
   if (!shouldAttachPlayback(tile)) {
@@ -36,7 +44,8 @@ export function TrackView({ tile }: { tile: TrackTile }) {
     return (
       <figure>
         <figcaption>{label}</figcaption>
-        <audio ref={ref as RefObject<HTMLAudioElement>} autoPlay controls />
+        {tile.muted ? <p>áudio remoto pausado</p> : null}
+        <audio ref={ref as RefObject<HTMLAudioElement>} autoPlay controls={playback === undefined} />
       </figure>
     );
   }
