@@ -2,7 +2,7 @@
 
 Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, `VERIFIED`, `DONE`, `BLOCKED`.
 
-> A evidência de dois PCs e o GO/NO-GO ficam no fim. Não bloqueiam a implementação de F03–F07 nem de F09. Bloqueiam o aceite final e o F08.
+> A evidência de dois PCs e o GO/NO-GO ficam no fim. Não bloqueiam a implementação de F03–F07, F09 nem F10. Bloqueiam o aceite final e o F08.
 
 | ID | Fase | Tarefa | Depende de | Estado | Dono inicial | Gate |
 |---|---|---|---|---|---|---|
@@ -36,8 +36,28 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F09-05 | Sala | Ensurdecer o áudio remoto só neste PC | F04-02 | READY | Claude | G9 |
 | F09-06 | Sala | Áudio do PC opcional no compartilhamento | F04-03 | READY | Claude | G9 |
 | F09-07 | Identidade | Login Google pelo navegador, chaves só no servidor | F03-02 | READY | Claude | G9 |
+| F10-01 | Segurança | Recusar controle e bidi nos nomes (S-21) | F03-03 | READY | Grok | G10 |
+| F10-02 | Segurança | Sala só para membro, sem username (S-01, S-10) | F03-03 | READY | Grok | G10 |
+| F10-03 | Segurança | Reuso de refresh revoga a família (S-03) | F03-02 | READY | Grok | G10 |
+| F10-04 | Segurança | Corte no SFU repetível e join na mesma trava (S-04) | F10-02 | PENDING | Grok | G10 |
+| F10-05 | Segurança | Desativar conta, senha, recuperação e corte no logout (S-02, S-18) | F10-03,F10-04 | PENDING | Grok | G10 |
+| F10-06 | Segurança | Grant só com as fontes autorizadas (S-09) | F10-04 | PENDING | Grok | G10 |
+| F10-07 | Segurança | Limite só atrás do segredo do proxy (S-11) | F07-01 | READY | Grok | G10 |
+| F10-08 | Segurança | Bootstrap sem oráculo e sem stdout (S-12) | F07-01 | READY | Grok | G10 |
+| F10-09 | Segurança | Contexto de build sem o .env da stack (S-19) | F07-01 | READY | Grok | G10 |
+| F10-10 | Segurança | TURN sem TLS externo e sem 5349 solto (S-20) | F07-01 | READY | Grok | G10 |
+| F10-11 | Segurança | Backup cifrado e contrato de firewall (S-17) | F07-01 | READY | Grok | G10 |
+| F10-12 | Segurança | Mídia e navegação só na origem do bundle (S-07, S-08) | F05-01 | READY | Grok | G10 |
+| F10-13 | Segurança | Capability mínima e CSP de base (S-14, S-15) | F05-01 | READY | Grok | G10 |
+| F10-14 | Segurança | Prova de mídia fora do instalador (S-13) | F05-01 | READY | Grok | G10 |
+| F10-15 | Segurança | Cofre de um slot, recusa outra origem (S-05) | F05-01 | READY | Grok | G10 |
+| F10-16 | Segurança | Contrato visível da bandeja (S-16) | F05-01 | READY | Grok | G10 |
+| F10-17 | Segurança | Login, refresh e logout no processo nativo (S-05, S-18) | F10-05,F10-07,F10-15 | PENDING | Grok | G10 |
+| F10-18 | Segurança | Salas e join no processo nativo (S-06) | F10-17 | PENDING | Grok | G10 |
 
 ## Estado em 2026-10-19
+
+F10 entrou com os 18 PRs do desenho de segurança (`plans/phase-10-seguranca.md`). Treze estão `READY`. F10-04, F10-05, F10-06, F10-17 e F10-18 esperam outra F10. Nada implementado.
 
 Nenhuma tarefa está `DONE`. F09-01, F09-05, F09-06 e F09-07 estão `READY`. F09-02, F09-03 e F09-04 estão `PENDING`. Nenhuma tarefa F09 foi implementada. Em 2026-10-19 os dois PCs com o instalador entraram na mesma sala. Microfone, câmera e compartilhamento de tela funcionaram. M01–M12 seguem `NOT_RUN`: faltam duração, resolução, rede distinta, parar e republicar, janela, queda de 5 s, TURN, troca de dispositivo, minimizar e diagnóstico. F02-02–F02-05 seguem `WAITING_VALIDATION`. F02-06 segue `BLOCKED`, sem GO e sem NO-GO.
 

@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-19 — F10 no PLAN — Claude
+Os 18 PRs do desenho de segurança entraram como F10-01 a F10-18, com as dependências do desenho e o gate G10. Detalhe em `plans/phase-10-seguranca.md`. Nada implementado. Sem GO/NO-GO.
+
 ### 2026-10-19 — desenho das correções de segurança — Grok e Claude
 O desenho de S-01 a S-21 está em `docs/reviews/security-fixes-design-2026-10-19.md`, com 18 PRs e a ordem mínima entre eles. Grok escreveu e passou por três revisões. A última caiu no limite do Grok; Claude fechou os dois pontos menores abertos: restore de `.sql` antigo fora do guard do backup, e teste do `PROXY_AUTH` separado entre API e Caddy. Sem código. Sem commit. Sem GO/NO-GO.
 

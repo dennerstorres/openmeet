@@ -9,5 +9,6 @@
 - **G7 Infra/release:** TLS/ICE/TURN em VPS real, teste de restauração, CI de release e instalador Windows.
 - **G8 OSS:** licença de projeto/dependências revisada, SECURITY.md, contribuições e documentação pública verificadas.
 - **G9 Servidores e sala:** os ADR 0007–0013. Servidores isolados na mesma API, convite por link sem vazar o código, cards e layouts, presença sem gravar ocupação no Postgres, ensurdecer local, áudio do PC com falha visível e Google sem segredo no cliente. Prova humana de link, anel e áudio do PC fica `WAITING_VALIDATION`, nunca PASS por inspeção.
+- **G10 Segurança:** cada achado S-01 a S-21 fechado com o teste que o desenho pede, sem afrouxar auth, TLS ou autorização e com `POC_JOIN` em 0. Itens que só um build instalado ou a stack real provam (WebView2, SFU, Caddy) ficam `WAITING_VALIDATION`.
 
 Se uma ação exige contexto fora da máquina do agente (2 PCs, rede, VPS) marcar WAITING_VALIDATION e fornecer roteiro ao humano, nunca declarar PASS.
