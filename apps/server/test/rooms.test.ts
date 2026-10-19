@@ -488,10 +488,21 @@ test("servers hold rooms, hide themselves from non-members, and gate the room to
     });
     assert.equal(participantInvite.statusCode, 403);
 
-    const joined = await app.inject({ method: "POST", url: `/api/v1/rooms/${workRoom}/join`, headers: auth(memberToken), payload: {} });
+    const joined = await app.inject({
+      method: "POST",
+      url: `/api/v1/rooms/${workRoom}/join`,
+      headers: auth(memberToken),
+      payload: { canPublishSources: ["screen_share_audio", "unknown"], canPublishData: true, roomAdmin: true },
+    });
     assert.equal(joined.statusCode, 200);
     const grants = await new TokenVerifier(apiKey, apiSecret).verify((joined.json() as { token: string }).token);
     assert.equal(grants.video?.room, workRoom);
+    // S-09: the sources the product asks for, including the PC audio of ADR 0008, and nothing else.
+    assert.deepEqual([...(grants.video?.canPublishSources ?? [])].sort(), ["camera", "microphone", "screen_share", "screen_share_audio"]);
+    assert.equal(grants.video?.canPublishData, false);
+    assert.notEqual(grants.video?.roomAdmin, true);
+    assert.notEqual(grants.video?.roomCreate, true);
+    assert.notEqual(grants.video?.hidden, true);
     const familyJoin = await app.inject({ method: "POST", url: `/api/v1/rooms/${familyRoom}/join`, headers: auth(memberToken), payload: { code } });
     assert.equal(familyJoin.statusCode, 403);
 

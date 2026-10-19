@@ -7,6 +7,7 @@ import { AuthError, type PublicUser } from "../auth/service.js";
 import { hashPassword } from "../auth/password.js";
 import { hashSecret } from "../auth/tokens.js";
 import { heldRooms, releaseHold, revokeAfter } from "../auth/media-hold.js";
+import { roomGrant } from "./grant.js";
 import type { RoomMedia } from "./media.js";
 
 export type RoomErrorCode =
@@ -664,7 +665,7 @@ async function issueRoomToken(env: AppEnv, room: string, userId: string, display
     throw new RoomError("room_unconfigured");
   }
   const tokenBuilder = new AccessToken(apiKey, apiSecret, { identity: userId, name: displayName, ttl: "10m" });
-  tokenBuilder.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: false });
+  tokenBuilder.addGrant(roomGrant(room));
   return { url: url.toString(), token: await tokenBuilder.toJwt(), expiresIn: 600 };
 }
 

@@ -87,6 +87,12 @@ test("POC join issues a room-scoped short-lived token and does not echo the secr
   assert.equal(grants.video?.roomJoin, true);
   assert.equal(grants.video?.canPublish, true);
   assert.equal(grants.video?.canSubscribe, true);
+  // S-09: the sources the product asks for, including the PC audio of ADR 0008, and nothing else.
+  assert.deepEqual([...(grants.video?.canPublishSources ?? [])].sort(), ["camera", "microphone", "screen_share", "screen_share_audio"]);
+  assert.equal(grants.video?.canPublishData, false);
+  assert.notEqual(grants.video?.roomAdmin, true);
+  assert.notEqual(grants.video?.roomCreate, true);
+  assert.notEqual(grants.video?.hidden, true);
   assert.equal(grants.video?.canPublishData, false);
   await app.close();
 });

@@ -1,5 +1,6 @@
 import { parseIdentity, parseRoomName, parseSignalUrl, PocInputError } from "@openmeet/shared";
 import { AccessToken } from "livekit-server-sdk";
+import { roomGrant } from "./rooms/grant.js";
 import type { FastifyInstance } from "fastify";
 
 export type AppEnv = Record<string, string | undefined>;
@@ -64,13 +65,7 @@ export async function issuePocJoin(env: AppEnv, roomInput: string, identityInput
   const room = parseRoomName(roomInput);
   const identity = parseIdentity(identityInput);
   const tokenBuilder = new AccessToken(apiKey, apiSecret, { identity, ttl: TOKEN_TTL });
-  tokenBuilder.addGrant({
-    roomJoin: true,
-    room,
-    canPublish: true,
-    canSubscribe: true,
-    canPublishData: false,
-  });
+  tokenBuilder.addGrant(roomGrant(room));
   const token = await tokenBuilder.toJwt();
   return { url: url.toString(), token };
 }
