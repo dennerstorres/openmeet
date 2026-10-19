@@ -116,6 +116,8 @@ export function MeetingApp() {
   const [layout, setLayout] = useState<CardLayout>("spotlight");
   const [pinnedId, setPinnedId] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  // ADR 0013: only this PC, only during the call, never saved.
+  const [deafened, setDeafened] = useState(false);
   const [levels, setLevels] = useState<Record<string, PlaybackLevel>>({});
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [controlPending, setControlPending] = useState(false);
@@ -285,6 +287,7 @@ export function MeetingApp() {
     if (!inCall) {
       setFullscreen(false);
       setPinnedId(null);
+      setDeafened(false);
     }
   }, [inCall]);
   useEffect(() => {
@@ -692,6 +695,7 @@ export function MeetingApp() {
               others={placement.others}
               pinnedId={pin}
               speakers={media.speakers}
+              deafened={deafened}
               fullscreen={isFullscreen}
               levelFor={levelFor}
               onLevel={changeLevel}
@@ -718,6 +722,15 @@ export function MeetingApp() {
                 onClick={() => void runControl("microphone", () => session().setMicrophone(!media.microphone))}
               >
                 Microfone {media.microphone ? "ligado" : "desligado"}
+              </button>
+              <button
+                type="button"
+                className={deafened ? "off" : ""}
+                aria-pressed={deafened}
+                title={deafened ? "Voltar a ouvir as pessoas neste PC" : "Cortar o som de todos neste PC. O microfone não muda."}
+                onClick={() => setDeafened((current) => !current)}
+              >
+                {deafened ? "Ensurdecido" : "Ensurdecer"}
               </button>
               <button
                 type="button"

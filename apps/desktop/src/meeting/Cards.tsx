@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import {
   applyPlayback,
   cardInitial,
+  effectivePlayback,
   shouldAttachPlayback,
   shouldShowLiveVideo,
   type CardLayout,
@@ -18,6 +19,7 @@ export interface CardStageProps {
   others: readonly string[];
   pinnedId: string | null;
   speakers: readonly string[];
+  deafened: boolean;
   fullscreen: boolean;
   levelFor: (cardId: string) => PlaybackLevel;
   onLevel: (cardId: string, patch: Partial<PlaybackLevel>) => void;
@@ -58,7 +60,9 @@ export function CardStage(props: CardStageProps) {
       {props.cards.flatMap((card) =>
         card.audioIds.flatMap((id) => {
           const tile = tileById.get(id);
-          return tile === undefined || !shouldAttachPlayback(tile) ? [] : [<AudioSink key={id} tile={tile} playback={props.levelFor(card.id)} />];
+          return tile === undefined || !shouldAttachPlayback(tile)
+            ? []
+            : [<AudioSink key={id} tile={tile} playback={effectivePlayback(props.levelFor(card.id), props.deafened)} />];
         }),
       )}
     </div>

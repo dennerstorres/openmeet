@@ -19,6 +19,11 @@ export function nextPlayback(current: PlaybackLevel, patch: Partial<PlaybackLeve
   };
 }
 
+/** ADR 0013: deafening cuts every remote sound here without touching what each card keeps. */
+export function effectivePlayback(level: PlaybackLevel, deafened: boolean): PlaybackLevel {
+  return deafened ? { heard: false, volume: level.volume } : level;
+}
+
 export function applyPlayback(element: { muted: boolean; volume: number }, level: PlaybackLevel): void {
   element.muted = !level.heard;
   element.volume = clampVolume(level.volume);

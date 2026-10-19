@@ -1,5 +1,9 @@
 # HISTORY — registro cronológico
 
+### 2026-10-19 — F09-05 ensurdecer — Claude
+Branch `task/F09-05-ensurdecer`, sobre `task/F09-04-presenca`. A barra da chamada ganhou Ensurdecer. Ligado, todo áudio remoto deste PC fica mudo, inclusive o de compartilhamento, sem mexer no microfone e sem avisar o servidor. O volume e o silêncio de cada card ficam guardados e voltam ao desligar. Nasce desligado, zera ao sair da sala e não grava em disco. Se o som ainda estiver bloqueado, o corte já vale quando a pessoa clicar em Ativar som, porque o elemento de áudio nasce mudo.
+Comandos, Windows 11: `pnpm typecheck`, `pnpm lint` e `pnpm --filter @openmeet/desktop build` ok. `pnpm -r test`: shared 32, media 43, server 34, desktop 2, todos pass. Não ouvido em chamada real. Sem GO/NO-GO.
+
 ### 2026-10-19 — F09-04 presença e anel de fala — Claude
 Branch `task/F09-04-presenca`, sobre `task/F09-02-convite`. `GET /api/v1/servers/:id/presence` pergunta ao LiveKit quem está em cada sala aberta do servidor, só para membros. O nome vem do banco pelo id; identidade desconhecida vira "Participante"; ninguém aparece duas vezes; sala que o SFU não conhece fica vazia. Nada vai para o Postgres. Se o SFU falha, a rota responde 503 e o app esconde os nomes e mantém as salas. O app pergunta a cada 5 s, fora da fila de ações, sem travar botões. A sessão de mídia guarda o alto-falante ativo do LiveKit; o card de quem fala e o nome dessa pessoa na sidebar ganham o anel verde, só na sala atual.
 Comandos, Windows 11: `pnpm typecheck`, `pnpm lint`, `prettier --write .` e `pnpm --filter @openmeet/desktop build` ok. `pnpm test`: shared 32, media 42, server 34, desktop 2, todos pass. No navegador, com API em memória e o LiveKit `--dev` local, duas contas na mesma sala apareceram debaixo dela na sidebar. Não visto: o anel com áudio real, porque o navegador de teste não tinha microfone. Por isso `WAITING_VALIDATION`. Sem GO/NO-GO.

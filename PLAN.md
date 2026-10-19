@@ -33,7 +33,7 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F09-02 | Servidores | Convite do servidor por link openmeet:// | F09-01 | WAITING_VALIDATION | Claude | G9 |
 | F09-03 | Sala | Três colunas, cards, destaque, grade, fixar e tela cheia | F09-01 | IMPLEMENTED | Claude | G9 |
 | F09-04 | Sala | Presença na sidebar e anel de quem fala | F09-03 | WAITING_VALIDATION | Claude | G9 |
-| F09-05 | Sala | Ensurdecer o áudio remoto só neste PC | F04-02 | READY | Claude | G9 |
+| F09-05 | Sala | Ensurdecer o áudio remoto só neste PC | F04-02 | IMPLEMENTED | Claude | G9 |
 | F09-06 | Sala | Áudio do PC opcional no compartilhamento | F04-03 | READY | Claude | G9 |
 | F09-07 | Identidade | Login Google pelo navegador, chaves só no servidor | F03-02 | READY | Claude | G9 |
 | F10-01 | Segurança | Recusar controle e bidi nos nomes (S-21) | F03-03 | READY | Grok | G10 |
@@ -56,6 +56,8 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F10-18 | Segurança | Salas e join no processo nativo (S-06) | F10-17 | PENDING | Grok | G10 |
 
 ## Estado em 2026-10-19
+
+F09-05 ficou `IMPLEMENTED` na branch `task/F09-05-ensurdecer`, sobre a F09-04: botão Ensurdecer na barra, só neste PC. Não foi ouvido em chamada real.
 
 F09-04 ficou `WAITING_VALIDATION` na branch `task/F09-04-presenca`, sobre a F09-02: nomes debaixo de cada sala e anel verde de quem fala. Falta ver o anel com áudio real em dois PCs.
 
