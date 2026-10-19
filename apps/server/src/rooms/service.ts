@@ -401,27 +401,11 @@ export async function listRooms(db: MigrationClient, actor: PublicUser): Promise
   return listed.rows.map(readRoom).filter((room): room is RoomRecord => room !== undefined);
 }
 
-export async function getRoom(db: MigrationClient, actor: PublicUser, id: string): Promise<{ room: RoomRecord; members: PublicUser[] }> {
+// S-10: a room member sees names and roles, never the login.
+export async function getRoom(db: MigrationClient, actor: PublicUser, id: string): Promise<{ room: RoomRecord; members: ServerMember[] }> {
   const { room, access } = await loadRoomAccess(db, actor, roomId(id));
   if (!activeRole(access.membership)) throw new RoomError("room_not_found");
-  const members = await db.query(
-    `select u.id, u.username, u.display_name, m.role
-     from server_members m
-     join users u on u.id = m.user_id
-     where m.server_id = $1 and m.removed_at is null
-     order by u.username`,
-    [room.serverId],
-  );
-  return {
-    room,
-    members: members.rows.flatMap((row) => {
-      const memberId = text(row.id);
-      const username = text(row.username);
-      const displayName = text(row.display_name);
-      const role = text(row.role);
-      return memberId && username && displayName && role ? [{ id: memberId, username, displayName, role }] : [];
-    }),
-  };
+  return { room, members: await serverMembers(db, room.serverId) };
 }
 
 export async function endRoom(db: MigrationClient, actor: PublicUser, id: string, media: RoomMedia | undefined): Promise<void> {
@@ -477,9 +461,11 @@ export async function joinRoom(
   code: string | undefined,
 ): Promise<{ url: string; token: string; expiresIn: number }> {
   const { room, access } = await loadRoomAccess(db, actor, roomId(id));
+  // S-01: no instance role skips this. Without a membership or a code the room's state stays hidden.
+  const member = activeRole(access.membership) !== undefined;
+  if (!member && !code) throw new RoomError("forbidden");
   if (room.ended) throw new RoomError("room_ended");
-  if (!activeRole(access.membership)) {
-    if (!code) throw new RoomError("forbidden");
+  if (!member && code) {
     await redeemInvite(db, room.serverId, actor.id, code);
     await audit(db, actor.id, "server_join", "server", room.serverId);
   }
