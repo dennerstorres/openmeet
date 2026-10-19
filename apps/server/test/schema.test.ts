@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { getTableColumns, getTableName } from "drizzle-orm";
-import { applyMigrations, type MigrationClient } from "../src/db/migrate.js";
+import { copyFile, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { applyMigrations, migrationDirectory, type MigrationClient } from "../src/db/migrate.js";
 import { identityEnums, identityTables } from "../src/db/schema.js";
 
 function pgliteClient(db: PGlite): MigrationClient {
@@ -48,7 +51,7 @@ test("identity migration matches the schema and rejects a second admin, duplicat
   const db = new PGlite();
   try {
     const client = pgliteClient(db);
-    assert.deepEqual(await applyMigrations(client), ["0001_identity.sql"]);
+    assert.deepEqual(await applyMigrations(client), ["0001_identity.sql", "0002_servers.sql"]);
     assert.deepEqual(await applyMigrations(client), []);
 
     const tables = await client.query("select tablename from pg_tables where schemaname = 'public'");
@@ -95,9 +98,29 @@ test("identity migration matches the schema and rejects a second admin, duplicat
     const member = await client.query("insert into users (username, password_hash, display_name) values ('member', 'hash-member', 'Member') returning id");
     const memberId = member.rows[0]?.id;
     assert.equal(typeof memberId, "string");
-    const room = await client.query("insert into rooms (name, slug, kind, created_by) values ('Sala', 'sala', 'persistent', $1) returning id", [adminId]);
+    const server = await client.query("insert into servers (name, created_by) values ('Geral', $1) returning id", [adminId]);
+    const serverId = server.rows[0]?.id;
+    await client.query("insert into server_members (server_id, user_id, role) values ($1, $2, 'owner')", [serverId, adminId]);
+    await expectSqlState(() => client.query("insert into server_members (server_id, user_id, role) values ($1, $2, 'owner')", [serverId, memberId]), "23505");
+    await expectSqlState(
+      () => client.query("insert into rooms (name, slug, kind, created_by) values ('Solta', 'solta', 'persistent', $1)", [adminId]),
+      "23502",
+    );
+    const room = await client.query("insert into rooms (server_id, name, slug, kind, created_by) values ($1, 'Sala', 'sala', 'persistent', $2) returning id", [
+      serverId,
+      adminId,
+    ]);
     const roomId = room.rows[0]?.id;
     assert.equal(typeof roomId, "string");
+    await expectSqlState(
+      () => client.query("insert into rooms (server_id, name, slug, kind, created_by) values ($1, 'Sala', 'sala', 'persistent', $2)", [serverId, adminId]),
+      "23505",
+    );
+    const other = await client.query("insert into servers (name, created_by) values ('RPG', $1) returning id", [adminId]);
+    await client.query("insert into rooms (server_id, name, slug, kind, created_by) values ($1, 'Sala', 'sala', 'persistent', $2)", [
+      other.rows[0]?.id,
+      adminId,
+    ]);
     await client.query("insert into memberships (room_id, user_id, role) values ($1, $2, 'participant')", [roomId, memberId]);
     await expectSqlState(() => client.query("insert into memberships (room_id, user_id, role) values ($1, $2, 'moderator')", [roomId, memberId]), "23505");
     await expectSqlState(
@@ -114,8 +137,67 @@ test("identity migration matches the schema and rejects a second admin, duplicat
     const applied = await client.query("select name from schema_migrations");
     assert.deepEqual(
       applied.rows.map((row) => row.name),
-      ["0001_identity.sql"],
+      ["0001_identity.sql", "0002_servers.sql"],
     );
+  } finally {
+    await db.close();
+  }
+});
+
+test("the servers migration moves existing rooms into Geral and revokes room invites", async () => {
+  const db = new PGlite();
+  const firstOnly = await mkdtemp(path.join(tmpdir(), "openmeet-migrations-"));
+  try {
+    const client = pgliteClient(db);
+    await copyFile(path.join(migrationDirectory(), "0001_identity.sql"), path.join(firstOnly, "0001_identity.sql"));
+    assert.deepEqual(await applyMigrations(client, firstOnly), ["0001_identity.sql"]);
+    const admin = await client.query("insert into users (username, password_hash, display_name, role) values ('admin', 'h1', 'Admin', 'admin') returning id");
+    const adminId = admin.rows[0]?.id;
+    const kept = await client.query("insert into users (username, password_hash, display_name) values ('kept', 'h2', 'Kept') returning id");
+    const keptId = kept.rows[0]?.id;
+    const gone = await client.query("insert into users (username, password_hash, display_name) values ('gone', 'h3', 'Gone') returning id");
+    const goneId = gone.rows[0]?.id;
+    const room = await client.query("insert into rooms (name, slug, kind, created_by) values ('Sala', 'sala', 'persistent', $1) returning id", [adminId]);
+    const roomId = room.rows[0]?.id;
+    await client.query("insert into memberships (room_id, user_id, role) values ($1, $2, 'moderator')", [roomId, adminId]);
+    await client.query("insert into memberships (room_id, user_id, role) values ($1, $2, 'participant')", [roomId, keptId]);
+    await client.query("insert into memberships (room_id, user_id, role, removed_at) values ($1, $2, 'participant', now())", [roomId, goneId]);
+    await client.query("insert into invites (room_id, code_hash, created_by, expires_at) values ($1, 'hash-a', $2, now() + interval '1 day')", [
+      roomId,
+      adminId,
+    ]);
+
+    assert.deepEqual(await applyMigrations(client), ["0002_servers.sql"]);
+
+    const servers = await client.query("select id, name, created_by from servers");
+    assert.equal(servers.rows.length, 1);
+    assert.equal(servers.rows[0]?.name, "Geral");
+    assert.equal(servers.rows[0]?.created_by, adminId);
+    const moved = await client.query("select server_id from rooms where id = $1", [roomId]);
+    assert.equal(moved.rows[0]?.server_id, servers.rows[0]?.id);
+    const members = await client.query("select user_id, role from server_members order by role");
+    assert.deepEqual(
+      members.rows.map((row) => [row.user_id, row.role]).sort(),
+      [
+        [adminId, "owner"],
+        [keptId, "participant"],
+      ].sort(),
+    );
+    const open = await client.query("select id from invites where revoked_at is null");
+    assert.deepEqual(open.rows, []);
+  } finally {
+    await rm(firstOnly, { recursive: true, force: true });
+    await db.close();
+  }
+});
+
+test("the servers migration on an empty database creates no server", async () => {
+  const db = new PGlite();
+  try {
+    const client = pgliteClient(db);
+    await applyMigrations(client);
+    const servers = await client.query("select id from servers");
+    assert.deepEqual(servers.rows, []);
   } finally {
     await db.close();
   }

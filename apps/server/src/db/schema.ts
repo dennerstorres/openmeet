@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, integer, pgEnum, pgTable, primaryKey, smallint, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, integer, pgEnum, pgTable, primaryKey, smallint, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 const createdAt = () => timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow();
@@ -9,6 +9,7 @@ export const userRole = pgEnum("user_role", ["admin", "moderator", "participant"
 export const roomKind = pgEnum("room_kind", ["persistent", "temporary"]);
 export const membershipRole = pgEnum("membership_role", ["moderator", "participant"]);
 export const registrationMode = pgEnum("registration_mode", ["closed", "invite"]);
+export const serverRole = pgEnum("server_role", ["owner", "moderator", "participant"]);
 
 export const users = pgTable(
   "users",
@@ -48,12 +49,74 @@ export const refreshSessions = pgTable(
   (table) => [check("refresh_sessions_token_hash_present", sql`char_length(${table.tokenHash}) > 0`)],
 );
 
+export const servers = pgTable(
+  "servers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [check("servers_name_length", sql`char_length(${table.name}) between 1 and 80`)],
+);
+
+export const serverMembers = pgTable(
+  "server_members",
+  {
+    serverId: uuid("server_id")
+      .notNull()
+      .references(() => servers.id),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    role: serverRole("role").notNull(),
+    removedAt: timestamp("removed_at", { withTimezone: true, mode: "date" }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.serverId, table.userId] }),
+    uniqueIndex("server_members_single_owner")
+      .on(table.serverId)
+      .where(sql`${table.role} = 'owner'`),
+  ],
+);
+
+export const serverInvites = pgTable(
+  "server_invites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    serverId: uuid("server_id")
+      .notNull()
+      .references(() => servers.id),
+    codeHash: text("code_hash").notNull().unique(),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "date" }),
+    maxUses: integer("max_uses").notNull().default(1),
+    useCount: integer("use_count").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    check("server_invites_code_hash_present", sql`char_length(${table.codeHash}) > 0`),
+    check("server_invites_max_uses_positive", sql`${table.maxUses} >= 1`),
+    check("server_invites_use_count_bounds", sql`${table.useCount} >= 0 and ${table.useCount} <= ${table.maxUses}`),
+  ],
+);
+
 export const rooms = pgTable(
   "rooms",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
-    slug: text("slug").notNull().unique(),
+    serverId: uuid("server_id")
+      .notNull()
+      .references(() => servers.id),
+    slug: text("slug").notNull(),
     kind: roomKind("kind").notNull(),
     createdBy: uuid("created_by")
       .notNull()
@@ -63,6 +126,7 @@ export const rooms = pgTable(
     updatedAt: updatedAt(),
   },
   (table) => [
+    unique("rooms_server_slug_unique").on(table.serverId, table.slug),
     check("rooms_name_length", sql`char_length(${table.name}) between 1 and 80`),
     check("rooms_slug_charset", sql`${table.slug} ~ '^[A-Za-z0-9_-]{1,64}$'`),
   ],
@@ -152,6 +216,19 @@ export const schemaMigrations = pgTable("schema_migrations", {
   appliedAt: timestamp("applied_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
-export const identityEnums = [userRole, roomKind, membershipRole, registrationMode] as const;
+export const identityEnums = [userRole, roomKind, membershipRole, registrationMode, serverRole] as const;
 
-export const identityTables = [users, refreshSessions, rooms, memberships, invites, auditEvents, instanceSettings, bootstrapTokens, schemaMigrations] as const;
+export const identityTables = [
+  users,
+  refreshSessions,
+  servers,
+  serverMembers,
+  serverInvites,
+  rooms,
+  memberships,
+  invites,
+  auditEvents,
+  instanceSettings,
+  bootstrapTokens,
+  schemaMigrations,
+] as const;

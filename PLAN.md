@@ -29,9 +29,9 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F02-05 | POC | Redes distintas, TURN, reconexão, métricas | F02-03,F02-04 | WAITING_VALIDATION | Grok | G2 |
 | F02-06 | POC | Decisão GO/NO-GO de Tauri/WebView2 | F02-05 | BLOCKED | Claude | G2 |
 | F08-01 | OSS | Segurança/licença/docs/release candidate | F07-02, F02-06 GO | PENDING | Claude+Codex review | G8 |
-| F09-01 | Servidores | Schema, API, migração Geral e token LiveKit pelo id da sala | F03-03 | READY | Claude | G9 |
-| F09-02 | Servidores | Convite do servidor por link openmeet:// | F09-01 | PENDING | Claude | G9 |
-| F09-03 | Sala | Três colunas, cards, destaque, grade, fixar e tela cheia | F09-01 | PENDING | Claude | G9 |
+| F09-01 | Servidores | Schema, API, migração Geral e token LiveKit pelo id da sala | F03-03 | IMPLEMENTED | Claude | G9 |
+| F09-02 | Servidores | Convite do servidor por link openmeet:// | F09-01 | READY | Claude | G9 |
+| F09-03 | Sala | Três colunas, cards, destaque, grade, fixar e tela cheia | F09-01 | READY | Claude | G9 |
 | F09-04 | Sala | Presença na sidebar e anel de quem fala | F09-03 | PENDING | Claude | G9 |
 | F09-05 | Sala | Ensurdecer o áudio remoto só neste PC | F04-02 | READY | Claude | G9 |
 | F09-06 | Sala | Áudio do PC opcional no compartilhamento | F04-03 | READY | Claude | G9 |
@@ -56,6 +56,8 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F10-18 | Segurança | Salas e join no processo nativo (S-06) | F10-17 | PENDING | Grok | G10 |
 
 ## Estado em 2026-10-19
+
+F09-01 ficou `IMPLEMENTED` na branch `task/F09-01-servidores`: migration `0002_servers.sql`, rotas de servidor e token LiveKit pelo id da sala. F09-02 e F09-03 passaram a `READY`. A F10 precisa renumerar as migrations do desenho a partir de `0003`. O admin já não entra em servidor de que não é membro, o que adianta parte do S-01.
 
 F10 entrou com os 18 PRs do desenho de segurança (`plans/phase-10-seguranca.md`). Treze estão `READY`. F10-04, F10-05, F10-06, F10-17 e F10-18 esperam outra F10. Nada implementado.
 

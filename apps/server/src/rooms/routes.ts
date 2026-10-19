@@ -3,15 +3,23 @@ import { AuthError, type AuthErrorCode, currentUser, type PublicUser } from "../
 import type { MigrationClient } from "../db/migrate.js";
 import type { AppEnv } from "../poc-join.js";
 import {
+  acceptServerInvite,
   createAccount,
   createInvite,
   createRoom,
+  createServer,
+  createServerInvite,
   endRoom,
   getRoom,
+  getServer,
   joinRoom,
   listRooms,
+  listServerRooms,
+  listServers,
   removeMember,
+  removeServerMember,
   revokeInvite,
+  revokeServerInvite,
   RoomError,
   type RoomErrorCode,
 } from "./service.js";
@@ -38,6 +46,7 @@ const ROOM_STATUS: Record<RoomErrorCode, number> = {
   weak_password: 400,
   forbidden: 403,
   room_not_found: 404,
+  server_not_found: 404,
   invalid_invite: 403,
   room_ended: 403,
   conflict: 409,
@@ -115,11 +124,125 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
       const actor = await caller(request);
       if (!db) throw new AuthError("auth_unconfigured");
       const room = await createRoom(db, actor, {
+        serverId: textField(request.body, "serverId"),
         name: requiredText(request.body, "name"),
         slug: requiredText(request.body, "slug"),
         kind: requiredText(request.body, "kind"),
       });
       return reply.code(201).header("cache-control", "no-store").send(room);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/servers", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const server = await createServer(db, actor, { name: requiredText(request.body, "name") });
+      return reply.code(201).header("cache-control", "no-store").send(server);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.get("/api/v1/servers", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await listServers(db, actor));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.get("/api/v1/servers/:id", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await getServer(db, actor, param(request, "id")));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.get("/api/v1/servers/:id/rooms", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await listServerRooms(db, actor, param(request, "id")));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/servers/:id/rooms", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const room = await createRoom(db, actor, {
+        serverId: param(request, "id"),
+        name: requiredText(request.body, "name"),
+        slug: requiredText(request.body, "slug"),
+        kind: requiredText(request.body, "kind"),
+      });
+      return reply.code(201).header("cache-control", "no-store").send(room);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/servers/:id/invites", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const invite = await createServerInvite(db, actor, param(request, "id"), {
+        expiresInMinutes: numberField(request.body, "expiresInMinutes", undefined),
+        maxUses: numberField(request.body, "maxUses", 1),
+      });
+      return reply.code(201).header("cache-control", "no-store").send(invite);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.delete("/api/v1/servers/:id/invites/:inviteId", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      await revokeServerInvite(db, actor, param(request, "id"), param(request, "inviteId"));
+      return reply.code(204).header("cache-control", "no-store").send();
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/servers/:id/join", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const joined = await acceptServerInvite(db, actor, param(request, "id"), requiredText(request.body, "code"));
+      return reply.code(200).header("cache-control", "no-store").send(joined);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.delete("/api/v1/servers/:id/members/:userId", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      await removeServerMember(db, actor, param(request, "id"), param(request, "userId"), media);
+      return reply.code(204).header("cache-control", "no-store").send();
     } catch (error) {
       return sendError(request, reply, error);
     }

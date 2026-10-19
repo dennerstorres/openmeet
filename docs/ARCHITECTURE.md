@@ -43,5 +43,5 @@ Existem: `GET /health/live`, `GET /health/ready`, `GET /api/v1/instance`,
 `POST /api/v1/auth/bootstrap`, `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`,
 `POST /api/v1/admin/users`, `GET|POST /api/v1/rooms`, `GET /api/v1/rooms/:id`, `PATCH /api/v1/rooms/:id`,
 `DELETE /api/v1/rooms/:id/members/:userId`, `POST /api/v1/rooms/:id/invites`, `DELETE /api/v1/rooms/:id/invites/:inviteId`,
-`POST /api/v1/rooms/:id/join`. `POST /api/v1/poc/join` só existe com `POC_JOIN=1` e só em loopback.
+`POST /api/v1/rooms/:id/join`. Servidores (ADR 0007): `GET|POST /api/v1/servers`, `GET /api/v1/servers/:id`, `GET|POST /api/v1/servers/:id/rooms`, `POST /api/v1/servers/:id/invites`, `DELETE /api/v1/servers/:id/invites/:inviteId`, `POST /api/v1/servers/:id/join`, `DELETE /api/v1/servers/:id/members/:userId`. As rotas de sala agem no servidor dono da sala: convite, remoção e acesso são do servidor. `POST /api/v1/rooms` sem `serverId` cai no servidor mais antigo que a conta gerencia; o admin sem servidor ganha `Geral`. O LiveKit usa o id da sala. `POST /api/v1/poc/join` só existe com `POC_JOIN=1` e só em loopback.
 Ainda não existem: `DELETE /api/v1/rooms/:id`, `GET /api/v1/admin/users`, `PATCH /api/v1/admin/users/:id`. `packages/shared` ainda não publica OpenAPI.

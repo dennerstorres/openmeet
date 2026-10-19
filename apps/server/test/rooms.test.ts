@@ -128,7 +128,7 @@ test("invite join issues a room-scoped token and hides the invite code", async (
     });
     assert.equal(invite.statusCode, 201);
     const code = (invite.json() as { code: string; id: string }).code;
-    const stored = await db.query("select code_hash from invites");
+    const stored = await db.query("select code_hash from server_invites");
     assert.equal(
       stored.rows.some((row) => row.code_hash === code),
       false,
@@ -148,7 +148,7 @@ test("invite join issues a room-scoped token and hides the invite code", async (
     assert.equal(body.expiresIn, 600);
     const grants = await new TokenVerifier(apiKey, apiSecret).verify(body.token);
     assert.equal(grants.sub, memberId);
-    assert.equal(grants.video?.room, "sala");
+    assert.equal(grants.video?.room, roomId);
     assert.equal(grants.video?.roomJoin, true);
     assert.equal(grants.video?.canPublishData, false);
     assert.equal(grants.video?.roomAdmin, undefined);
@@ -193,7 +193,7 @@ test("invite join issues a room-scoped token and hides the invite code", async (
     const hiddenList = await app.inject({ method: "GET", url: "/api/v1/rooms", headers: auth(otherToken) });
     assert.deepEqual(hiddenList.json(), []);
 
-    for (const state of ["revoked", "expired", "wrong-room"] as const) {
+    for (const state of ["revoked", "expired", "wrong-server"] as const) {
       const invitation = await app.inject({
         method: "POST",
         url: `/api/v1/rooms/${roomId}/invites`,
@@ -207,13 +207,15 @@ test("invite join issues a room-scoped token and hides the invite code", async (
         const revoke = await app.inject({ method: "DELETE", url: `/api/v1/rooms/${roomId}/invites/${inviteBody.id}`, headers: auth(adminToken) });
         assert.equal(revoke.statusCode, 204);
       } else if (state === "expired") {
-        await db.query("update invites set expires_at = now() - interval '1 second' where id = $1", [inviteBody.id]);
+        await db.query("update server_invites set expires_at = now() - interval '1 second' where id = $1", [inviteBody.id]);
       } else {
+        const server = await app.inject({ method: "POST", url: "/api/v1/servers", headers: auth(adminToken), payload: { name: "Outro" } });
+        assert.equal(server.statusCode, 201);
         const another = await app.inject({
           method: "POST",
-          url: "/api/v1/rooms",
+          url: `/api/v1/servers/${(server.json() as { id: string }).id}/rooms`,
           headers: auth(adminToken),
-          payload: { name: "Another", slug: "another", kind: "persistent" },
+          payload: { name: "Another", slug: "sala", kind: "persistent" },
         });
         assert.equal(another.statusCode, 201);
         targetRoom = (another.json() as { id: string }).id;
@@ -225,7 +227,7 @@ test("invite join issues a room-scoped token and hides the invite code", async (
         payload: { code: inviteBody.code },
       });
       assert.equal(invalidInvite.statusCode, 403);
-      const uses = await db.query("select use_count from invites where id = $1", [inviteBody.id]);
+      const uses = await db.query("select use_count from server_invites where id = $1", [inviteBody.id]);
       assert.equal(uses.rows[0]?.use_count, 0);
     }
 
@@ -240,7 +242,7 @@ test("invite join issues a room-scoped token and hides the invite code", async (
 
     const removed = await app.inject({ method: "DELETE", url: `/api/v1/rooms/${roomId}/members/${memberId}`, headers: auth(adminToken) });
     assert.equal(removed.statusCode, 204);
-    assert.equal(mediaCalls.includes(`disconnect sala ${memberId}`), true);
+    assert.equal(mediaCalls.includes(`disconnect ${roomId} ${memberId}`), true);
     const blocked = await app.inject({ method: "POST", url: `/api/v1/rooms/${roomId}/join`, headers: auth(memberToken), payload: {} });
     assert.equal(blocked.statusCode, 403);
     const restored = await app.inject({
@@ -251,9 +253,12 @@ test("invite join issues a room-scoped token and hides the invite code", async (
     });
     assert.equal(restored.statusCode, 403);
     assert.equal(restored.json().error, "forbidden");
-    const stillRemoved = await db.query("select removed_at is not null as removed from memberships where room_id = $1 and user_id = $2", [roomId, memberId]);
+    const stillRemoved = await db.query(
+      "select removed_at is not null as removed from server_members m join rooms r on r.server_id = m.server_id where r.id = $1 and m.user_id = $2",
+      [roomId, memberId],
+    );
     assert.equal(stillRemoved.rows[0]?.removed === true || stillRemoved.rows[0]?.removed === "t", true);
-    const spent = await db.query("select use_count from invites where id = $1", [reusableBody.id]);
+    const spent = await db.query("select use_count from server_invites where id = $1", [reusableBody.id]);
     assert.equal(spent.rows[0]?.use_count, 0);
     const readmit = await app.inject({
       method: "POST",
@@ -271,7 +276,7 @@ test("invite join issues a room-scoped token and hides the invite code", async (
     assert.equal(back.statusCode, 200);
     const ended = await app.inject({ method: "PATCH", url: `/api/v1/rooms/${roomId}`, headers: auth(adminToken), payload: { ended: true } });
     assert.equal(ended.statusCode, 204);
-    assert.equal(mediaCalls.includes("close sala"), true);
+    assert.equal(mediaCalls.includes(`close ${roomId}`), true);
     const closed = await app.inject({ method: "POST", url: `/api/v1/rooms/${roomId}/join`, headers: auth(adminToken), payload: {} });
     assert.equal(closed.statusCode, 403);
     assert.equal(closed.json().error, "room_ended");
@@ -349,6 +354,178 @@ test("a failed SFU disconnect stays revoked and the retry reaches the SFU again"
     const retry = await app.inject({ method: "PATCH", url: `/api/v1/rooms/${roomId}`, headers: auth(adminToken), payload: { ended: true } });
     assert.equal(retry.statusCode, 204);
     assert.equal(closes, 2);
+  } finally {
+    await app.close();
+    await pg.close();
+  }
+});
+
+test("servers hold rooms, hide themselves from non-members, and gate the room token", async () => {
+  const pg = new PGlite();
+  const db = pgliteClient(pg);
+  await applyMigrations(db);
+  const mediaCalls: string[] = [];
+  const media: RoomMedia = {
+    disconnect: async (room, identity) => {
+      mediaCalls.push(`disconnect ${room} ${identity}`);
+    },
+    closeRoom: async (room) => {
+      mediaCalls.push(`close ${room}`);
+    },
+  };
+  const app = await buildApp({
+    logger: false,
+    env: {
+      AUTH_SECRET: authSecret,
+      BOOTSTRAP_TOKEN: bootstrapToken,
+      LIVEKIT_URL: "ws://127.0.0.1:7880",
+      LIVEKIT_API_KEY: apiKey,
+      LIVEKIT_API_SECRET: apiSecret,
+    },
+    db,
+    media,
+  });
+  try {
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/bootstrap",
+      payload: { token: bootstrapToken, username: "admin", password: adminPassword, displayName: "Admin" },
+    });
+    assert.equal(created.statusCode, 201);
+    const adminToken = (created.json() as { accessToken: string }).accessToken;
+    const account = await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/users",
+      headers: auth(adminToken),
+      payload: { username: "member", password: memberPassword, displayName: "Member", role: "moderator" },
+    });
+    assert.equal(account.statusCode, 201);
+    const memberId = (account.json() as { id: string }).id;
+    const memberToken = await login(app, "member", memberPassword);
+
+    const deniedServer = await app.inject({ method: "POST", url: "/api/v1/servers", headers: auth(memberToken), payload: { name: "Meu" } });
+    assert.equal(deniedServer.statusCode, 403);
+    const blank = await app.inject({ method: "POST", url: "/api/v1/servers", headers: auth(adminToken), payload: { name: "   " } });
+    assert.equal(blank.statusCode, 400);
+
+    const ids: string[] = [];
+    for (const name of ["Trabalho", "Família"]) {
+      const server = await app.inject({ method: "POST", url: "/api/v1/servers", headers: auth(adminToken), payload: { name } });
+      assert.equal(server.statusCode, 201);
+      assert.equal((server.json() as { role: string }).role, "owner");
+      ids.push((server.json() as { id: string }).id);
+    }
+    const [work, family] = ids as [string, string];
+    const roomIds: string[] = [];
+    for (const server of [work, family]) {
+      const room = await app.inject({
+        method: "POST",
+        url: `/api/v1/servers/${server}/rooms`,
+        headers: auth(adminToken),
+        payload: { name: "Geral", slug: "geral", kind: "persistent" },
+      });
+      assert.equal(room.statusCode, 201);
+      assert.equal((room.json() as { serverId: string }).serverId, server);
+      roomIds.push((room.json() as { id: string }).id);
+    }
+    const [workRoom, familyRoom] = roomIds as [string, string];
+    const duplicate = await app.inject({
+      method: "POST",
+      url: `/api/v1/servers/${work}/rooms`,
+      headers: auth(adminToken),
+      payload: { name: "Outra", slug: "geral", kind: "persistent" },
+    });
+    assert.equal(duplicate.statusCode, 409);
+
+    assert.deepEqual((await app.inject({ method: "GET", url: "/api/v1/servers", headers: auth(memberToken) })).json(), []);
+    for (const url of [`/api/v1/servers/${work}`, `/api/v1/servers/${work}/rooms`, `/api/v1/rooms/${workRoom}`]) {
+      const hidden = await app.inject({ method: "GET", url, headers: auth(memberToken) });
+      assert.equal(hidden.statusCode, 404, url);
+    }
+    const notMember = await app.inject({ method: "POST", url: `/api/v1/rooms/${workRoom}/join`, headers: auth(memberToken), payload: {} });
+    assert.equal(notMember.statusCode, 403);
+    const badId = await app.inject({ method: "GET", url: "/api/v1/servers/not-a-uuid", headers: auth(memberToken) });
+    assert.equal(badId.statusCode, 404);
+
+    const invite = await app.inject({ method: "POST", url: `/api/v1/servers/${work}/invites`, headers: auth(adminToken), payload: { expiresInMinutes: 30 } });
+    assert.equal(invite.statusCode, 201);
+    const code = (invite.json() as { code: string }).code;
+    const wrongServer = await app.inject({ method: "POST", url: `/api/v1/servers/${family}/join`, headers: auth(memberToken), payload: { code } });
+    assert.equal(wrongServer.statusCode, 403);
+    const accepted = await app.inject({ method: "POST", url: `/api/v1/servers/${work}/join`, headers: auth(memberToken), payload: { code } });
+    assert.equal(accepted.statusCode, 200);
+    assert.equal((accepted.json() as { role: string }).role, "participant");
+    assert.equal(accepted.body.includes(code), false);
+
+    const listed = (await app.inject({ method: "GET", url: "/api/v1/servers", headers: auth(memberToken) })).json() as { id: string }[];
+    assert.deepEqual(
+      listed.map((server) => server.id),
+      [work],
+    );
+    const detail = await app.inject({ method: "GET", url: `/api/v1/servers/${work}`, headers: auth(memberToken) });
+    assert.equal(detail.statusCode, 200);
+    assert.equal(detail.body.includes("username"), false);
+    assert.equal((detail.json() as { members: unknown[] }).members.length, 2);
+    const rooms = (await app.inject({ method: "GET", url: "/api/v1/rooms", headers: auth(memberToken) })).json() as { id: string }[];
+    assert.deepEqual(
+      rooms.map((room) => room.id),
+      [workRoom],
+    );
+
+    // An instance moderator is still only a participant inside the server.
+    const participantRoom = await app.inject({
+      method: "POST",
+      url: `/api/v1/servers/${work}/rooms`,
+      headers: auth(memberToken),
+      payload: { name: "Minha", slug: "minha", kind: "temporary" },
+    });
+    assert.equal(participantRoom.statusCode, 403);
+    const participantInvite = await app.inject({
+      method: "POST",
+      url: `/api/v1/servers/${work}/invites`,
+      headers: auth(memberToken),
+      payload: { expiresInMinutes: 30 },
+    });
+    assert.equal(participantInvite.statusCode, 403);
+
+    const joined = await app.inject({ method: "POST", url: `/api/v1/rooms/${workRoom}/join`, headers: auth(memberToken), payload: {} });
+    assert.equal(joined.statusCode, 200);
+    const grants = await new TokenVerifier(apiKey, apiSecret).verify((joined.json() as { token: string }).token);
+    assert.equal(grants.video?.room, workRoom);
+    const familyJoin = await app.inject({ method: "POST", url: `/api/v1/rooms/${familyRoom}/join`, headers: auth(memberToken), payload: { code } });
+    assert.equal(familyJoin.statusCode, 403);
+
+    const participantRemoval = await app.inject({ method: "DELETE", url: `/api/v1/servers/${work}/members/${memberId}`, headers: auth(memberToken) });
+    assert.equal(participantRemoval.statusCode, 403);
+    const removed = await app.inject({ method: "DELETE", url: `/api/v1/servers/${work}/members/${memberId}`, headers: auth(adminToken) });
+    assert.equal(removed.statusCode, 204);
+    assert.deepEqual(mediaCalls, [`disconnect ${workRoom} ${memberId}`]);
+    const afterRemoval = await app.inject({ method: "POST", url: `/api/v1/rooms/${workRoom}/join`, headers: auth(memberToken), payload: {} });
+    assert.equal(afterRemoval.statusCode, 403);
+    assert.deepEqual((await app.inject({ method: "GET", url: "/api/v1/servers", headers: auth(memberToken) })).json(), []);
+
+    // The instance admin does not see a server it is not a member of.
+    const foreign = await db.query("insert into servers (name, created_by) values ('RPG', $1) returning id", [memberId]);
+    const foreignId = String(foreign.rows[0]?.id);
+    await db.query("insert into server_members (server_id, user_id, role) values ($1, $2, 'owner')", [foreignId, memberId]);
+    const foreignRoom = await db.query(
+      "insert into rooms (server_id, name, slug, kind, created_by) values ($1, 'Mesa', 'mesa', 'persistent', $2) returning id",
+      [foreignId, memberId],
+    );
+    const adminHidden = await app.inject({ method: "GET", url: `/api/v1/servers/${foreignId}`, headers: auth(adminToken) });
+    assert.equal(adminHidden.statusCode, 404);
+    const adminJoin = await app.inject({
+      method: "POST",
+      url: `/api/v1/rooms/${String(foreignRoom.rows[0]?.id)}/join`,
+      headers: auth(adminToken),
+      payload: {},
+    });
+    assert.equal(adminJoin.statusCode, 403);
+    const adminServers = (await app.inject({ method: "GET", url: "/api/v1/servers", headers: auth(adminToken) })).json() as { id: string }[];
+    assert.equal(
+      adminServers.some((server) => server.id === foreignId),
+      false,
+    );
   } finally {
     await app.close();
     await pg.close();

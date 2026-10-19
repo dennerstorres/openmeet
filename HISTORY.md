@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-19 — F09-01 servidores — Claude
+Branch `task/F09-01-servidores`. Migration `0002_servers.sql`: `servers`, `server_members` (um dono por servidor), `server_invites`, `rooms.server_id` obrigatório e slug único por servidor. A migração cria `Geral` quando há sala, põe o admin como dono, quem tinha sala ativa como participante, e revoga os convites de sala. Rotas `/api/v1/servers`. As rotas de sala agem no servidor da sala, então o app atual continua funcionando. O token e o corte do LiveKit usam o id da sala. O admin não vê nem entra em servidor de que não é membro. `pnpm typecheck` e `pnpm lint` ok. `pnpm -r test`: server 29, shared 19, media 34, desktop 2, todos pass, Windows 11. `prettier --check` acusa só `PocApp.tsx` e `TrackView.tsx`, que vieram de antes. Sem stack real e sem SFU vivo. Riscos: as migrations do desenho F10 precisam começar em `0003`; `GET /api/v1/rooms/:id` ainda mostra username (S-10, F10-02). Sem GO/NO-GO.
+
 ### 2026-10-19 — F10 no PLAN — Claude
 Os 18 PRs do desenho de segurança entraram como F10-01 a F10-18, com as dependências do desenho e o gate G10. Detalhe em `plans/phase-10-seguranca.md`. Nada implementado. Sem GO/NO-GO.
 

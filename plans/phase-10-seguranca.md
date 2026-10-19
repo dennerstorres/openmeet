@@ -3,7 +3,7 @@
 Objetivo: fechar os achados S-01 a S-21 da auditoria `docs/reviews/security-audit-2026-10-19.md`. Correção, arquivos e teste de cada item estão em `docs/reviews/security-fixes-design-2026-10-19.md`, seção PR Plan. Não marcar `DONE` nem PASS sem o teste pedido.
 
 ## Execução
-Uma tarefa por branch, na ordem das dependências do `PLAN.md`. A numeração não é fila de deploy. Fazer backup antes da migration `0002`. `POC_JOIN` continua 0.
+Uma tarefa por branch, na ordem das dependências do `PLAN.md`. A numeração não é fila de deploy. As migrations do desenho começam em `0003`, porque a F09-01 usou `0002_servers.sql`. Fazer backup antes da primeira delas. `POC_JOIN` continua 0.
 
 ## Critério de saída
 G10. O que depende do WebView2 instalado, do SFU ou do Caddy real fica `WAITING_VALIDATION` até alguém provar.

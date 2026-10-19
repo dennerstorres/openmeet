@@ -15,6 +15,7 @@ export type RoomErrorCode =
   | "weak_password"
   | "forbidden"
   | "room_not_found"
+  | "server_not_found"
   | "invalid_invite"
   | "room_ended"
   | "conflict"
@@ -34,18 +35,36 @@ export class RoomError extends Error {
 const USERNAME = /^[A-Za-z0-9_-]{1,64}$/;
 const SLUG = /^[A-Za-z0-9_-]{1,64}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DEFAULT_SERVER_NAME = "Geral";
 
 interface RoomRecord {
   id: string;
+  serverId: string;
   name: string;
   slug: string;
   kind: string;
   ended: boolean;
 }
 
-interface Membership {
+interface ServerRecord {
+  id: string;
+  name: string;
+}
+
+interface ServerMembership {
   role: string;
   removed: boolean;
+}
+
+interface ServerAccess {
+  server: ServerRecord;
+  membership: ServerMembership | undefined;
+}
+
+export interface ServerMember {
+  id: string;
+  displayName: string;
+  role: string;
 }
 
 function isTrue(value: unknown): boolean {
@@ -63,6 +82,21 @@ function sqlState(error: unknown): string {
 export function roomId(value: string): string {
   if (!UUID.test(value)) throw new RoomError("room_not_found");
   return value;
+}
+
+export function serverId(value: string): string {
+  if (!UUID.test(value)) throw new RoomError("server_not_found");
+  return value;
+}
+
+function parseName(value: string): string {
+  const name = value.trim();
+  if (name.length < 1 || name.length > 80) throw new RoomError("invalid_body");
+  return name;
+}
+
+async function audit(db: MigrationClient, actorId: string, action: string, targetType: string, targetId: string): Promise<void> {
+  await db.query("insert into audit_events (actor_user_id, action, target_type, target_id) values ($1, $2, $3, $4)", [actorId, action, targetType, targetId]);
 }
 
 export async function createAccount(
@@ -88,7 +122,7 @@ export async function createAccount(
     const name = text(row?.display_name);
     const role = text(row?.role);
     if (!id || !username || !name || !role) throw new RoomError("conflict");
-    await db.query("insert into audit_events (actor_user_id, action, target_type, target_id) values ($1, 'user_create', 'user', $2)", [actor.id, id]);
+    await audit(db, actor.id, "user_create", "user", id);
     return { id, username, displayName: name, role };
   } catch (error) {
     if (error instanceof RoomError) throw error;
@@ -97,15 +131,171 @@ export async function createAccount(
   }
 }
 
-export async function createRoom(db: MigrationClient, actor: PublicUser, input: { name: string; slug: string; kind: string }): Promise<RoomRecord> {
-  if (actor.role !== "admin" && actor.role !== "moderator") throw new RoomError("forbidden");
-  const name = input.name.trim();
-  if (name.length < 1 || name.length > 80) throw new RoomError("invalid_body");
+// Servers
+
+export async function createServer(db: MigrationClient, actor: PublicUser, input: { name: string }): Promise<ServerRecord & { role: string }> {
+  if (actor.role !== "admin") throw new RoomError("forbidden");
+  const name = parseName(input.name);
+  return db.transaction((tx) => insertServer(tx, actor, name));
+}
+
+async function insertServer(tx: MigrationClient, actor: PublicUser, name: string): Promise<ServerRecord & { role: string }> {
+  const inserted = await tx.query("insert into servers (name, created_by) values ($1, $2) returning id", [name, actor.id]);
+  const id = text(inserted.rows[0]?.id);
+  if (!id) throw new RoomError("conflict");
+  await tx.query("insert into server_members (server_id, user_id, role) values ($1, $2, 'owner')", [id, actor.id]);
+  await audit(tx, actor.id, "server_create", "server", id);
+  return { id, name, role: "owner" };
+}
+
+export async function listServers(db: MigrationClient, actor: PublicUser): Promise<(ServerRecord & { role: string })[]> {
+  const listed = await db.query(
+    `select s.id, s.name, m.role
+     from servers s
+     join server_members m on m.server_id = s.id and m.user_id = $1 and m.removed_at is null
+     order by s.created_at, s.id`,
+    [actor.id],
+  );
+  return listed.rows.flatMap((row) => {
+    const id = text(row.id);
+    const name = text(row.name);
+    const role = text(row.role);
+    return id && name && role ? [{ id, name, role }] : [];
+  });
+}
+
+export async function getServer(
+  db: MigrationClient,
+  actor: PublicUser,
+  id: string,
+): Promise<{ server: ServerRecord & { role: string }; members: ServerMember[] }> {
+  const access = await loadServerAccess(db, actor, serverId(id));
+  const role = activeRole(access.membership);
+  if (!role) throw new RoomError("server_not_found");
+  return { server: { ...access.server, role }, members: await serverMembers(db, access.server.id) };
+}
+
+export async function listServerRooms(db: MigrationClient, actor: PublicUser, id: string): Promise<RoomRecord[]> {
+  const access = await loadServerAccess(db, actor, serverId(id));
+  if (!activeRole(access.membership)) throw new RoomError("server_not_found");
+  const listed = await db.query(
+    "select id, server_id, name, slug, kind, ended_at is not null as ended from rooms where server_id = $1 order by created_at, id",
+    [access.server.id],
+  );
+  return listed.rows.map(readRoom).filter((room): room is RoomRecord => room !== undefined);
+}
+
+async function serverMembers(db: MigrationClient, id: string): Promise<ServerMember[]> {
+  const members = await db.query(
+    `select u.id, u.display_name, m.role
+     from server_members m
+     join users u on u.id = m.user_id
+     where m.server_id = $1 and m.removed_at is null
+     order by u.display_name, u.id`,
+    [id],
+  );
+  return members.rows.flatMap((row) => {
+    const memberId = text(row.id);
+    const displayName = text(row.display_name);
+    const role = text(row.role);
+    return memberId && displayName && role ? [{ id: memberId, displayName, role }] : [];
+  });
+}
+
+export async function createServerInvite(
+  db: MigrationClient,
+  actor: PublicUser,
+  id: string,
+  input: { expiresInMinutes: number; maxUses: number },
+): Promise<{ id: string; code: string; maxUses: number }> {
+  const access = await loadServerAccess(db, actor, serverId(id));
+  requireMember(access);
+  if (!canManage(access.membership)) throw new RoomError("forbidden");
+  if (!Number.isInteger(input.expiresInMinutes) || input.expiresInMinutes < 1 || input.expiresInMinutes > 10080) throw new RoomError("invalid_body");
+  if (!Number.isInteger(input.maxUses) || input.maxUses < 1 || input.maxUses > 20) throw new RoomError("invalid_body");
+  const code = randomBytes(32).toString("base64url");
+  const inserted = await db.query(
+    `insert into server_invites (server_id, code_hash, created_by, expires_at, max_uses)
+     values ($1, $2, $3, now() + ($4 * interval '1 minute'), $5)
+     returning id`,
+    [access.server.id, hashSecret(code), actor.id, input.expiresInMinutes, input.maxUses],
+  );
+  const inviteId = text(inserted.rows[0]?.id);
+  if (!inviteId) throw new RoomError("room_unconfigured");
+  await audit(db, actor.id, "invite_create", "server", access.server.id);
+  return { id: inviteId, code, maxUses: input.maxUses };
+}
+
+export async function revokeServerInvite(db: MigrationClient, actor: PublicUser, id: string, inviteId: string): Promise<void> {
+  const access = await loadServerAccess(db, actor, serverId(id));
+  requireMember(access);
+  if (!canManage(access.membership)) throw new RoomError("forbidden");
+  if (!UUID.test(inviteId)) throw new RoomError("server_not_found");
+  const updated = await db.query("update server_invites set revoked_at = now() where id = $1 and server_id = $2 and revoked_at is null returning id", [
+    inviteId,
+    access.server.id,
+  ]);
+  if (updated.rows.length !== 1) throw new RoomError("server_not_found");
+  await audit(db, actor.id, "invite_revoke", "server", access.server.id);
+}
+
+export async function acceptServerInvite(db: MigrationClient, actor: PublicUser, id: string, code: string): Promise<ServerRecord & { role: string }> {
+  const access = await loadServerAccess(db, actor, serverId(id));
+  const role = activeRole(access.membership);
+  if (role) return { ...access.server, role };
+  await redeemInvite(db, access.server.id, actor.id, code);
+  await audit(db, actor.id, "server_join", "server", access.server.id);
+  return { ...access.server, role: "participant" };
+}
+
+export async function removeServerMember(db: MigrationClient, actor: PublicUser, id: string, memberId: string, media: RoomMedia | undefined): Promise<void> {
+  if (!media) throw new RoomError("room_unconfigured");
+  const access = await loadServerAccess(db, actor, serverId(id));
+  requireMember(access);
+  await removeFromServer(db, actor, access, memberId, media);
+}
+
+async function removeFromServer(db: MigrationClient, actor: PublicUser, access: ServerAccess, memberId: string, media: RoomMedia): Promise<void> {
+  if (!canManage(access.membership)) throw new RoomError("forbidden");
+  if (!UUID.test(memberId) || memberId === actor.id) throw new RoomError("forbidden");
+  const target = await db.query("select role, removed_at is not null as removed from server_members where server_id = $1 and user_id = $2", [
+    access.server.id,
+    memberId,
+  ]);
+  const targetRole = text(target.rows[0]?.role);
+  if (!targetRole) throw new RoomError("server_not_found");
+  if (targetRole === "owner") throw new RoomError("forbidden");
+  if (targetRole === "moderator" && access.membership?.role !== "owner") throw new RoomError("forbidden");
+  const updated = await db.query(
+    "update server_members set removed_at = now() where server_id = $1 and user_id = $2 and removed_at is null returning user_id",
+    [access.server.id, memberId],
+  );
+  if (updated.rows.length === 1) await audit(db, actor.id, "member_remove", "user", memberId);
+  const openRooms = await db.query("select id from rooms where server_id = $1 and ended_at is null order by created_at, id", [access.server.id]);
+  for (const row of openRooms.rows) {
+    const room = text(row.id);
+    if (room) await disconnectMedia(() => media.disconnect(room, memberId));
+  }
+}
+
+// Rooms
+
+export async function createRoom(
+  db: MigrationClient,
+  actor: PublicUser,
+  input: { serverId: string | undefined; name: string; slug: string; kind: string },
+): Promise<RoomRecord> {
+  const name = parseName(input.name);
   if (!SLUG.test(input.slug)) throw new RoomError("invalid_body");
   if (input.kind !== "persistent" && input.kind !== "temporary") throw new RoomError("invalid_body");
   try {
     return await db.transaction(async (tx) => {
-      const inserted = await tx.query("insert into rooms (name, slug, kind, created_by) values ($1, $2, $3, $4) returning id", [
+      const target = input.serverId === undefined ? await defaultServer(tx, actor) : serverId(input.serverId);
+      const access = await loadServerAccess(tx, actor, target);
+      requireMember(access);
+      if (!canManage(access.membership)) throw new RoomError("forbidden");
+      const inserted = await tx.query("insert into rooms (server_id, name, slug, kind, created_by) values ($1, $2, $3, $4, $5) returning id", [
+        access.server.id,
         name,
         input.slug,
         input.kind,
@@ -113,9 +303,8 @@ export async function createRoom(db: MigrationClient, actor: PublicUser, input: 
       ]);
       const id = text(inserted.rows[0]?.id);
       if (!id) throw new RoomError("conflict");
-      await tx.query("insert into memberships (room_id, user_id, role) values ($1, $2, 'moderator')", [id, actor.id]);
-      await tx.query("insert into audit_events (actor_user_id, action, target_type, target_id) values ($1, 'room_create', 'room', $2)", [actor.id, id]);
-      return { id, name, slug: input.slug, kind: input.kind, ended: false };
+      await audit(tx, actor.id, "room_create", "room", id);
+      return { id, serverId: access.server.id, name, slug: input.slug, kind: input.kind, ended: false };
     });
   } catch (error) {
     if (error instanceof RoomError) throw error;
@@ -124,32 +313,47 @@ export async function createRoom(db: MigrationClient, actor: PublicUser, input: 
   }
 }
 
+// A client that predates servers creates rooms without naming one. It lands in the oldest server the caller manages.
+// The instance admin with no server gets "Geral", so a fresh install still works from the current desktop app.
+async function defaultServer(tx: MigrationClient, actor: PublicUser): Promise<string> {
+  const managed = await tx.query(
+    `select s.id
+     from servers s
+     join server_members m on m.server_id = s.id and m.user_id = $1 and m.removed_at is null and m.role in ('owner', 'moderator')
+     order by s.created_at, s.id
+     limit 1`,
+    [actor.id],
+  );
+  const found = text(managed.rows[0]?.id);
+  if (found) return found;
+  if (actor.role !== "admin") throw new RoomError("forbidden");
+  return (await insertServer(tx, actor, DEFAULT_SERVER_NAME)).id;
+}
+
 export async function listRooms(db: MigrationClient, actor: PublicUser): Promise<RoomRecord[]> {
-  const listed =
-    actor.role === "admin"
-      ? await db.query("select id, name, slug, kind, ended_at is not null as ended from rooms order by created_at")
-      : await db.query(
-          `select r.id, r.name, r.slug, r.kind, r.ended_at is not null as ended
-           from rooms r
-           join memberships m on m.room_id = r.id and m.user_id = $1 and m.removed_at is null
-           order by r.created_at`,
-          [actor.id],
-        );
+  const listed = await db.query(
+    `select r.id, r.server_id, r.name, r.slug, r.kind, r.ended_at is not null as ended
+     from rooms r
+     join server_members m on m.server_id = r.server_id and m.user_id = $1 and m.removed_at is null
+     order by r.created_at, r.id`,
+    [actor.id],
+  );
   return listed.rows.map(readRoom).filter((room): room is RoomRecord => room !== undefined);
 }
 
 export async function getRoom(db: MigrationClient, actor: PublicUser, id: string): Promise<{ room: RoomRecord; members: PublicUser[] }> {
-  const access = await loadAccess(db, actor, roomId(id));
+  const { room, access } = await loadRoomAccess(db, actor, roomId(id));
+  if (!activeRole(access.membership)) throw new RoomError("room_not_found");
   const members = await db.query(
     `select u.id, u.username, u.display_name, m.role
-     from memberships m
+     from server_members m
      join users u on u.id = m.user_id
-     where m.room_id = $1 and m.removed_at is null
+     where m.server_id = $1 and m.removed_at is null
      order by u.username`,
-    [access.room.id],
+    [room.serverId],
   );
   return {
-    room: access.room,
+    room,
     members: members.rows.flatMap((row) => {
       const memberId = text(row.id);
       const username = text(row.username);
@@ -162,34 +366,38 @@ export async function getRoom(db: MigrationClient, actor: PublicUser, id: string
 
 export async function endRoom(db: MigrationClient, actor: PublicUser, id: string, media: RoomMedia | undefined): Promise<void> {
   if (!media) throw new RoomError("room_unconfigured");
-  const access = await loadAccess(db, actor, roomId(id));
-  if (!canManage(actor, access.membership)) throw new RoomError("forbidden");
-  const updated = await db.query("update rooms set ended_at = now(), updated_at = now() where id = $1 and ended_at is null returning id", [access.room.id]);
-  if (updated.rows.length === 1) {
-    await db.query("insert into audit_events (actor_user_id, action, target_type, target_id) values ($1, 'room_end', 'room', $2)", [actor.id, access.room.id]);
-  }
-  await disconnectMedia(() => media.closeRoom(access.room.slug));
+  const { room, access } = await loadRoomAccess(db, actor, roomId(id));
+  if (!activeRole(access.membership)) throw new RoomError("room_not_found");
+  if (!canManage(access.membership)) throw new RoomError("forbidden");
+  const updated = await db.query("update rooms set ended_at = now(), updated_at = now() where id = $1 and ended_at is null returning id", [room.id]);
+  if (updated.rows.length === 1) await audit(db, actor.id, "room_end", "room", room.id);
+  await disconnectMedia(() => media.closeRoom(room.id));
 }
+
+// The room routes below predate servers. They act on the server that owns the room.
 
 export async function removeMember(db: MigrationClient, actor: PublicUser, id: string, memberId: string, media: RoomMedia | undefined): Promise<void> {
   if (!media) throw new RoomError("room_unconfigured");
-  const access = await loadAccess(db, actor, roomId(id));
-  if (!canManage(actor, access.membership)) throw new RoomError("forbidden");
-  if (!UUID.test(memberId) || memberId === actor.id) throw new RoomError("forbidden");
-  const updated = await db.query("update memberships set removed_at = now() where room_id = $1 and user_id = $2 and removed_at is null returning user_id", [
-    access.room.id,
-    memberId,
-  ]);
-  if (updated.rows.length === 1) {
-    await db.query("insert into audit_events (actor_user_id, action, target_type, target_id) values ($1, 'member_remove', 'user', $2)", [actor.id, memberId]);
-  } else {
-    const existing = await db.query("select user_id from memberships where room_id = $1 and user_id = $2 and removed_at is not null", [
-      access.room.id,
-      memberId,
-    ]);
-    if (existing.rows.length !== 1) throw new RoomError("room_not_found");
-  }
-  await disconnectMedia(() => media.disconnect(access.room.slug, memberId));
+  const { access } = await loadRoomAccess(db, actor, roomId(id));
+  if (!activeRole(access.membership)) throw new RoomError("room_not_found");
+  await removeFromServer(db, actor, access, memberId, media);
+}
+
+export async function createInvite(
+  db: MigrationClient,
+  actor: PublicUser,
+  id: string,
+  input: { expiresInMinutes: number; maxUses: number },
+): Promise<{ id: string; code: string; maxUses: number }> {
+  const { room, access } = await loadRoomAccess(db, actor, roomId(id));
+  if (!activeRole(access.membership)) throw new RoomError("room_not_found");
+  return createServerInvite(db, actor, room.serverId, input);
+}
+
+export async function revokeInvite(db: MigrationClient, actor: PublicUser, id: string, inviteId: string): Promise<void> {
+  const { room, access } = await loadRoomAccess(db, actor, roomId(id));
+  if (!activeRole(access.membership)) throw new RoomError("room_not_found");
+  await revokeServerInvite(db, actor, room.serverId, inviteId);
 }
 
 async function disconnectMedia(run: () => Promise<void>): Promise<void> {
@@ -201,47 +409,6 @@ async function disconnectMedia(run: () => Promise<void>): Promise<void> {
   }
 }
 
-export async function createInvite(
-  db: MigrationClient,
-  actor: PublicUser,
-  id: string,
-  input: { expiresInMinutes: number; maxUses: number },
-): Promise<{ id: string; code: string; maxUses: number }> {
-  const access = await loadAccess(db, actor, roomId(id));
-  if (!canManage(actor, access.membership)) throw new RoomError("forbidden");
-  if (!Number.isInteger(input.expiresInMinutes) || input.expiresInMinutes < 1 || input.expiresInMinutes > 10080) throw new RoomError("invalid_body");
-  if (!Number.isInteger(input.maxUses) || input.maxUses < 1 || input.maxUses > 20) throw new RoomError("invalid_body");
-  const code = randomBytes(32).toString("base64url");
-  const inserted = await db.query(
-    `insert into invites (room_id, code_hash, created_by, expires_at, max_uses)
-     values ($1, $2, $3, now() + ($4 * interval '1 minute'), $5)
-     returning id`,
-    [access.room.id, hashSecret(code), actor.id, input.expiresInMinutes, input.maxUses],
-  );
-  const inviteId = text(inserted.rows[0]?.id);
-  if (!inviteId) throw new RoomError("room_unconfigured");
-  await db.query("insert into audit_events (actor_user_id, action, target_type, target_id) values ($1, 'invite_create', 'room', $2)", [
-    actor.id,
-    access.room.id,
-  ]);
-  return { id: inviteId, code, maxUses: input.maxUses };
-}
-
-export async function revokeInvite(db: MigrationClient, actor: PublicUser, id: string, inviteId: string): Promise<void> {
-  const access = await loadAccess(db, actor, roomId(id));
-  if (!canManage(actor, access.membership)) throw new RoomError("forbidden");
-  if (!UUID.test(inviteId)) throw new RoomError("room_not_found");
-  const updated = await db.query("update invites set revoked_at = now() where id = $1 and room_id = $2 and revoked_at is null returning id", [
-    inviteId,
-    access.room.id,
-  ]);
-  if (updated.rows.length !== 1) throw new RoomError("room_not_found");
-  await db.query("insert into audit_events (actor_user_id, action, target_type, target_id) values ($1, 'invite_revoke', 'room', $2)", [
-    actor.id,
-    access.room.id,
-  ]);
-}
-
 export async function joinRoom(
   db: MigrationClient,
   env: AppEnv,
@@ -249,36 +416,37 @@ export async function joinRoom(
   id: string,
   code: string | undefined,
 ): Promise<{ url: string; token: string; expiresIn: number }> {
-  const access = await loadAccess(db, actor, roomId(id), true);
-  if (access.room.ended) throw new RoomError("room_ended");
-  const active = access.membership !== undefined && !access.membership.removed;
-  if (!active && actor.role !== "admin") {
+  const { room, access } = await loadRoomAccess(db, actor, roomId(id));
+  if (room.ended) throw new RoomError("room_ended");
+  if (!activeRole(access.membership)) {
     if (!code) throw new RoomError("forbidden");
-    await redeemInvite(db, access.room.id, actor.id, code);
+    await redeemInvite(db, room.serverId, actor.id, code);
+    await audit(db, actor.id, "server_join", "server", room.serverId);
   }
-  const token = await issueRoomToken(env, access.room.slug, actor.id, actor.displayName);
-  await db.query("insert into audit_events (actor_user_id, action, target_type, target_id) values ($1, 'room_join', 'room', $2)", [actor.id, access.room.id]);
+  const token = await issueRoomToken(env, room.id, actor.id, actor.displayName);
+  await audit(db, actor.id, "room_join", "room", room.id);
   return token;
 }
 
 async function redeemInvite(db: MigrationClient, id: string, userId: string, code: string): Promise<void> {
   await db.transaction(async (tx) => {
     const updated = await tx.query(
-      `update invites
+      `update server_invites
        set use_count = use_count + 1
-       where room_id = $1 and code_hash = $2 and revoked_at is null and expires_at > now() and use_count < max_uses
+       where server_id = $1 and code_hash = $2 and revoked_at is null and expires_at > now() and use_count < max_uses
        returning id`,
       [id, hashSecret(code)],
     );
     const inviteId = text(updated.rows[0]?.id);
     if (updated.rows.length !== 1 || !inviteId) throw new RoomError("invalid_invite");
+    // A removed member comes back only with an invite created after the removal.
     const joined = await tx.query(
-      `insert into memberships (room_id, user_id, role) values ($1, $2, 'participant')
-       on conflict (room_id, user_id) do update set removed_at = null, role = 'participant'
-       where memberships.removed_at is not null
+      `insert into server_members (server_id, user_id, role) values ($1, $2, 'participant')
+       on conflict (server_id, user_id) do update set removed_at = null, role = 'participant'
+       where server_members.removed_at is not null
          and exists (
-           select 1 from invites
-           where invites.id = $3 and invites.created_at > memberships.removed_at
+           select 1 from server_invites
+           where server_invites.id = $3 and server_invites.created_at > server_members.removed_at
          )
        returning user_id`,
       [id, userId, inviteId],
@@ -287,7 +455,8 @@ async function redeemInvite(db: MigrationClient, id: string, userId: string, cod
   });
 }
 
-async function issueRoomToken(env: AppEnv, slug: string, userId: string, displayName: string): Promise<{ url: string; token: string; expiresIn: number }> {
+// The LiveKit room is the room id. Slugs repeat across servers; ids do not.
+async function issueRoomToken(env: AppEnv, room: string, userId: string, displayName: string): Promise<{ url: string; token: string; expiresIn: number }> {
   const apiKey = env.LIVEKIT_API_KEY;
   const apiSecret = env.LIVEKIT_API_SECRET;
   const signalUrl = env.LIVEKIT_URL;
@@ -299,36 +468,48 @@ async function issueRoomToken(env: AppEnv, slug: string, userId: string, display
     throw new RoomError("room_unconfigured");
   }
   const tokenBuilder = new AccessToken(apiKey, apiSecret, { identity: userId, name: displayName, ttl: "10m" });
-  tokenBuilder.addGrant({ roomJoin: true, room: slug, canPublish: true, canSubscribe: true, canPublishData: false });
+  tokenBuilder.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: false });
   return { url: url.toString(), token: await tokenBuilder.toJwt(), expiresIn: 600 };
 }
 
-async function loadAccess(
-  db: MigrationClient,
-  actor: PublicUser,
-  id: string,
-  allowMissing = false,
-): Promise<{ room: RoomRecord; membership: Membership | undefined }> {
-  const found = await db.query("select id, name, slug, kind, ended_at is not null as ended from rooms where id = $1", [id]);
-  const room = readRoom(found.rows[0]);
-  if (!room) throw new RoomError("room_not_found");
-  const member = await db.query("select role, removed_at is not null as removed from memberships where room_id = $1 and user_id = $2", [id, actor.id]);
+async function loadServerAccess(db: MigrationClient, actor: PublicUser, id: string): Promise<ServerAccess> {
+  const found = await db.query("select id, name from servers where id = $1", [id]);
+  const foundId = text(found.rows[0]?.id);
+  const name = text(found.rows[0]?.name);
+  if (!foundId || !name) throw new RoomError("server_not_found");
+  const member = await db.query("select role, removed_at is not null as removed from server_members where server_id = $1 and user_id = $2", [id, actor.id]);
   const role = text(member.rows[0]?.role);
-  const membership = role ? { role, removed: isTrue(member.rows[0]?.removed) } : undefined;
-  if (actor.role !== "admin" && (membership === undefined || membership.removed) && !allowMissing) throw new RoomError("room_not_found");
-  return { room, membership };
+  return { server: { id: foundId, name }, membership: role ? { role, removed: isTrue(member.rows[0]?.removed) } : undefined };
 }
 
-function canManage(actor: PublicUser, membership: Membership | undefined): boolean {
-  return actor.role === "admin" || (membership !== undefined && !membership.removed && membership.role === "moderator");
+// A missing room and a room in a server the caller is not part of look the same to the caller.
+async function loadRoomAccess(db: MigrationClient, actor: PublicUser, id: string): Promise<{ room: RoomRecord; access: ServerAccess }> {
+  const found = await db.query("select id, server_id, name, slug, kind, ended_at is not null as ended from rooms where id = $1", [id]);
+  const room = readRoom(found.rows[0]);
+  if (!room) throw new RoomError("room_not_found");
+  return { room, access: await loadServerAccess(db, actor, room.serverId) };
+}
+
+function requireMember(access: ServerAccess): void {
+  if (!activeRole(access.membership)) throw new RoomError("server_not_found");
+}
+
+function activeRole(membership: ServerMembership | undefined): string | undefined {
+  return membership !== undefined && !membership.removed ? membership.role : undefined;
+}
+
+function canManage(membership: ServerMembership | undefined): boolean {
+  const role = activeRole(membership);
+  return role === "owner" || role === "moderator";
 }
 
 function readRoom(row: Record<string, unknown> | undefined): RoomRecord | undefined {
   if (!row) return undefined;
   const id = text(row.id);
+  const server = text(row.server_id);
   const name = text(row.name);
   const slug = text(row.slug);
   const kind = text(row.kind);
-  if (!id || !name || !slug || !kind) return undefined;
-  return { id, name, slug, kind, ended: isTrue(row.ended) };
+  if (!id || !server || !name || !slug || !kind) return undefined;
+  return { id, serverId: server, name, slug, kind, ended: isTrue(row.ended) };
 }
