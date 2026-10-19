@@ -8,6 +8,8 @@ export interface InstanceCard {
   name: string;
   apiVersion: "v1";
   bootstrapOpen: boolean;
+  /** ADR 0010: the server holds both Google keys. Older servers omit it. */
+  googleLogin: boolean;
 }
 
 export interface AccountUser {
@@ -91,7 +93,7 @@ export function parseInstanceCard(value: unknown): InstanceCard {
   if (hasControlCharacter(name)) {
     throw new PocInputError("invalid_instance", "Instance metadata is incomplete");
   }
-  return { name, apiVersion: "v1", bootstrapOpen: record.bootstrapOpen };
+  return { name, apiVersion: "v1", bootstrapOpen: record.bootstrapOpen, googleLogin: record.googleLogin === true };
 }
 
 export function parseAccountSession(value: unknown): AccountSession {
@@ -135,6 +137,39 @@ export function parseServer(value: unknown): ServerSummary {
     throw new PocInputError("invalid_instance", "Server is incomplete");
   }
   return { id, name, role };
+}
+
+const GOOGLE_AUTHORIZE = "https://accounts.google.com/o/oauth2/v2/auth";
+const POLL = /^[A-Za-z0-9_-]{43}$/;
+
+/** The instance chooses nothing about where the browser goes: only Google's own sign-in page. */
+export function parseGoogleStart(value: unknown): { authUrl: string; poll: string; expiresIn: number } {
+  const record = objectRecord(value, "invalid_instance", "Google start is not an object");
+  const authUrl = text(record.authUrl);
+  const poll = text(record.poll);
+  const expiresIn = record.expiresIn;
+  let url: URL | undefined;
+  try {
+    url = authUrl === undefined ? undefined : new URL(authUrl);
+  } catch {
+    url = undefined;
+  }
+  if (
+    url === undefined ||
+    url.origin + url.pathname !== GOOGLE_AUTHORIZE ||
+    url.username !== "" ||
+    url.password !== "" ||
+    url.hash !== "" ||
+    poll === undefined ||
+    !POLL.test(poll) ||
+    typeof expiresIn !== "number" ||
+    !Number.isInteger(expiresIn) ||
+    expiresIn < 1 ||
+    expiresIn > 3600
+  ) {
+    throw new PocInputError("invalid_instance", "Google start is incomplete");
+  }
+  return { authUrl: url.toString(), poll, expiresIn };
 }
 
 export function parseRoomJoin(value: unknown): PocJoinResponse {
@@ -184,7 +219,9 @@ function instancePath(path: string): string {
     path === "/api/v1/auth/logout" ||
     path === "/api/v1/rooms" ||
     path === "/api/v1/servers" ||
-    path === "/api/v1/invites/accept"
+    path === "/api/v1/invites/accept" ||
+    path === "/api/v1/auth/google/start" ||
+    path === "/api/v1/auth/google/poll"
   ) {
     return path;
   }

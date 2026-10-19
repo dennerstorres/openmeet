@@ -38,3 +38,12 @@ O dump vai para `infra/compose/generated/openmeet.sql`. O comando não recebe a 
 TLS e ICE/TURN numa VPS, NAT, rede celular e duas redes externas continuam sem evidência. Não declarar a fase pronta antes desse teste e de uma restauração no ambiente real. O instalador Windows está em `docs/RELEASE.md`.
 
 Referências: https://docs.livekit.io/transport/self-hosting/ e https://docs.livekit.io/transport/self-hosting/ports-firewall/
+
+## Login com Google (opcional, ADR 0010)
+
+1. No Google Cloud, crie um cliente OAuth do tipo **aplicativo da Web**.
+2. URI de redirecionamento autorizada: `https://<API_DOMAIN>/api/v1/auth/google/callback`.
+3. Grave no `infra/compose/.env`, fora do Git: `GOOGLE_CLIENT_ID=...` e `GOOGLE_CLIENT_SECRET=...`.
+4. Recrie o serviço `api`. `GET /api/v1/instance` passa a responder `googleLogin: true` e o botão aparece no aplicativo.
+
+Sem as duas chaves o botão some e as rotas do Google respondem 404. A URI de retorno vem de `API_DOMAIN`, ou de `GOOGLE_REDIRECT_URI` quando definida; nunca do cabeçalho Host. A primeira entrada com Google cria um participante sem servidor; o convite continua obrigatório. O primeiro administrador continua nascendo pelo token de instalação.

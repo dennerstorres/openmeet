@@ -211,6 +211,43 @@ export const bootstrapTokens = pgTable(
   (table) => [check("bootstrap_tokens_token_hash_present", sql`char_length(${table.tokenHash}) > 0`)],
 );
 
+export const userIdentities = pgTable(
+  "user_identities",
+  {
+    provider: text("provider").notNull(),
+    subject: text("subject").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    email: text("email"),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.provider, table.subject] }),
+    uniqueIndex("user_identities_one_per_user").on(table.provider, table.userId),
+    check("user_identities_provider", sql`${table.provider} = 'google'`),
+    check("user_identities_subject_length", sql`char_length(${table.subject}) between 1 and 255`),
+  ],
+);
+
+export const oauthLogins = pgTable(
+  "oauth_logins",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    stateHash: text("state_hash").notNull().unique(),
+    pollHash: text("poll_hash").notNull().unique(),
+    pkceVerifier: text("pkce_verifier").notNull(),
+    nonce: text("nonce").notNull(),
+    userId: uuid("user_id").references(() => users.id),
+    failure: text("failure"),
+    completedAt: timestamp("completed_at", { withTimezone: true, mode: "date" }),
+    consumedAt: timestamp("consumed_at", { withTimezone: true, mode: "date" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [check("oauth_logins_failure_length", sql`${table.failure} is null or char_length(${table.failure}) between 1 and 64`)],
+);
+
 export const schemaMigrations = pgTable("schema_migrations", {
   name: text("name").primaryKey(),
   appliedAt: timestamp("applied_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
@@ -230,5 +267,7 @@ export const identityTables = [
   auditEvents,
   instanceSettings,
   bootstrapTokens,
+  userIdentities,
+  oauthLogins,
   schemaMigrations,
 ] as const;

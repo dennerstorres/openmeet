@@ -901,3 +901,22 @@ button.ghost:hover:not(:disabled) {
   color: #b5c7bb;
   font-size: 13px;
 }
+
+/* ADR 0010 */
+
+button.google {
+  background: #e7f2ea;
+  color: #111613;
+  font-weight: 600;
+}
+
+.google-wait {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #d5e6da;
+}
+
+.google-wait p {
+  margin: 0;
+}

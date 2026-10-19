@@ -34,6 +34,10 @@ services:
       BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:?set BOOTSTRAP_TOKEN}
       TRUST_PROXY: "1"
       POC_JOIN: "0"
+      # ADR 0010. Optional. Without both keys the Google button does not appear.
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       LOG_LEVEL: info
     depends_on:
       postgres:

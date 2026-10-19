@@ -1,3 +1,4 @@
+mod google;
 mod invite;
 mod shell;
 
@@ -19,6 +20,7 @@ pub fn run() {
         // A second launch, including one opened by an openmeet:// link, hands its link to this one.
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| shell::show_main(app)))
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(shell::shortcut_plugin())
         .on_permission_request(|webview, kind| {
@@ -59,7 +61,8 @@ pub fn run() {
             shell::shell_set_consent,
             shell::shell_tracks,
             shell::shell_show,
-            invite::invite_take
+            invite::invite_take,
+            google::open_google_login
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

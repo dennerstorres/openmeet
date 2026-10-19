@@ -12,6 +12,7 @@
     "allow-shell-set-consent",
     "allow-shell-tracks",
     "allow-shell-show",
-    "allow-invite-take"
+    "allow-invite-take",
+    "allow-open-google-login"
   ]
 }

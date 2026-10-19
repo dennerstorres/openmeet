@@ -13,6 +13,9 @@ const nextRefresh = "refresh-token-rotated";
 const joinToken = "header.payload.signature";
 const inviteCode = "C".repeat(43);
 let presenceDown = false;
+const googlePoll = "G".repeat(43);
+let googlePolls = 0;
+let googleOutcome = "ok";
 
 function session(role: string, refresh = refreshToken) {
   return {
@@ -34,7 +37,16 @@ function apiFor(role: string): { api: InstanceApi; calls: string[]; bodies: unkn
     async request(origin, method, path, body) {
       calls.push(`${method} ${origin}${path}`);
       bodies.push(body);
-      if (path === "/api/v1/instance") return { status: 200, body: { name: "Sala", apiVersion: "v1", bootstrapOpen: false } };
+      if (path === "/api/v1/instance") return { status: 200, body: { name: "Sala", apiVersion: "v1", bootstrapOpen: false, googleLogin: true } };
+      if (path === "/api/v1/auth/google/start") {
+        return { status: 201, body: { authUrl: `https://accounts.google.com/o/oauth2/v2/auth?state=s`, poll: googlePoll, expiresIn: 600 } };
+      }
+      if (path === "/api/v1/auth/google/poll") {
+        googlePolls += 1;
+        if ((body as { poll?: string } | null)?.poll !== googlePoll) return { status: 401, body: { error: "invalid_session" } };
+        if (googlePolls < 3) return { status: 202, body: { status: "pending" } };
+        return googleOutcome === "ok" ? { status: 200, body: session(role) } : { status: 403, body: { error: googleOutcome } };
+      }
       if (path === "/api/v1/auth/login" || path === "/api/v1/auth/refresh") {
         return { status: 200, body: session(role, path === "/api/v1/auth/refresh" ? nextRefresh : refreshToken) };
       }
@@ -417,4 +429,69 @@ test("presence fills the room list, never blocks other work, and hides on failur
   await model.refreshPresence();
   await model.selectServer(otherServerId);
   assert.equal(model.snapshot().presence, null);
+});
+
+test("Google opens only the system browser, polls with its own secret, and lands like a password login", async () => {
+  googlePolls = 0;
+  googleOutcome = "ok";
+  const { api, calls, bodies } = apiFor("participant");
+  const vault = new MemorySessionVault();
+  const model = new MeetingModel(api, mediaFor(), vault);
+  await model.confirmInstance("https://meet.example");
+  assert.equal(model.snapshot().googleLogin, true);
+  const opened: string[] = [];
+  const waits: number[] = [];
+  await model.loginWithGoogle(
+    async (url) => {
+      opened.push(url);
+    },
+    async (ms) => {
+      waits.push(ms);
+    },
+  );
+  assert.deepEqual(opened, ["https://accounts.google.com/o/oauth2/v2/auth?state=s"]);
+  assert.equal(googlePolls, 3);
+  assert.equal(model.snapshot().step, "rooms");
+  assert.equal(model.snapshot().googleWaiting, false);
+  assert.equal(await vault.load("https://meet.example"), refreshToken);
+  const pollBodies = bodies.filter((_, index) => calls[index] === "POST https://meet.example/api/v1/auth/google/poll");
+  assert.equal(
+    pollBodies.every((body) => JSON.stringify(body).includes(googlePoll)),
+    true,
+  );
+  assert.equal(opened[0]?.includes(googlePoll), false);
+  assert.equal(JSON.stringify(model.snapshot()).includes(googlePoll), false);
+});
+
+test("a refused or cancelled Google sign-in stays on the account screen", async () => {
+  googlePolls = 0;
+  googleOutcome = "account_disabled";
+  const { api } = apiFor("participant");
+  const model = new MeetingModel(api, mediaFor());
+  await model.confirmInstance("https://meet.example");
+  await model.loginWithGoogle(
+    async () => undefined,
+    async () => undefined,
+  );
+  assert.equal(model.snapshot().step, "account");
+  assert.equal(model.snapshot().error, "account_disabled");
+
+  googlePolls = -100;
+  googleOutcome = "ok";
+  let release: () => void = () => undefined;
+  const waiting = model.loginWithGoogle(
+    async () => undefined,
+    () =>
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+  );
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(model.snapshot().googleWaiting, true);
+  model.cancelGoogle();
+  assert.equal(model.snapshot().googleWaiting, false);
+  release();
+  await waiting;
+  assert.equal(model.snapshot().step, "account");
+  assert.equal(model.snapshot().userLabel, null);
 });

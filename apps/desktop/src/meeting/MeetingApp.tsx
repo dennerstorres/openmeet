@@ -34,6 +34,7 @@ import {
   isTauri,
   listenInvite,
   listenShell,
+  openGoogleLogin,
   setShortcutConsent,
   shellStatus,
   shellTracks,
@@ -70,6 +71,11 @@ const ERROR_TEXT: Record<string, string> = {
   bootstrap_rejected: "O token de instalação não confere.",
   unauthorized: "A sessão expirou.",
   forbidden: "Sem permissão para isso.",
+  google_unconfigured: "Esta instância não tem login Google.",
+  google_denied: "O Google não confirmou a entrada.",
+  google_failed: "Não foi possível entrar com o Google. Tente de novo ou use usuário e senha.",
+  google_expired: "O pedido de entrada com o Google expirou. Tente de novo.",
+  account_disabled: "Esta conta está desativada nesta instância.",
   server_not_found: "O servidor não está disponível.",
   invalid_invite: "O convite não vale.",
   room_ended: "A sala está encerrada.",
@@ -424,6 +430,10 @@ export function MeetingApp() {
                 });
               }}
               onChange={() => void model.changeInstance()}
+              googleLogin={state.googleLogin}
+              googleWaiting={state.googleWaiting}
+              onGoogle={() => void model.loginWithGoogle(openGoogleLogin)}
+              onCancelGoogle={() => model.cancelGoogle()}
             />
           )}
         </section>
@@ -941,6 +951,10 @@ function AccountStep(props: {
   onSetupToken: (value: string) => void;
   onSubmit: (mode: "login" | "bootstrap") => void;
   onChange: () => void;
+  googleLogin: boolean;
+  googleWaiting: boolean;
+  onGoogle: () => void;
+  onCancelGoogle: () => void;
 }) {
   return (
     <form
@@ -978,6 +992,20 @@ function AccountStep(props: {
       <button type="submit" disabled={props.pending}>
         {props.bootstrapOpen ? "Criar administrador" : "Entrar"}
       </button>
+      {props.googleLogin && !props.bootstrapOpen ? (
+        props.googleWaiting ? (
+          <div className="google-wait" role="status">
+            <p>Conclua a entrada no navegador que abriu. Esta tela continua sozinha.</p>
+            <button type="button" className="ghost" onClick={props.onCancelGoogle}>
+              Cancelar
+            </button>
+          </div>
+        ) : (
+          <button type="button" className="google" disabled={props.pending} onClick={props.onGoogle}>
+            Entrar com Google
+          </button>
+        )
+      ) : null}
       <button type="button" onClick={props.onChange}>
         Trocar instância
       </button>

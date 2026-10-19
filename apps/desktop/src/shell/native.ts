@@ -66,3 +66,12 @@ export function listenInvite(handler: (link: string) => void): Promise<UnlistenF
       .catch(() => undefined);
   });
 }
+
+/** ADR 0010: Google opens in the system browser, never in this window. The native side checks the address again. */
+export async function openGoogleLogin(url: string): Promise<void> {
+  if (isTauri()) {
+    await invoke("open_google_login", { url });
+    return;
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
+}

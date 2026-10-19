@@ -1,5 +1,7 @@
 import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance } from "fastify";
+import type { GoogleTokens } from "./auth/google.js";
+import { registerGoogle } from "./auth/google-routes.js";
 import { attemptPolicy, type AttemptOptions } from "./auth/limit.js";
 import { registerAuth } from "./auth/routes.js";
 import type { MigrationClient } from "./db/migrate.js";
@@ -17,6 +19,7 @@ export async function buildApp(options?: {
   db?: MigrationClient;
   media?: RoomMedia;
   attempts?: AttemptOptions;
+  googleTokens?: GoogleTokens;
 }): Promise<FastifyInstance> {
   const env = options?.env ?? process.env;
   const app = Fastify({
@@ -52,6 +55,7 @@ export async function buildApp(options?: {
   const attempts = attemptPolicy(env.TRUST_PROXY === "1", options?.attempts);
   registerInstance(app, env, options?.db);
   registerAuth(app, env, options?.db, attempts);
+  registerGoogle(app, env, options?.db, attempts, options?.googleTokens);
   registerRooms(app, env, options?.db, options?.media);
   registerPocJoin(app, env);
   registerInvitePage(app);

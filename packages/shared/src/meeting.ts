@@ -4,6 +4,7 @@ import {
   canonicalInstanceUrl,
   hasControlCharacter,
   parseAccountSession,
+  parseGoogleStart,
   parseInstanceCard,
   parseRoomJoin,
   parsePresence,
@@ -50,6 +51,9 @@ export interface ShellSnapshot {
   origin: string | null;
   instanceName: string | null;
   bootstrapOpen: boolean;
+  googleLogin: boolean;
+  /** The system browser is open on Google and the app is waiting for the session. */
+  googleWaiting: boolean;
   userLabel: string | null;
   role: string | null;
   /** The instance admin creates servers. */
@@ -76,6 +80,11 @@ export interface ShellSnapshot {
 }
 
 const INVITE_MINUTES = 1440;
+const GOOGLE_POLL_MS = 2000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 const INVITE_USES = 10;
 
 const idleMedia: MeetingMedia = {
@@ -105,6 +114,8 @@ export class MeetingModel {
   private origin: string | null = null;
   private instanceName: string | null = null;
   private bootstrapOpen = false;
+  private googleLogin = false;
+  private googleWaiting = false;
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
   private userLabel: string | null = null;
@@ -136,6 +147,8 @@ export class MeetingModel {
       origin: this.origin,
       instanceName: this.instanceName,
       bootstrapOpen: this.bootstrapOpen,
+      googleLogin: this.googleLogin,
+      googleWaiting: this.googleWaiting,
       userLabel: this.userLabel,
       role,
       canCreateServer: role === "admin",
@@ -178,6 +191,7 @@ export class MeetingModel {
       this.origin = origin;
       this.instanceName = card.name;
       this.bootstrapOpen = card.bootstrapOpen;
+      this.googleLogin = card.googleLogin;
       if (await this.restore(origin, generation)) return;
       if (generation !== this.generation) return;
       this.step = "account";
@@ -204,6 +218,58 @@ export class MeetingModel {
       }
       await this.acceptSession(origin, parseAccountSession(result.body), generation);
     });
+  }
+
+  /**
+   * ADR 0010. Opens Google in the system browser, then asks the API for the session until it is
+   * ready. The poll secret never goes to the browser. Another action, or cancelGoogle, stops the wait.
+   */
+  async loginWithGoogle(openUrl: (url: string) => Promise<void>, wait: (ms: number) => Promise<void> = sleep): Promise<void> {
+    await this.run(async (generation) => {
+      const origin = this.pinned();
+      if (origin === null || !this.googleLogin) {
+        this.error = "google_unconfigured";
+        return;
+      }
+      const started = await this.api.request(origin, "POST", "/api/v1/auth/google/start", {}, null);
+      if (generation !== this.generation) return;
+      if (started.status !== 201) {
+        this.error = readErrorCode(started.body);
+        return;
+      }
+      const { authUrl, poll, expiresIn } = parseGoogleStart(started.body);
+      await openUrl(authUrl);
+      if (generation !== this.generation) return;
+      this.googleWaiting = true;
+      this.publish();
+      try {
+        const deadline = Date.now() + expiresIn * 1000;
+        while (Date.now() < deadline) {
+          await wait(GOOGLE_POLL_MS);
+          if (generation !== this.generation) return;
+          const result = await this.api.request(origin, "POST", "/api/v1/auth/google/poll", { poll }, null);
+          if (generation !== this.generation) return;
+          if (result.status === 202) continue;
+          if (result.status !== 200) {
+            this.error = readErrorCode(result.body);
+            return;
+          }
+          await this.acceptSession(origin, parseAccountSession(result.body), generation);
+          return;
+        }
+        this.error = "google_expired";
+      } finally {
+        this.googleWaiting = false;
+      }
+    });
+  }
+
+  cancelGoogle(): void {
+    if (!this.googleWaiting) return;
+    this.generation += 1;
+    this.googleWaiting = false;
+    this.pending = false;
+    this.publish();
   }
 
   async createRoom(name: string, slug: string, kind: string): Promise<void> {

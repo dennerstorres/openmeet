@@ -15,9 +15,11 @@ const PAGE_HEADERS = {
   "x-frame-options": "DENY",
 };
 
-/** The request log never carries the invite code. */
+const GOOGLE_CALLBACK = /^\/api\/v1\/auth\/google\/callback\?.*$/;
+
+/** The request log never carries the invite code, nor the Google code and state. */
 export function redactInviteUrl(url: string): string {
-  return url.replace(INVITE_PATH, "/convite/[redacted]");
+  return url.replace(INVITE_PATH, "/convite/[redacted]").replace(GOOGLE_CALLBACK, "/api/v1/auth/google/callback?[redacted]");
 }
 
 function page(body: string): string {

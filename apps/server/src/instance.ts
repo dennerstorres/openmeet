@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { MigrationClient } from "./db/migrate.js";
+import { googleConfig } from "./auth/google.js";
 import type { AppEnv } from "./poc-join.js";
 
 function isTrue(value: unknown): boolean {
@@ -31,7 +32,7 @@ export function registerInstance(app: FastifyInstance, env: AppEnv, db: Migratio
       return reply
         .code(200)
         .header("cache-control", "no-store")
-        .send({ name: instanceName(env), apiVersion: "v1", bootstrapOpen });
+        .send({ name: instanceName(env), apiVersion: "v1", bootstrapOpen, googleLogin: googleConfig(env) !== undefined });
     } catch {
       request.log.error({ code: "instance_metadata_failed" }, "instance metadata failed");
       return reply.code(503).header("cache-control", "no-store").send({ error: "instance_unavailable" });

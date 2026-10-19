@@ -139,6 +139,13 @@ async function startSession(db: MigrationClient, secret: string, user: StoredUse
   };
 }
 
+/** Starts a session for an account found some other way (ADR 0010). Run it inside the caller transaction. */
+export async function startSessionFor(db: MigrationClient, secret: string, userId: string, action: string): Promise<SessionBody> {
+  const user = await findUserById(db, userId);
+  if (!user || user.disabled) throw new AuthError("invalid_credentials");
+  return startSession(db, secret, user, undefined, action);
+}
+
 export async function bootstrapAdmin(
   db: MigrationClient,
   secret: string,

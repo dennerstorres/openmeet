@@ -1,6 +1,7 @@
 export {
   canonicalInstanceUrl,
   parseAccountSession,
+  parseGoogleStart,
   parseInstanceCard,
   parseRoomJoin,
   parsePresence,

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PocInputError, canonicalInstanceUrl, parseInstanceCard, prepareInstanceRequest, readErrorCode } from "../src/index.js";
+import { parseGoogleStart, PocInputError, canonicalInstanceUrl, parseInstanceCard, prepareInstanceRequest, readErrorCode } from "../src/index.js";
 
 const roomId = "11111111-1111-4111-8111-111111111111";
 
@@ -35,6 +35,7 @@ test("instance metadata requires the public card", () => {
     name: "Sala",
     apiVersion: "v1",
     bootstrapOpen: true,
+    googleLogin: false,
   });
   assert.throws(() => parseInstanceCard({ name: "Sala", apiVersion: "v1" }), PocInputError);
 });
@@ -90,4 +91,22 @@ test("error codes stay inside a short token", () => {
   assert.equal(readErrorCode({ error: "invalid_credentials" }), "invalid_credentials");
   assert.equal(readErrorCode({ error: "Bearer secret-token" }), "request_failed");
   assert.equal(readErrorCode(null), "request_failed");
+});
+
+test("Google start is accepted only when it points at Google's own sign-in page", () => {
+  const poll = "P".repeat(43);
+  const good = { authUrl: "https://accounts.google.com/o/oauth2/v2/auth?client_id=x&state=y", poll, expiresIn: 600 };
+  assert.equal(parseGoogleStart(good).poll, poll);
+  for (const authUrl of [
+    "https://evil.example/o/oauth2/v2/auth?x=1",
+    "https://accounts.google.com.evil.example/o/oauth2/v2/auth",
+    "http://accounts.google.com/o/oauth2/v2/auth",
+    "https://user@accounts.google.com/o/oauth2/v2/auth",
+    "https://accounts.google.com/o/oauth2/v2/auth#x",
+    "javascript:alert(1)",
+  ]) {
+    assert.throws(() => parseGoogleStart({ ...good, authUrl }), PocInputError, authUrl);
+  }
+  assert.throws(() => parseGoogleStart({ ...good, poll: "short" }), PocInputError);
+  assert.throws(() => parseGoogleStart({ ...good, expiresIn: 99999 }), PocInputError);
 });

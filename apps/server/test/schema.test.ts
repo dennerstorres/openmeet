@@ -51,7 +51,7 @@ test("identity migration matches the schema and rejects a second admin, duplicat
   const db = new PGlite();
   try {
     const client = pgliteClient(db);
-    assert.deepEqual(await applyMigrations(client), ["0001_identity.sql", "0002_servers.sql"]);
+    assert.deepEqual(await applyMigrations(client), ["0001_identity.sql", "0002_servers.sql", "0003_google_login.sql"]);
     assert.deepEqual(await applyMigrations(client), []);
 
     const tables = await client.query("select tablename from pg_tables where schemaname = 'public'");
@@ -137,7 +137,7 @@ test("identity migration matches the schema and rejects a second admin, duplicat
     const applied = await client.query("select name from schema_migrations");
     assert.deepEqual(
       applied.rows.map((row) => row.name),
-      ["0001_identity.sql", "0002_servers.sql"],
+      ["0001_identity.sql", "0002_servers.sql", "0003_google_login.sql"],
     );
   } finally {
     await db.close();
@@ -167,7 +167,7 @@ test("the servers migration moves existing rooms into Geral and revokes room inv
       adminId,
     ]);
 
-    assert.deepEqual(await applyMigrations(client), ["0002_servers.sql"]);
+    assert.deepEqual(await applyMigrations(client), ["0002_servers.sql", "0003_google_login.sql"]);
 
     const servers = await client.query("select id, name, created_by from servers");
     assert.equal(servers.rows.length, 1);

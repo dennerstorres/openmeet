@@ -37,3 +37,8 @@ commands.allow = ["shell_show"]
 identifier = "allow-invite-take"
 description = "Enables the invite_take command without any pre-configured scope."
 commands.allow = ["invite_take"]
+
+[[permission]]
+identifier = "allow-open-google-login"
+description = "Enables the open_google_login command without any pre-configured scope."
+commands.allow = ["open_google_login"]

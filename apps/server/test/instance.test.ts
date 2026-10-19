@@ -36,7 +36,7 @@ test("GET /api/v1/instance returns only the public card", async () => {
   const response = await app.inject({ method: "GET", url: "/api/v1/instance" });
   assert.equal(response.statusCode, 200);
   assert.equal(response.headers["cache-control"], "no-store");
-  assert.deepEqual(response.json(), { name: "OpenMeet", apiVersion: "v1", bootstrapOpen: false });
+  assert.deepEqual(response.json(), { name: "OpenMeet", apiVersion: "v1", bootstrapOpen: false, googleLogin: false });
   assert.equal(response.body.includes(authSecret), false);
   assert.equal(response.body.includes(bootstrapToken), false);
   await app.close();
