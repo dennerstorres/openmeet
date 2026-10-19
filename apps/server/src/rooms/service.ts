@@ -20,7 +20,8 @@ export type RoomErrorCode =
   | "room_ended"
   | "conflict"
   | "room_unconfigured"
-  | "media_disconnect_failed";
+  | "media_disconnect_failed"
+  | "presence_unavailable";
 
 export class RoomError extends Error {
   readonly code: RoomErrorCode;
@@ -286,6 +287,55 @@ async function removeFromServer(db: MigrationClient, actor: PublicUser, access: 
     const room = text(row.id);
     if (room) await disconnectMedia(() => media.disconnect(room, memberId));
   }
+}
+
+export interface RoomOccupant {
+  id: string;
+  displayName: string;
+}
+
+// ADR 0011. Read from the SFU on each request, never stored. Names come from the database, not from the token.
+export async function serverPresence(
+  db: MigrationClient,
+  actor: PublicUser,
+  id: string,
+  media: RoomMedia | undefined,
+): Promise<Record<string, RoomOccupant[]>> {
+  const access = await loadServerAccess(db, actor, serverId(id));
+  requireMember(access);
+  const occupants = media?.occupants?.bind(media);
+  if (!occupants) throw new RoomError("presence_unavailable");
+  const open = await db.query("select id from rooms where server_id = $1 and ended_at is null order by created_at, id", [access.server.id]);
+  const roomIds = open.rows.flatMap((row) => {
+    const room = text(row.id);
+    return room ? [room] : [];
+  });
+  let lists: string[][];
+  try {
+    lists = await Promise.all(roomIds.map((room) => occupants(room)));
+  } catch {
+    throw new RoomError("presence_unavailable");
+  }
+  const identities = [...new Set(lists.flat().filter((identity) => UUID.test(identity)))];
+  const names = new Map<string, string>();
+  if (identities.length > 0) {
+    const found = await db.query("select id, display_name from users where id = any($1::uuid[])", [identities]);
+    for (const row of found.rows) {
+      const userId = text(row.id);
+      const displayName = text(row.display_name);
+      if (userId && displayName) names.set(userId, displayName);
+    }
+  }
+  const presence: Record<string, RoomOccupant[]> = {};
+  roomIds.forEach((room, index) => {
+    const seen = new Set<string>();
+    presence[room] = (lists[index] ?? []).flatMap((identity) => {
+      if (seen.has(identity)) return [];
+      seen.add(identity);
+      return [{ id: identity, displayName: names.get(identity) ?? "Participante" }];
+    });
+  });
+  return presence;
 }
 
 // Rooms

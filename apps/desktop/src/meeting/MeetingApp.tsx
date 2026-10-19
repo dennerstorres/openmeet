@@ -56,6 +56,7 @@ const idleSnapshot: PocSnapshot = {
   camera: false,
   screen: false,
   audioPlayback: true,
+  speakers: [],
 };
 
 const ERROR_TEXT: Record<string, string> = {
@@ -80,6 +81,8 @@ const ERROR_TEXT: Record<string, string> = {
   request_failed: "A instância não respondeu.",
   instance_unavailable: "A instância não confirmou os metadados.",
 };
+
+const PRESENCE_MS = 5000;
 
 function errorText(code: string | null): string | null {
   if (code === null) return null;
@@ -160,6 +163,13 @@ export function MeetingApp() {
   };
 
   useEffect(() => model.subscribe(setState), [model]);
+  const presenceKey = state.step === "rooms" || state.step === "meeting" ? `${state.selectedServerId ?? ""}:${state.activeRoomId ?? ""}` : null;
+  useEffect(() => {
+    if (presenceKey === null) return;
+    void model.refreshPresence();
+    const timer = window.setInterval(() => void model.refreshPresence(), PRESENCE_MS);
+    return () => window.clearInterval(timer);
+  }, [model, presenceKey]);
   useEffect(() => {
     if (!isTauri()) return;
     let stop: (() => void) | undefined;
@@ -477,6 +487,22 @@ export function MeetingApp() {
                 <span className="room-name">{room.name}</span>
                 {room.ended ? <span className="badge">encerrada</span> : room.kind === "temporary" ? <span className="badge">temporária</span> : null}
               </button>
+              {(state.presence?.[room.id] ?? []).length > 0 ? (
+                <ul className="occupants" aria-label={`Na sala ${room.name}`}>
+                  {(state.presence?.[room.id] ?? []).map((person) => {
+                    const speaking = room.id === state.activeRoomId && media.speakers.includes(person.id);
+                    return (
+                      <li key={person.id} className={speaking ? "speaking" : undefined}>
+                        <span className="avatar tiny" aria-hidden="true">
+                          <span>{cardInitial(person.label)}</span>
+                        </span>
+                        <span className="room-name">{person.label}</span>
+                        {speaking ? <span className="sr"> falando</span> : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -665,6 +691,7 @@ export function MeetingApp() {
               featuredId={placement.featuredId}
               others={placement.others}
               pinnedId={pin}
+              speakers={media.speakers}
               fullscreen={isFullscreen}
               levelFor={levelFor}
               onLevel={changeLevel}

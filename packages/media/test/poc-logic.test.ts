@@ -275,3 +275,13 @@ test("media errors keep name and message only", () => {
   assert.equal(describeMediaError({ name: "NotAllowedError", message: "Permission denied" }), "NotAllowedError: Permission denied");
   assert.equal(describeMediaError("nope"), "unknown media error");
 });
+
+test("the active speakers come from the SFU and clear when the call drops", () => {
+  const room = new Room();
+  const session = new LiveKitPocSession({ room });
+  assert.deepEqual(session.snapshot().speakers, []);
+  room.emit(RoomEvent.ActiveSpeakersChanged, [{ identity: "ana" }, { identity: "" }, { identity: "bia" }] as never);
+  assert.deepEqual(session.snapshot().speakers, ["ana", "bia"]);
+  room.emit(RoomEvent.Disconnected, DisconnectReason.SERVER_SHUTDOWN);
+  assert.deepEqual(session.snapshot().speakers, []);
+});

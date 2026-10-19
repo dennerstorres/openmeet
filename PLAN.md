@@ -32,7 +32,7 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F09-01 | Servidores | Schema, API, migração Geral e token LiveKit pelo id da sala | F03-03 | IMPLEMENTED | Claude | G9 |
 | F09-02 | Servidores | Convite do servidor por link openmeet:// | F09-01 | WAITING_VALIDATION | Claude | G9 |
 | F09-03 | Sala | Três colunas, cards, destaque, grade, fixar e tela cheia | F09-01 | IMPLEMENTED | Claude | G9 |
-| F09-04 | Sala | Presença na sidebar e anel de quem fala | F09-03 | READY | Claude | G9 |
+| F09-04 | Sala | Presença na sidebar e anel de quem fala | F09-03 | WAITING_VALIDATION | Claude | G9 |
 | F09-05 | Sala | Ensurdecer o áudio remoto só neste PC | F04-02 | READY | Claude | G9 |
 | F09-06 | Sala | Áudio do PC opcional no compartilhamento | F04-03 | READY | Claude | G9 |
 | F09-07 | Identidade | Login Google pelo navegador, chaves só no servidor | F03-02 | READY | Claude | G9 |
@@ -56,6 +56,8 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F10-18 | Segurança | Salas e join no processo nativo (S-06) | F10-17 | PENDING | Grok | G10 |
 
 ## Estado em 2026-10-19
+
+F09-04 ficou `WAITING_VALIDATION` na branch `task/F09-04-presenca`, sobre a F09-02: nomes debaixo de cada sala e anel verde de quem fala. Falta ver o anel com áudio real em dois PCs.
 
 F09-02 ficou `WAITING_VALIDATION` na branch `task/F09-02-convite`, sobre a F09-03: link `openmeet://`, página `/convite/:code`, código colado e aceite depois do login. Falta o clique no link com o instalador novo no Windows.
 

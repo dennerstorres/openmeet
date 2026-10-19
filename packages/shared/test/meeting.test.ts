@@ -12,6 +12,7 @@ const refreshToken = "refresh-token-value";
 const nextRefresh = "refresh-token-rotated";
 const joinToken = "header.payload.signature";
 const inviteCode = "C".repeat(43);
+let presenceDown = false;
 
 function session(role: string, refresh = refreshToken) {
   return {
@@ -59,6 +60,20 @@ function apiFor(role: string): { api: InstanceApi; calls: string[]; bodies: unkn
         return sent === inviteCode
           ? { status: 200, body: { id: otherServerId, name: "Família", role: "participant" } }
           : { status: 403, body: { error: "invalid_invite" } };
+      }
+      if (path === `/api/v1/servers/${serverId}/presence`) {
+        if (presenceDown) return { status: 503, body: { error: "presence_unavailable" } };
+        return {
+          status: 200,
+          body: {
+            [roomId]: [
+              { id: userId, displayName: "Ada" },
+              { id: userId, displayName: "Ada" },
+              { id: "x", displayName: roomId },
+            ],
+            bogus: [],
+          },
+        };
       }
       if (path.endsWith("/join")) return { status: 200, body: { url: "wss://sfu.example", token: joinToken } };
       if (path === "/api/v1/auth/logout") return { status: 204, body: null };
@@ -374,4 +389,32 @@ test("owners copy a link for the selected server and participants cannot", async
   assert.equal(model.snapshot().createdInvite, `openmeet://convite?host=meet.example&code=${inviteCode}`);
   await model.signOut();
   assert.equal(model.snapshot().createdInvite, null);
+});
+
+test("presence fills the room list, never blocks other work, and hides on failure", async () => {
+  const { api } = apiFor("admin");
+  const model = new MeetingModel(api, mediaFor());
+  await model.confirmInstance("https://meet.example");
+  await model.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  assert.equal(model.snapshot().presence, null);
+  await model.refreshPresence();
+  assert.equal(model.snapshot().pending, false);
+  assert.deepEqual(model.snapshot().presence, {
+    [roomId]: [
+      { id: userId, label: "Ada" },
+      { id: "x", label: "Participante" },
+    ],
+  });
+  presenceDown = true;
+  try {
+    await model.refreshPresence();
+    assert.equal(model.snapshot().presence, null);
+    assert.equal(model.snapshot().rooms.length, 1);
+    assert.equal(model.snapshot().error, null);
+  } finally {
+    presenceDown = false;
+  }
+  await model.refreshPresence();
+  await model.selectServer(otherServerId);
+  assert.equal(model.snapshot().presence, null);
 });

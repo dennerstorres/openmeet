@@ -83,6 +83,8 @@ export interface PocSnapshot {
   camera: boolean;
   screen: boolean;
   audioPlayback: boolean;
+  /** Identities the SFU reports as speaking now, loudest first. */
+  speakers: string[];
 }
 
 type Listener = (snapshot: PocSnapshot) => void;
@@ -125,6 +127,7 @@ export class LiveKitPocSession {
   private explicitLeave = false;
   private devices: DeviceOption[] = [];
   private audioPlayback = true;
+  private speakers: string[] = [];
   private stats: RtcSnapshot;
   private marks: ReconnectMark[] = [];
 
@@ -156,6 +159,7 @@ export class LiveKitPocSession {
       this.phase = nextPhase(this.phase, outcome.event);
       this.disconnectReason = outcome.reason;
       this.tiles.clear();
+      this.speakers = [];
       this.note("info", `disconnected: ${outcome.reason}`);
     });
     this.room.on(RoomEvent.MediaDevicesError, (error: Error) => {
@@ -188,6 +192,10 @@ export class LiveKitPocSession {
     this.room.on(RoomEvent.LocalTrackUnpublished, (publication: LocalTrackPublication) => {
       this.tiles.delete(publication.trackSid);
       this.note("info", `local track stopped: ${sourceName(publication.source)}`);
+    });
+    this.room.on(RoomEvent.ActiveSpeakersChanged, (speakers: { identity: string }[]) => {
+      this.speakers = speakers.map((person) => person.identity).filter((identity) => identity.length > 0);
+      this.emit();
     });
     this.room.on(RoomEvent.ParticipantConnected, () => {
       this.emit();
@@ -235,6 +243,7 @@ export class LiveKitPocSession {
       camera: local.isCameraEnabled,
       screen: local.isScreenShareEnabled,
       audioPlayback: this.audioPlayback,
+      speakers: [...this.speakers],
     };
   }
 

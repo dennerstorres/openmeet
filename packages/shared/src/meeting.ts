@@ -6,11 +6,13 @@ import {
   parseAccountSession,
   parseInstanceCard,
   parseRoomJoin,
+  parsePresence,
   parseRoomList,
   parseServer,
   parseServerList,
   readErrorCode,
   type AccountSession,
+  type RoomOccupant,
   type RoomSummary,
   type ServerSummary,
 } from "./instance.js";
@@ -67,6 +69,8 @@ export interface ShellSnapshot {
   inviteWaiting: string | null;
   /** The last link created here, for the person to copy. */
   createdInvite: string | null;
+  /** People in each room of the selected server, or null when the SFU could not be asked. */
+  presence: Readonly<Record<string, readonly RoomOccupant[]>> | null;
   error: string | null;
   pending: boolean;
 }
@@ -112,6 +116,8 @@ export class MeetingModel {
   private inviteOffer: { origin: string; code: string } | null = null;
   private pendingInvite: { origin: string; code: string } | null = null;
   private createdInvite: string | null = null;
+  private presence: Record<string, RoomOccupant[]> | null = null;
+  private presenceAsk = 0;
   private error: string | null = null;
   private pending = false;
   private readonly listeners = new Set<(snapshot: ShellSnapshot) => void>();
@@ -143,6 +149,10 @@ export class MeetingModel {
       inviteOffer: this.inviteOffer === null ? null : { host: inviteHost(this.inviteOffer.origin), sameInstance: this.inviteOffer.origin === this.origin },
       inviteWaiting: this.pendingInvite === null ? null : inviteHost(this.pendingInvite.origin),
       createdInvite: this.createdInvite,
+      presence:
+        this.presence === null
+          ? null
+          : Object.fromEntries(Object.entries(this.presence).map(([room, people]) => [room, people.map((person) => ({ ...person }))])),
       error: this.error,
       pending: this.pending,
     };
@@ -259,6 +269,8 @@ export class MeetingModel {
     await this.run(async (generation) => {
       this.selectedServerId = serverId;
       this.rooms = [];
+      this.presence = null;
+      this.presenceAsk += 1;
       await this.loadRooms(generation);
     });
   }
@@ -356,6 +368,28 @@ export class MeetingModel {
 
   clearCreatedInvite(): void {
     this.createdInvite = null;
+    this.publish();
+  }
+
+  /**
+   * Asks who is in the rooms of the selected server. It runs beside other work: no pending flag,
+   * no generation bump, and a failure only hides the names.
+   */
+  async refreshPresence(): Promise<void> {
+    const origin = this.origin;
+    const accessToken = this.accessToken;
+    const serverId = this.selectedServerId;
+    if (origin === null || accessToken === null || serverId === null) return;
+    const ask = ++this.presenceAsk;
+    let next: Record<string, RoomOccupant[]> | null = null;
+    try {
+      const result = await this.api.request(origin, "GET", `/api/v1/servers/${serverId}/presence`, null, accessToken);
+      if (result.status === 200) next = parsePresence(result.body);
+    } catch {
+      next = null;
+    }
+    if (ask !== this.presenceAsk || serverId !== this.selectedServerId || accessToken !== this.accessToken) return;
+    this.presence = next;
     this.publish();
   }
 
@@ -559,6 +593,8 @@ export class MeetingModel {
     this.rooms = [];
     this.activeRoom = null;
     this.createdInvite = null;
+    this.presence = null;
+    this.presenceAsk += 1;
     if (origin === null || refreshToken === null) return;
     await this.vault.clear(origin);
     try {

@@ -842,3 +842,52 @@ button.ghost:hover:not(:disabled) {
   box-sizing: border-box;
   font-size: 13px;
 }
+
+/* ADR 0011: who is in each room, and who speaks in this call. */
+
+.occupants {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 0 6px 28px;
+  padding: 0;
+  list-style: none;
+}
+
+.occupants li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #9bb0a2;
+  font-size: 13px;
+}
+
+.avatar.tiny {
+  flex: 0 0 auto;
+}
+
+.avatar.tiny span {
+  width: 20px;
+  font-size: 10px;
+  box-shadow: 0 0 0 2px transparent;
+  transition: box-shadow 0.12s ease;
+}
+
+.occupants li.speaking {
+  color: #e7f2ea;
+}
+
+.occupants li.speaking .avatar span {
+  box-shadow: 0 0 0 2px #23a559;
+}
+
+.card.speaking {
+  border-color: #23a559;
+  box-shadow: 0 0 0 2px rgb(35 165 89 / 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar.tiny span {
+    transition: none;
+  }
+}

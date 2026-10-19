@@ -24,6 +24,7 @@ const idleSnapshot: PocSnapshot = {
   reconnect: EMPTY_RECONNECT,
   microphone: false,
   audioPlayback: true,
+  speakers: [],
   camera: false,
   screen: false,
 };

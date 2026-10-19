@@ -4,6 +4,8 @@ import type { AppEnv } from "../poc-join.js";
 export interface RoomMedia {
   disconnect(room: string, identity: string): Promise<void>;
   closeRoom(room: string): Promise<void>;
+  /** Identities in the SFU room right now. A room that does not exist yet is empty. */
+  occupants?(room: string): Promise<string[]>;
 }
 
 interface LiveKitRooms {
@@ -25,6 +27,15 @@ export function roomMedia(client: LiveKitRooms, now = () => Date.now()): RoomMed
         await client.removeParticipant(room, identity, { revokeTokenTs: revokeAt() });
       } catch (error) {
         if (!isAbsent(error)) throw error;
+      }
+    },
+    async occupants(room) {
+      try {
+        const people = await client.listParticipants(room);
+        return people.map((person) => person.identity).filter((identity) => identity.length > 0);
+      } catch (error) {
+        if (isAbsent(error)) return [];
+        throw error;
       }
     },
     async closeRoom(room) {

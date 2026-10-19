@@ -21,6 +21,7 @@ import {
   removeServerMember,
   revokeInvite,
   revokeServerInvite,
+  serverPresence,
   RoomError,
   type RoomErrorCode,
 } from "./service.js";
@@ -53,6 +54,7 @@ const ROOM_STATUS: Record<RoomErrorCode, number> = {
   conflict: 409,
   room_unconfigured: 503,
   media_disconnect_failed: 502,
+  presence_unavailable: 503,
 };
 
 function configuredSecret(env: AppEnv): string | undefined {
@@ -197,6 +199,19 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
         kind: requiredText(request.body, "kind"),
       });
       return reply.code(201).header("cache-control", "no-store").send(room);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.get("/api/v1/servers/:id/presence", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await serverPresence(db, actor, param(request, "id"), media));
     } catch (error) {
       return sendError(request, reply, error);
     }

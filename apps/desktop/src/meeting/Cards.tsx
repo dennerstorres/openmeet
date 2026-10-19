@@ -17,6 +17,7 @@ export interface CardStageProps {
   featuredId: string | null;
   others: readonly string[];
   pinnedId: string | null;
+  speakers: readonly string[];
   fullscreen: boolean;
   levelFor: (cardId: string) => PlaybackLevel;
   onLevel: (cardId: string, patch: Partial<PlaybackLevel>) => void;
@@ -38,6 +39,7 @@ export function CardStage(props: CardStageProps) {
       size={size}
       video={card.videoId === null ? undefined : tileById.get(card.videoId)}
       pinned={props.pinnedId === card.id}
+      speaking={card.kind === "person" && props.speakers.includes(card.identity)}
       playback={props.levelFor(card.id)}
       onLevel={(patch) => props.onLevel(card.id, patch)}
       onPin={() => props.onPin(props.pinnedId === card.id ? null : card.id)}
@@ -68,6 +70,7 @@ function CardView(props: {
   size: "center" | "strip" | "grid";
   video: TrackTile | undefined;
   pinned: boolean;
+  speaking: boolean;
   playback: PlaybackLevel;
   onLevel: (patch: Partial<PlaybackLevel>) => void;
   onPin: () => void;
@@ -77,7 +80,7 @@ function CardView(props: {
   const hearable = card.kind === "person" && !card.local && card.audioIds.length > 0;
   const name = card.kind === "share" ? `Tela de ${card.label}` : card.local ? `${card.label} (você)` : card.label;
   return (
-    <article className={`card ${props.size}${props.pinned ? " pinned" : ""}${card.kind === "share" ? " share" : ""}`}>
+    <article className={`card ${props.size}${props.pinned ? " pinned" : ""}${props.speaking ? " speaking" : ""}${card.kind === "share" ? " share" : ""}`}>
       {live && props.video ? (
         <VideoSink tile={props.video} />
       ) : (
@@ -87,6 +90,7 @@ function CardView(props: {
       )}
       <footer>
         <span className="name">{name}</span>
+        {props.speaking ? <span className="sr">falando</span> : null}
         {hearable && !props.playback.heard ? <span className="badge">mudo aqui</span> : null}
         <button type="button" className="ghost" aria-pressed={props.pinned} onClick={props.onPin}>
           {props.pinned ? "Soltar" : "Fixar"}

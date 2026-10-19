@@ -38,6 +38,32 @@ export interface ServerSummary {
   role: "owner" | "moderator" | "participant";
 }
 
+export interface RoomOccupant {
+  id: string;
+  label: string;
+}
+
+/** Room id to the people in it. Unknown shapes are dropped; a bad name becomes "Participante". */
+export function parsePresence(value: unknown): Record<string, RoomOccupant[]> {
+  const record = objectRecord(value, "invalid_instance", "Presence is not an object");
+  const presence: Record<string, RoomOccupant[]> = {};
+  for (const [roomId, list] of Object.entries(record)) {
+    if (!UUID.test(roomId) || !Array.isArray(list)) continue;
+    const seen = new Set<string>();
+    presence[roomId] = list.flatMap((item: unknown) => {
+      if (typeof item !== "object" || item === null) return [];
+      const entry = item as Record<string, unknown>;
+      const id = text(entry.id);
+      if (id === undefined || id.length > 128 || seen.has(id)) return [];
+      seen.add(id);
+      const name = text(entry.displayName);
+      const label = name === undefined || name.length > 80 || hasControlCharacter(name) || UUID.test(name) ? "Participante" : name;
+      return [{ id, label }];
+    });
+  }
+  return presence;
+}
+
 export interface PreparedRequest {
   url: string;
   method: "GET" | "POST";
@@ -164,7 +190,7 @@ function instancePath(path: string): string {
   }
   const join = /^\/api\/v1\/rooms\/([0-9a-f-]{36})\/join$/i.exec(path);
   if (join?.[1] !== undefined && UUID.test(join[1])) return path;
-  const serverRooms = /^\/api\/v1\/servers\/([0-9a-f-]{36})\/(?:rooms|invites)$/i.exec(path);
+  const serverRooms = /^\/api\/v1\/servers\/([0-9a-f-]{36})\/(?:rooms|invites|presence)$/i.exec(path);
   if (serverRooms?.[1] !== undefined && UUID.test(serverRooms[1])) return path;
   throw new PocInputError("invalid_api_base", "Request path is not part of the instance API");
 }
