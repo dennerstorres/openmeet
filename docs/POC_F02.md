@@ -42,4 +42,4 @@ Um navegador solto ou um teste de unidade não substitui o app empacotado nem o 
 7. Registrar WebView2, build do Windows, versão do LiveKit, RTT, jitter, perda, fps e log sem mídia nem segredo.
 8. Só então preencher ADR 0004 com GO ou NO-GO.
 
-Até esse registro, F02-02 em diante não passam de `WAITING_VALIDATION` e nenhuma feature de produto (F03+) começa.
+Até esse registro, F02-02 em diante ficam sem GO. O aceite final e o F08 esperam essa evidência. F03–F07 podem ser implementadas.

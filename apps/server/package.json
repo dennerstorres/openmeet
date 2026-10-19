@@ -8,15 +8,19 @@
     "start": "node --env-file-if-exists=../../.env dist/main.js",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test test/health.test.ts test/poc-join.test.ts test/env-file.test.ts"
+    "db:migrate": "node --env-file-if-exists=../../.env --import tsx src/db/cli.ts",
+    "test": "node --import tsx --test test/health.test.ts test/poc-join.test.ts test/env-file.test.ts test/schema.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.1",
     "@openmeet/shared": "workspace:*",
+    "drizzle-orm": "0.45.4",
     "fastify": "^5.12.7",
-    "livekit-server-sdk": "^2.19.1"
+    "livekit-server-sdk": "^2.19.1",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10",
     "@types/node": "^24.19.2",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3"

@@ -1,5 +1,11 @@
 # HISTORY — registro cronológico
 
+### 2026-10-18 — schema de identidade — Grok
+F03-01 ficou `IMPLEMENTED`. SQL `apps/server/drizzle/0001_identity.sql` e o schema Drizzle cobrem usuários, sessões, salas, memberships, convites, auditoria, settings e bootstrap. Só entram hashes. `pnpm --filter @openmeet/server typecheck` exit 0. `pnpm --filter @openmeet/server test` 11 pass, fail 0, Windows. A migration rodou duas vezes no PGlite, não no VPS. `/health/ready` segue `not_configured`. F03-02 não começou. Sem commit. M01–M12 seguem NOT_RUN. Sem GO/NO-GO.
+
+### 2026-10-18 — teste de dois PCs vai para o fim — Grok
+F03-01 ficou `READY` e depende de F02-01. F02-02–F02-06 continuam sem evidência e passaram para o fim do plano. F08 só segue com o GO. F03–F07 podem ser implementadas. M01–M12 seguem NOT_RUN. Sem GO/NO-GO.
+
 ### 2026-10-18 — o que ainda não rodou — Grok
 M01–M12 continuam NOT_RUN. Não houve mídia nos dois PCs: microfone nos dois sentidos, câmera, tela e janela no segundo PC. M4, a permissão ao vivo num perfil limpo do app empacotado, não rodou. O Claude não deu GO nem NO-GO. F02-06 segue BLOCKED. F03+ segue PENDING.
 
