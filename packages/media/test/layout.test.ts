@@ -8,6 +8,11 @@ const remoteScreen = { id: "remote-screen", source: "screen", media: "video", lo
 const localScreen = { id: "local-screen", source: "screen", media: "video", local: true, surface: "window" };
 const voice = { id: "mic", source: "microphone", media: "audio", local: false };
 
+test("five cameras stay visible together", () => {
+  const cameras = ["a", "b", "c", "d", "e"].map((id) => ({ id, source: "camera", media: "video", local: id === "a" }));
+  assert.deepEqual(arrangeTiles(cameras), { stageId: null, gridIds: ["a", "b", "c", "d", "e"] });
+});
+
 test("cameras stay in the grid until someone shares a screen", () => {
   assert.deepEqual(arrangeTiles([camera, localCamera, voice]), { stageId: null, gridIds: ["cam", "self"] });
 });

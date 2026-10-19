@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-18 — duração, métricas e dispositivos na reunião — Grok
+F04-04 ficou `WAITING_VALIDATION` na `main`. A reunião troca entrada, saída e câmera sem novo join. O relógio continua na reconexão e some ao sair ou numa falha fatal. As métricas saem a cada 5 s. Sair de uma sala persistente deixa a sala na lista. Cinco câmeras cabem na grade. Áudio de sistema segue desligado. O refresh continua só na memória. `pnpm --filter @openmeet/media test` 28 pass. `pnpm --filter @openmeet/shared test` 18 pass. `pnpm --filter @openmeet/media build` e `pnpm --filter @openmeet/desktop typecheck` exit 0. Windows, Node v24.18.0. A janela não foi aberta. Os 60 min com cinco pessoas não rodaram. M01–M12 seguem NOT_RUN. F05-01 não começou. Sem GO/NO-GO.
+
 ### 2026-10-18 — compartilhamento e layout da reunião — Grok
 F04-03 ficou `IMPLEMENTED` na `main`. O botão abre o seletor ou para a publicação. A tela remota fica em destaque; a local só ocupa o destaque se ninguém mais compartilha. O aviso nomeia monitor, janela ou guia, e some ao parar. Troca silenciosa da origem entra no diagnóstico. Áudio de sistema segue desligado. `pnpm --filter @openmeet/media test` 25 pass. `pnpm --filter @openmeet/desktop typecheck` exit 0. Windows, Node v24.18.0. A janela não foi aberta. F04-04 não começou. M01–M12 seguem NOT_RUN. Sem GO/NO-GO.
 

@@ -129,6 +129,24 @@ test("entering a room connects and leaving returns without a new client", async 
   assert.equal(model.snapshot().userLabel, null);
 });
 
+test("leaving a persistent room keeps it listed for the same client", async () => {
+  const { api, calls } = apiFor("admin");
+  const media = mediaFor();
+  const model = new MeetingModel(api, media);
+  await model.confirmInstance("https://meet.example");
+  await model.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  await model.enterRoom(roomId, "");
+  model.leaveRoom();
+  assert.equal(model.snapshot().step, "rooms");
+  assert.equal(model.snapshot().rooms.length, 1);
+  assert.equal(model.snapshot().rooms[0]?.id, roomId);
+  assert.equal(model.snapshot().rooms[0]?.kind, "persistent");
+  assert.equal(model.snapshot().rooms[0]?.ended, false);
+  const joins = calls.filter((call) => call.endsWith("/join"));
+  assert.equal(joins.length, 1);
+  assert.equal(media.disconnects, 2);
+});
+
 test("media failure stays on the room list", async () => {
   const { api } = apiFor("admin");
   const media: MeetingMedia = {

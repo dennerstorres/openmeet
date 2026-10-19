@@ -1,14 +1,19 @@
 import {
   arrangeTiles,
   DEFAULT_PLAYBACK,
+  describeMediaError,
   emptyStats,
+  formatElapsed,
   LiveKitPocSession,
   localScreenSurface,
   mediaActionError,
+  meetingElapsedMs,
   nextPlayback,
   publicationControlsEnabled,
   screenCaption,
   screenShareAction,
+  type DeviceKind,
+  type DeviceOption,
   type PlaybackLevel,
   type PocSnapshot,
   type TrackTile,
@@ -83,6 +88,8 @@ export function MeetingApp() {
   const [levels, setLevels] = useState<Record<string, PlaybackLevel>>({});
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [controlPending, setControlPending] = useState(false);
+  const [connectedAt, setConnectedAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   function session(): LiveKitPocSession {
     sessionRef.current ??= new LiveKitPocSession({ appVersion: desktopPackage.version });
@@ -98,6 +105,37 @@ export function MeetingApp() {
   useEffect(() => model.subscribe(setState), [model]);
   useEffect(() => session().subscribe(setMedia), []);
   useEffect(() => {
+    const live = state.step === "meeting" && (media.phase === "connected" || media.phase === "reconnecting");
+    if (!live) {
+      if (state.step !== "meeting" || media.phase === "idle" || media.phase === "fatal") setConnectedAt(null);
+      return;
+    }
+    setConnectedAt((current) => current ?? Date.now());
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [state.step, media.phase]);
+  useEffect(() => {
+    if (state.step !== "meeting" || (media.phase !== "connected" && media.phase !== "reconnecting")) return;
+    let cancelled = false;
+    void session()
+      .refreshDevices()
+      .catch((caught: unknown) => {
+        if (!cancelled) setMediaError(describeMediaError(caught));
+      });
+    const timer = window.setInterval(() => {
+      void session()
+        .refreshStats()
+        .catch((caught: unknown) => {
+          if (!cancelled) setMediaError(describeMediaError(caught));
+        });
+    }, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [state.step, media.phase]);
+  useEffect(() => {
     if (state.origin === null) return;
     try {
       localStorage.setItem("openmeet.instance", state.origin);
@@ -109,6 +147,8 @@ export function MeetingApp() {
   const notice = errorText(state.error);
   const active = state.rooms.find((room) => room.id === state.activeRoomId);
   const controlsEnabled = publicationControlsEnabled(media.phase);
+  const elapsedMs = meetingElapsedMs(connectedAt, now, state.step === "meeting" ? media.phase : "idle");
+  const elapsedLabel = elapsedMs === null ? null : formatElapsed(elapsedMs);
 
   function levelFor(id: string): PlaybackLevel {
     return levels[id] ?? DEFAULT_PLAYBACK;
@@ -116,6 +156,20 @@ export function MeetingApp() {
 
   function changeLevel(id: string, patch: Partial<PlaybackLevel>): void {
     setLevels((current) => ({ ...current, [id]: nextPlayback(current[id] ?? DEFAULT_PLAYBACK, patch) }));
+  }
+
+  function onDevice(kind: DeviceKind, deviceId: string): void {
+    if (deviceId.length === 0) return;
+    void runControl("device", () => session().selectDevice(kind, deviceId));
+  }
+
+  async function refreshDevices(): Promise<void> {
+    setMediaError(null);
+    try {
+      await session().refreshDevices();
+    } catch (caught) {
+      setMediaError(describeMediaError(caught));
+    }
   }
 
   async function runControl(label: string, action: () => Promise<void>): Promise<void> {
@@ -188,7 +242,9 @@ export function MeetingApp() {
           <p>
             Estado: <strong>{media.phase}</strong>
             {media.disconnectReason ? ` · ${media.disconnectReason}` : ""}
+            {elapsedLabel ? ` · ${elapsedLabel}` : ""}
           </p>
+          <p>{media.participants.length} na sala</p>
           {media.participants.length === 0 ? (
             <p>Ninguém na sala.</p>
           ) : (
@@ -221,8 +277,26 @@ export function MeetingApp() {
             >
               {media.screen ? "Parar compartilhamento" : "Compartilhar tela"}
             </button>
+            <button type="button" disabled={!controlsEnabled} onClick={() => void refreshDevices()}>
+              Atualizar dispositivos
+            </button>
+            <DeviceSelect label="Entrada" kind="audioinput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
+            <DeviceSelect label="Saída" kind="audiooutput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
+            <DeviceSelect label="Câmera" kind="videoinput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
           </div>
           <MeetingStage tiles={media.tiles} sharing={media.screen} levelFor={levelFor} onChange={changeLevel} />
+          <p>
+            {media.stats.userAgent ?? "user agent indisponível"} · app {media.stats.appVersion ?? "—"}
+          </p>
+          {media.stats.available ? (
+            <p>
+              perda {media.stats.packetsLost ?? "—"} · jitter {media.stats.jitterMs ?? "—"} ms · RTT {media.stats.rttMs ?? "—"} ms · candidato{" "}
+              {media.stats.candidateType ?? "—"} · saída {media.stats.outboundWidth ?? "—"}x{media.stats.outboundHeight ?? "—"} @{" "}
+              {media.stats.outboundFps ?? "—"} fps · superfície {media.stats.displaySurface ?? "—"}
+            </p>
+          ) : (
+            <p>Métricas ainda não disponíveis.</p>
+          )}
           <button
             type="button"
             onClick={() => {
@@ -308,6 +382,42 @@ function TileFrame({ tile, playback, onChange }: { tile: TrackTile; playback: Pl
         </div>
       ) : null}
     </div>
+  );
+}
+
+function DeviceSelect({
+  label,
+  kind,
+  devices,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  kind: DeviceKind;
+  devices: DeviceOption[];
+  disabled: boolean;
+  onChange: (kind: DeviceKind, deviceId: string) => void;
+}) {
+  const options = devices.filter((device) => device.kind === kind);
+  const active = options.find((device) => device.active);
+  return (
+    <label>
+      {label}
+      <select
+        value={active?.deviceId ?? ""}
+        disabled={disabled}
+        onChange={(event) => {
+          onChange(kind, event.currentTarget.value);
+        }}
+      >
+        <option value="">padrão</option>
+        {options.map((device) => (
+          <option key={device.deviceId} value={device.deviceId}>
+            {device.active ? `${device.label} (ativo)` : device.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
