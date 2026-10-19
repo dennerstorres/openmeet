@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, integer, pgEnum, pgTable, primaryKey, smallint, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, index, integer, pgEnum, pgTable, primaryKey, smallint, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 const createdAt = () => timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow();
@@ -44,9 +44,10 @@ export const refreshSessions = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
     revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "date" }),
     replacedBy: uuid("replaced_by").references((): AnyPgColumn => refreshSessions.id),
+    familyId: uuid("family_id").notNull(),
     createdAt: createdAt(),
   },
-  (table) => [check("refresh_sessions_token_hash_present", sql`char_length(${table.tokenHash}) > 0`)],
+  (table) => [index("refresh_sessions_family").on(table.familyId), check("refresh_sessions_token_hash_present", sql`char_length(${table.tokenHash}) > 0`)],
 );
 
 export const servers = pgTable(

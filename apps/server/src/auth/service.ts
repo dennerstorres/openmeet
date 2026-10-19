@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { parseLabel } from "@openmeet/shared";
 import type { MigrationClient } from "../db/migrate.js";
 import { hashPassword, verifyPassword } from "./password.js";
@@ -116,18 +117,26 @@ async function audit(db: MigrationClient, actorId: string, action: string): Prom
   await db.query("insert into audit_events (actor_user_id, action, target_type, target_id) values ($1, $2, 'user', $1)", [actorId, action]);
 }
 
-async function startSession(db: MigrationClient, secret: string, user: StoredUser, replaces: string | undefined, action: string): Promise<SessionBody> {
+// A login starts a family named by its own id. A refresh stays in the family of the session it replaces (S-03).
+async function startSession(
+  db: MigrationClient,
+  secret: string,
+  user: StoredUser,
+  replaces: { id: string; familyId: string } | undefined,
+  action: string,
+): Promise<SessionBody> {
   const refreshToken = newRefreshToken();
-  const inserted = await db.query("insert into refresh_sessions (user_id, token_hash, expires_at) values ($1, $2, now() + interval '30 days') returning id", [
-    user.id,
-    hashSecret(refreshToken),
-  ]);
+  const id = randomUUID();
+  const inserted = await db.query(
+    "insert into refresh_sessions (id, user_id, token_hash, expires_at, family_id) values ($1, $2, $3, now() + interval '30 days', $4) returning id",
+    [id, user.id, hashSecret(refreshToken), replaces?.familyId ?? id],
+  );
   const sessionId = text(inserted.rows[0]?.id);
   if (!sessionId) throw new AuthError("unauthorized");
   if (replaces) {
     const revoked = await db.query("update refresh_sessions set revoked_at = now(), replaced_by = $1 where id = $2 and revoked_at is null returning id", [
       sessionId,
-      replaces,
+      replaces.id,
     ]);
     if (revoked.rows.length !== 1) throw new AuthError("invalid_session");
   }
@@ -211,20 +220,35 @@ export async function login(
 
 export async function refreshSession(db: MigrationClient, secret: string, refreshToken: string): Promise<SessionBody> {
   if (refreshToken.length < 32) throw new AuthError("invalid_session");
-  return db.transaction(async (tx) => {
-    const found = await tx.query(
-      `select id, user_id, revoked_at is not null as revoked, expires_at <= now() as expired
-       from refresh_sessions where token_hash = $1 for update`,
+  // The family revocation must commit, so reuse is reported after the transaction instead of thrown inside it.
+  const result = await db.transaction(async (tx): Promise<SessionBody | "reused" | "invalid"> => {
+    const found = await tx.query("select family_id from refresh_sessions where token_hash = $1", [hashSecret(refreshToken)]);
+    const familyId = text(found.rows[0]?.family_id);
+    if (!familyId) return "invalid";
+    // Every row of the family is locked in a fixed order, so two refreshes of one family run one after the other.
+    await tx.query("select id from refresh_sessions where family_id = $1 order by id for update", [familyId]);
+    const locked = await tx.query(
+      `select id, user_id, replaced_by, revoked_at is not null as revoked, expires_at <= now() as expired
+       from refresh_sessions where token_hash = $1`,
       [hashSecret(refreshToken)],
     );
-    const row = found.rows[0];
+    const row = locked.rows[0];
     const sessionId = text(row?.id);
     const userId = text(row?.user_id);
-    if (!row || !sessionId || !userId || isTrue(row.revoked) || isTrue(row.expired)) throw new AuthError("invalid_session");
+    if (!row || !sessionId || !userId) return "invalid";
+    if (text(row.replaced_by)) {
+      await tx.query("update refresh_sessions set revoked_at = now() where family_id = $1 and revoked_at is null", [familyId]);
+      await audit(tx, userId, "refresh_reuse");
+      return "reused";
+    }
+    // Logout and expiry are not reuse: nothing else is touched.
+    if (isTrue(row.revoked) || isTrue(row.expired)) return "invalid";
     const user = await findUserById(tx, userId);
-    if (!user || user.disabled) throw new AuthError("invalid_session");
-    return startSession(tx, secret, user, sessionId, "refresh");
+    if (!user || user.disabled) return "invalid";
+    return startSession(tx, secret, user, { id: sessionId, familyId }, "refresh");
   });
+  if (result === "reused" || result === "invalid") throw new AuthError("invalid_session");
+  return result;
 }
 
 export async function logout(db: MigrationClient, refreshToken: string): Promise<void> {

@@ -145,6 +145,11 @@ test("bootstrap, login, refresh and logout keep only hashes", async () => {
     ]);
     assert.equal(old.rows[0]?.revoked === true || old.rows[0]?.revoked === "t", true);
     assert.equal(typeof old.rows[0]?.replaced_by, "string");
+    // S-03: presenting the replaced token again takes the replacement down with it.
+    const replacement = await app.inject({ method: "POST", url: "/api/v1/auth/refresh", payload: { refreshToken: third.refreshToken } });
+    assert.equal(replacement.statusCode, 401);
+    const replacementAccess = await app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: `Bearer ${third.accessToken}` } });
+    assert.equal(replacementAccess.statusCode, 401);
 
     const gone = await app.inject({ method: "POST", url: "/api/v1/auth/logout", payload: { refreshToken: third.refreshToken } });
     assert.equal(gone.statusCode, 204);
@@ -177,12 +182,68 @@ test("bootstrap, login, refresh and logout keep only hashes", async () => {
 
     const audit = await db.query("select action from audit_events order by created_at");
     const actions = audit.rows.map((row) => row.action);
-    assert.deepEqual(actions, ["bootstrap", "login", "refresh", "logout"]);
+    assert.deepEqual(actions, ["bootstrap", "login", "refresh", "refresh_reuse"]);
     const leaked = await db.query(
       "select count(*) as n from audit_events where action like $1 or target_type like $1 or coalesce(target_id::text, '') like $1",
       [`%${password}%`],
     );
     assert.equal(Number(leaked.rows[0]?.n), 0);
+  } finally {
+    await app.close();
+    await pg.close();
+  }
+});
+
+test("refresh reuse revokes only its own family; logout and expiry revoke nothing else", async () => {
+  const pg = new PGlite();
+  const db = pgliteClient(pg);
+  await applyMigrations(db);
+  const app = await buildApp({ logger: false, env: { AUTH_SECRET: authSecret, BOOTSTRAP_TOKEN: bootstrapToken }, db });
+  type Session = { refreshToken: string; accessToken: string };
+  const refresh = async (token: string) => app.inject({ method: "POST", url: "/api/v1/auth/refresh", payload: { refreshToken: token } });
+  const me = async (token: string) => (await app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: `Bearer ${token}` } })).statusCode;
+  const signIn = async () => (await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { username: "admin", password } })).json() as Session;
+  try {
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/bootstrap",
+      payload: { token: bootstrapToken, username: "admin", password, displayName: "Admin" },
+    });
+    assert.equal(created.statusCode, 201);
+    const laptop = await signIn();
+    const phone = await signIn();
+    const laptop2 = (await refresh(laptop.refreshToken)).json() as Session;
+    const laptop3 = (await refresh(laptop2.refreshToken)).json() as Session;
+    assert.equal(await me(laptop3.accessToken), 200);
+
+    const reused = await refresh(laptop.refreshToken);
+    assert.equal(reused.statusCode, 401);
+    assert.deepEqual(reused.json(), { error: "invalid_session" });
+    assert.equal(reused.body.includes("eyJ"), false);
+    assert.equal((await refresh(laptop3.refreshToken)).statusCode, 401);
+    assert.equal(await me(laptop3.accessToken), 401);
+    const family = await db.query(
+      "select count(*)::int as n, count(revoked_at)::int as revoked from refresh_sessions where family_id = (select family_id from refresh_sessions where token_hash = $1)",
+      [hashSecret(laptop.refreshToken)],
+    );
+    assert.deepEqual(family.rows[0], { n: 3, revoked: 3 });
+
+    // The other device is another family and keeps going.
+    assert.equal(await me(phone.accessToken), 200);
+    const phone2 = (await refresh(phone.refreshToken)).json() as Session;
+    assert.equal(await me(phone2.accessToken), 200);
+
+    // Expiry and logout are not reuse.
+    const tablet = await signIn();
+    const tablet2 = (await refresh(tablet.refreshToken)).json() as Session;
+    await db.query("update refresh_sessions set expires_at = now() - interval '1 second' where token_hash = $1", [hashSecret(tablet2.refreshToken)]);
+    assert.equal((await refresh(tablet2.refreshToken)).statusCode, 401);
+    assert.equal(await me(phone2.accessToken), 200);
+    assert.equal((await app.inject({ method: "POST", url: "/api/v1/auth/logout", payload: { refreshToken: phone2.refreshToken } })).statusCode, 204);
+    assert.equal((await refresh(phone2.refreshToken)).statusCode, 401);
+    const desk = await signIn();
+    assert.equal(await me(desk.accessToken), 200);
+    assert.equal((await refresh(desk.refreshToken)).statusCode, 200);
   } finally {
     await app.close();
     await pg.close();

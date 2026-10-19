@@ -38,7 +38,7 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F09-07 | Identidade | Login Google pelo navegador, chaves só no servidor | F03-02 | WAITING_VALIDATION | Claude | G9 |
 | F10-01 | Segurança | Recusar controle e bidi nos nomes (S-21) | F03-03 | IMPLEMENTED | Claude | G10 |
 | F10-02 | Segurança | Sala só para membro, sem username (S-01, S-10) | F03-03 | IMPLEMENTED | Claude | G10 |
-| F10-03 | Segurança | Reuso de refresh revoga a família (S-03) | F03-02 | READY | Grok | G10 |
+| F10-03 | Segurança | Reuso de refresh revoga a família (S-03) | F03-02 | IMPLEMENTED | Claude | G10 |
 | F10-04 | Segurança | Corte no SFU repetível e join na mesma trava (S-04) | F10-02 | READY | Grok | G10 |
 | F10-05 | Segurança | Desativar conta, senha, recuperação e corte no logout (S-02, S-18) | F10-03,F10-04 | PENDING | Grok | G10 |
 | F10-06 | Segurança | Grant só com as fontes autorizadas (S-09) | F10-04 | PENDING | Grok | G10 |
@@ -57,6 +57,8 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F11-01 | Marca | Novo ícone do app e variantes | F07-02 | WAITING_VALIDATION | Claude | G7 |
 
 ## Estado em 2026-10-19
+
+F10-03 ficou `IMPLEMENTED` na branch `task/F10-03-refresh`: refresh já substituído revoga a família inteira, as outras famílias seguem. Migration `0005_session_family.sql`.
 
 F10-02 ficou `IMPLEMENTED` na branch `task/F10-02-membro`, sobre a F10-01: membro da sala não vê o login dos outros, e sem membership nem convite o join é 403 antes de dizer se a sala acabou. O ramo de admin já tinha saído na F09-01. F10-04 passou a `READY`.
 

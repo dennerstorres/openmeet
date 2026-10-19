@@ -51,7 +51,13 @@ test("identity migration matches the schema and rejects a second admin, duplicat
   const db = new PGlite();
   try {
     const client = pgliteClient(db);
-    assert.deepEqual(await applyMigrations(client), ["0001_identity.sql", "0002_servers.sql", "0003_google_login.sql", "0004_display_name.sql"]);
+    assert.deepEqual(await applyMigrations(client), [
+      "0001_identity.sql",
+      "0002_servers.sql",
+      "0003_google_login.sql",
+      "0004_display_name.sql",
+      "0005_session_family.sql",
+    ]);
     assert.deepEqual(await applyMigrations(client), []);
 
     const tables = await client.query("select tablename from pg_tables where schemaname = 'public'");
@@ -137,7 +143,7 @@ test("identity migration matches the schema and rejects a second admin, duplicat
     const applied = await client.query("select name from schema_migrations");
     assert.deepEqual(
       applied.rows.map((row) => row.name),
-      ["0001_identity.sql", "0002_servers.sql", "0003_google_login.sql", "0004_display_name.sql"],
+      ["0001_identity.sql", "0002_servers.sql", "0003_google_login.sql", "0004_display_name.sql", "0005_session_family.sql"],
     );
   } finally {
     await db.close();
@@ -167,7 +173,7 @@ test("the servers migration moves existing rooms into Geral and revokes room inv
       adminId,
     ]);
 
-    assert.deepEqual(await applyMigrations(client), ["0002_servers.sql", "0003_google_login.sql", "0004_display_name.sql"]);
+    assert.deepEqual(await applyMigrations(client), ["0002_servers.sql", "0003_google_login.sql", "0004_display_name.sql", "0005_session_family.sql"]);
 
     const servers = await client.query("select id, name, created_by from servers");
     assert.equal(servers.rows.length, 1);
@@ -200,5 +206,43 @@ test("the servers migration on an empty database creates no server", async () =>
     assert.deepEqual(servers.rows, []);
   } finally {
     await db.close();
+  }
+});
+
+test("the session family migration names every chain by its root", async () => {
+  const db = new PGlite();
+  const upTo = await mkdtemp(path.join(tmpdir(), "openmeet-family-"));
+  try {
+    const client = pgliteClient(db);
+    for (const name of ["0001_identity.sql", "0002_servers.sql", "0003_google_login.sql", "0004_display_name.sql"]) {
+      await copyFile(path.join(migrationDirectory(), name), path.join(upTo, name));
+    }
+    await applyMigrations(client, upTo);
+    const user = await client.query("insert into users (username, password_hash, display_name, role) values ('admin', 'h', 'Admin', 'admin') returning id");
+    const userId = user.rows[0]?.id;
+    const session = async (hash: string, replacedBy: unknown) =>
+      (
+        await client.query("insert into refresh_sessions (user_id, token_hash, expires_at, replaced_by) values ($1, $2, now(), $3) returning id", [
+          userId,
+          hash,
+          replacedBy ?? null,
+        ])
+      ).rows[0]?.id;
+    const c = await session("c", null);
+    const b = await session("b", c);
+    const a = await session("a", b);
+    const alone = await session("alone", null);
+
+    assert.deepEqual(await applyMigrations(client), ["0005_session_family.sql"]);
+    const rows = await client.query("select id, family_id from refresh_sessions");
+    const family = new Map(rows.rows.map((row) => [row.id, row.family_id]));
+    assert.equal(family.get(a), a);
+    assert.equal(family.get(b), a);
+    assert.equal(family.get(c), a);
+    assert.equal(family.get(alone), alone);
+    await expectSqlState(() => client.query("insert into refresh_sessions (user_id, token_hash, expires_at) values ($1, 'd', now())", [userId]), "23502");
+  } finally {
+    await db.close();
+    await rm(upTo, { recursive: true, force: true });
   }
 });
