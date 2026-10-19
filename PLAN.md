@@ -53,10 +53,12 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F10-15 | Segurança | Cofre de um slot, recusa outra origem (S-05) | F05-01 | WAITING_VALIDATION | Claude | G10 |
 | F10-16 | Segurança | Contrato visível da bandeja (S-16) | F05-01 | WAITING_VALIDATION | Claude | G10 |
 | F10-17 | Segurança | Login, refresh e logout no processo nativo (S-05, S-18) | F10-05,F10-07,F10-15 | WAITING_VALIDATION | Claude | G10 |
-| F10-18 | Segurança | Salas e join no processo nativo (S-06) | F10-17 | READY | Grok | G10 |
+| F10-18 | Segurança | Salas e join no processo nativo (S-06) | F10-17 | WAITING_VALIDATION | Claude | G10 |
 | F11-01 | Marca | Novo ícone do app e variantes | F07-02 | WAITING_VALIDATION | Claude | G7 |
 
 ## Estado em 2026-10-19
+
+F10-18 ficou `WAITING_VALIDATION` na branch `task/F10-18-salas-nativas`: o access token sai da página; salas, servidores, convites, presença e join passam pelo Rust com lista fechada de rotas. Falta o instalador contra uma instância real. Com isso as 18 tarefas da F10 têm código; nenhuma está `DONE`.
 
 F10-17 ficou `WAITING_VALIDATION` na branch `task/F10-17-auth-nativa`: login, bootstrap, Google, refresh e logout no Rust; o refresh não entra na página. Falta o instalador contra uma instância real. F10-18 passou a `READY` com essa espera.
 

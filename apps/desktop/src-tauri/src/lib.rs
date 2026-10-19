@@ -70,6 +70,7 @@ pub fn run() {
             }
         })
         .manage(invite::PendingInvite::default())
+        .manage(session::NativeSession::default())
         .setup(|app| {
             use tauri_plugin_deep_link::DeepLinkExt;
             // `install` looks the window up by its label, so it is created first.
@@ -91,6 +92,7 @@ pub fn run() {
             session::session_google,
             session::session_refresh,
             session::session_logout,
+            session::instance_call,
             shell::shell_status,
             shell::shell_set_consent,
             shell::shell_tracks,

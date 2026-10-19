@@ -12,6 +12,7 @@
     "allow-session-google",
     "allow-session-refresh",
     "allow-session-logout",
+    "allow-instance-call",
     "allow-shell-status",
     "allow-shell-set-consent",
     "allow-shell-tracks",

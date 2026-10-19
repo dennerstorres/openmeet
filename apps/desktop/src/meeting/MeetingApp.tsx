@@ -31,6 +31,7 @@ import { CardStage } from "./Cards";
 import { IconCamera, IconClock, IconGear, IconHangUp, IconHeadphones, IconLogo, IconMic, IconPlus, IconScreen, IconSignal, IconSpeaker } from "./Icons";
 import { ShellConsent } from "../shell/ShellConsent";
 import {
+  createDesktopApi,
   createDesktopBroker,
   isTauri,
   listenInvite,
@@ -155,7 +156,11 @@ export function MeetingApp() {
   }
 
   if (modelRef.current === null) {
-    modelRef.current = new MeetingModel(createFetchApi(), createLiveKitMedia(session), isTauri() ? createDesktopBroker() : undefined);
+    modelRef.current = new MeetingModel(
+      isTauri() ? createDesktopApi(createFetchApi()) : createFetchApi(),
+      createLiveKitMedia(session),
+      isTauri() ? createDesktopBroker() : undefined,
+    );
   }
   const model = modelRef.current;
   const [state, setState] = useState<ShellSnapshot>(model.snapshot());

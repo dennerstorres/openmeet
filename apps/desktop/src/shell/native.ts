@@ -1,6 +1,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { ApiResult, SessionBroker } from "@openmeet/shared";
+import type { ApiResult, InstanceApi, SessionBroker } from "@openmeet/shared";
 
 export { isTauri };
 
@@ -27,6 +27,20 @@ export function createDesktopBroker(): SessionBroker {
     },
     logout(origin) {
       return invoke<ApiResult>("session_logout", { origin });
+    },
+  };
+}
+
+/**
+ * S-06: with a session, every instance call goes through the native process, which holds the access
+ * token and allows only the room and server routes. The page holds a marker, not the token. Calls without
+ * a session (instance card, Google start) stay on fetch.
+ */
+export function createDesktopApi(open: InstanceApi): InstanceApi {
+  return {
+    request(origin, method, path, body, accessToken) {
+      if (accessToken === null) return open.request(origin, method, path, body, null);
+      return invoke<ApiResult>("instance_call", { origin, method, path, body: method === "GET" ? null : (body ?? {}) });
     },
   };
 }
