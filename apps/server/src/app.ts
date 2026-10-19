@@ -4,6 +4,7 @@ import { attemptPolicy, type AttemptOptions } from "./auth/limit.js";
 import { registerAuth } from "./auth/routes.js";
 import type { MigrationClient } from "./db/migrate.js";
 import { registerInstance } from "./instance.js";
+import { redactInviteUrl, registerInvitePage } from "./invite-page.js";
 import { registerPocJoin, type AppEnv } from "./poc-join.js";
 import type { RoomMedia } from "./rooms/media.js";
 import { registerRooms } from "./rooms/routes.js";
@@ -21,6 +22,9 @@ export async function buildApp(options?: {
   const app = Fastify({
     logger: options?.logger ?? {
       level: env.LOG_LEVEL ?? "info",
+      serializers: {
+        req: (request: { method: string; url: string }) => ({ method: request.method, url: redactInviteUrl(request.url) }),
+      },
     },
   });
 
@@ -50,5 +54,6 @@ export async function buildApp(options?: {
   registerAuth(app, env, options?.db, attempts);
   registerRooms(app, env, options?.db, options?.media);
   registerPocJoin(app, env);
+  registerInvitePage(app);
   return app;
 }

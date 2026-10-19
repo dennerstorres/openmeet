@@ -136,7 +136,7 @@ fn action_for(shortcut: &Shortcut) -> Option<&'static str> {
     })
 }
 
-fn show_main<R: tauri::Runtime>(app: &AppHandle<R>) {
+pub(crate) fn show_main<R: tauri::Runtime>(app: &AppHandle<R>) {
     let Some(window) = app.get_webview_window("main") else {
         return;
     };

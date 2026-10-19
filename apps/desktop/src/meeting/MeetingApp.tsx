@@ -29,7 +29,18 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { holdMeetingLock } from "../shell/background";
 import { CardStage } from "./Cards";
 import { ShellConsent } from "../shell/ShellConsent";
-import { createDesktopVault, isTauri, listenShell, setShortcutConsent, shellStatus, shellTracks, showWindow, type ShellStatus } from "../shell/native";
+import {
+  createDesktopVault,
+  isTauri,
+  listenInvite,
+  listenShell,
+  setShortcutConsent,
+  shellStatus,
+  shellTracks,
+  showWindow,
+  takeInvite,
+  type ShellStatus,
+} from "../shell/native";
 import { createFetchApi, createLiveKitMedia } from "./api";
 
 const idleSnapshot: PocSnapshot = {
@@ -96,6 +107,8 @@ export function MeetingApp() {
   const [roomSlug, setRoomSlug] = useState("");
   const [roomKind, setRoomKind] = useState("persistent");
   const [serverName, setServerName] = useState("");
+  const [pastedInvite, setPastedInvite] = useState("");
+  const [copied, setCopied] = useState(false);
   const [creating, setCreating] = useState<"server" | "room" | null>(null);
   const [layout, setLayout] = useState<CardLayout>("spotlight");
   const [pinnedId, setPinnedId] = useState<string | null>(null);
@@ -147,6 +160,28 @@ export function MeetingApp() {
   };
 
   useEffect(() => model.subscribe(setState), [model]);
+  useEffect(() => {
+    if (!isTauri()) return;
+    let stop: (() => void) | undefined;
+    let closed = false;
+    const offer = (link: string) => {
+      model.offerInvite(link);
+      void showWindow().catch(() => undefined);
+    };
+    void takeInvite()
+      .then((link) => {
+        if (!closed && link !== null) offer(link);
+      })
+      .catch(() => undefined);
+    void listenInvite(offer).then((unlisten) => {
+      if (closed) unlisten();
+      else stop = unlisten;
+    });
+    return () => {
+      closed = true;
+      stop?.();
+    };
+  }, [model]);
   useEffect(() => session().subscribe(setMedia), []);
   useEffect(() => {
     if (!isTauri()) return;
@@ -315,6 +350,16 @@ export function MeetingApp() {
       />
     ) : null;
 
+  const invitePanel = (
+    <InvitePanel
+      offer={state.inviteOffer}
+      waiting={state.step === "account" || state.step === "instance" ? state.inviteWaiting : null}
+      pending={state.pending}
+      onAccept={() => void model.acceptInvite()}
+      onDecline={() => model.declineInvite()}
+    />
+  );
+
   if (state.step === "instance" || state.step === "account") {
     return (
       <main className="app-shell">
@@ -330,6 +375,7 @@ export function MeetingApp() {
         </aside>
         <section className="workspace">
           {notice ? <p className="error">{notice}</p> : null}
+          {invitePanel}
           {consent}
           {state.step === "instance" ? (
             <InstanceStep address={address} pending={state.pending} onAddress={setAddress} onConfirm={() => void model.confirmInstance(address)} />
@@ -436,6 +482,50 @@ export function MeetingApp() {
         </ul>
         {selectedServer && state.rooms.length === 0 ? <p className="hint">Nenhuma sala neste servidor.</p> : null}
         {state.canCreate ? (
+          state.createdInvite ? (
+            <div className="inline-form invite-out">
+              <span className="hint">Link de convite · vale 24 h e 10 usos</span>
+              <input readOnly value={state.createdInvite} aria-label="Link de convite" onFocus={(event) => event.currentTarget.select()} />
+              <div className="row">
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() =>
+                    void navigator.clipboard
+                      .writeText(state.createdInvite ?? "")
+                      .then(() => setCopied(true))
+                      .catch(() => setMediaError("Não foi possível copiar. Selecione o link e copie."))
+                  }
+                >
+                  {copied ? "Copiado" : "Copiar link"}
+                </button>
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => {
+                    setCopied(false);
+                    model.clearCreatedInvite();
+                  }}
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="ghost add-room"
+              disabled={state.pending}
+              onClick={() => {
+                setCopied(false);
+                void model.createInvite();
+              }}
+            >
+              Convidar para {selectedServer?.name ?? "o servidor"}
+            </button>
+          )
+        ) : null}
+        {state.canCreate ? (
           creating === "room" ? (
             <form
               className="inline-form"
@@ -478,6 +568,25 @@ export function MeetingApp() {
             </button>
           )
         ) : null}
+        <form
+          className="paste-invite"
+          onSubmit={(event: FormEvent) => {
+            event.preventDefault();
+            model.offerInvite(pastedInvite);
+            setPastedInvite("");
+          }}
+        >
+          <label>
+            <span className="hint">Tenho um convite</span>
+            <input
+              value={pastedInvite}
+              onChange={(event) => setPastedInvite(event.currentTarget.value)}
+              placeholder="Cole o link ou o código"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </label>
+        </form>
         <footer className="account">
           <div className="you-row">
             <span className="avatar small" aria-hidden="true">
@@ -504,6 +613,7 @@ export function MeetingApp() {
 
       <section className="call-area">
         {notice ? <p className="error">{notice}</p> : null}
+        {invitePanel}
         {mediaError ? <p className="error">{mediaError}</p> : null}
         {consent}
         {inCall ? (
@@ -792,4 +902,36 @@ function AccountStep(props: {
       </button>
     </form>
   );
+}
+
+function InvitePanel(props: { offer: ShellSnapshot["inviteOffer"]; waiting: string | null; pending: boolean; onAccept: () => void; onDecline: () => void }) {
+  if (props.offer) {
+    return (
+      <section className="invite-offer" role="alertdialog" aria-labelledby="invite-title">
+        <h2 id="invite-title">Convite para um servidor</h2>
+        {props.offer.sameInstance ? (
+          <p>
+            O convite é desta instância, <strong>{props.offer.host}</strong>. Aceitar coloca você no servidor. Nenhuma sala é aberta.
+          </p>
+        ) : (
+          <p>
+            O convite é de outra instância: <strong>{props.offer.host}</strong>. Aceitar sai da conta atual e abre essa instância. Só entre com sua senha se
+            você confia nesse endereço.
+          </p>
+        )}
+        <div className="row">
+          <button type="button" className="primary" disabled={props.pending} onClick={props.onAccept}>
+            {props.offer.sameInstance ? "Aceitar convite" : `Abrir ${props.offer.host}`}
+          </button>
+          <button type="button" className="ghost" onClick={props.onDecline}>
+            Recusar
+          </button>
+        </div>
+      </section>
+    );
+  }
+  if (props.waiting) {
+    return <p className="invite-waiting">Entre na conta de {props.waiting} para aceitar o convite.</p>;
+  }
+  return null;
 }

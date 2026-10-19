@@ -1,3 +1,4 @@
+mod invite;
 mod shell;
 
 fn is_app_origin(url: &tauri::Url) -> bool {
@@ -15,6 +16,9 @@ fn is_app_origin(url: &tauri::Url) -> bool {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // A second launch, including one opened by an openmeet:// link, hands its link to this one.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| shell::show_main(app)))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(shell::shortcut_plugin())
         .on_permission_request(|webview, kind| {
@@ -33,7 +37,20 @@ pub fn run() {
                 _ => PermissionResponse::Deny,
             }
         })
-        .setup(|app| shell::install(app))
+        .manage(invite::PendingInvite::default())
+        .setup(|app| {
+            use tauri_plugin_deep_link::DeepLinkExt;
+            shell::install(app)?;
+            #[cfg(debug_assertions)]
+            app.deep_link().register_all()?;
+            let handle = app.handle().clone();
+            app.deep_link()
+                .on_open_url(move |event| invite::deliver(&handle, event.urls().into_iter().map(|url| url.to_string())));
+            if let Some(urls) = app.deep_link().get_current()? {
+                invite::deliver(app.handle(), urls.into_iter().map(|url| url.to_string()));
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             shell::session_load,
             shell::session_save,
@@ -41,7 +58,8 @@ pub fn run() {
             shell::shell_status,
             shell::shell_set_consent,
             shell::shell_tracks,
-            shell::shell_show
+            shell::shell_show,
+            invite::invite_take
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

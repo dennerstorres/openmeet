@@ -36,6 +36,7 @@ const USERNAME = /^[A-Za-z0-9_-]{1,64}$/;
 const SLUG = /^[A-Za-z0-9_-]{1,64}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DEFAULT_SERVER_NAME = "Geral";
+const INVITE_CODE = /^[A-Za-z0-9_-]{43}$/;
 
 interface RoomRecord {
   id: string;
@@ -246,6 +247,15 @@ export async function acceptServerInvite(db: MigrationClient, actor: PublicUser,
   await redeemInvite(db, access.server.id, actor.id, code);
   await audit(db, actor.id, "server_join", "server", access.server.id);
   return { ...access.server, role: "participant" };
+}
+
+// ADR 0012: the link carries only the code. The server comes from the invite itself.
+export async function acceptInviteCode(db: MigrationClient, actor: PublicUser, code: string): Promise<ServerRecord & { role: string }> {
+  if (!INVITE_CODE.test(code)) throw new RoomError("invalid_invite");
+  const found = await db.query("select server_id from server_invites where code_hash = $1 and revoked_at is null and expires_at > now()", [hashSecret(code)]);
+  const id = text(found.rows[0]?.server_id);
+  if (!id) throw new RoomError("invalid_invite");
+  return acceptServerInvite(db, actor, id, code);
 }
 
 export async function removeServerMember(db: MigrationClient, actor: PublicUser, id: string, memberId: string, media: RoomMedia | undefined): Promise<void> {

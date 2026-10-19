@@ -1,4 +1,5 @@
 import { PocInputError } from "./poc.js";
+import { inviteHost, inviteLink, parseInvite, type InviteLink } from "./invite.js";
 import {
   canonicalInstanceUrl,
   hasControlCharacter,
@@ -60,9 +61,18 @@ export interface ShellSnapshot {
   activeRoomId: string | null;
   activeRoomName: string | null;
   activeServerId: string | null;
+  /** An invite waiting for the person to confirm. The code itself is never in the snapshot. */
+  inviteOffer: { host: string; sameInstance: boolean } | null;
+  /** Host of a confirmed invite that is accepted right after login. */
+  inviteWaiting: string | null;
+  /** The last link created here, for the person to copy. */
+  createdInvite: string | null;
   error: string | null;
   pending: boolean;
 }
+
+const INVITE_MINUTES = 1440;
+const INVITE_USES = 10;
 
 const idleMedia: MeetingMedia = {
   async connect() {},
@@ -99,6 +109,9 @@ export class MeetingModel {
   private selectedServerId: string | null = null;
   private rooms: RoomSummary[] = [];
   private activeRoom: { id: string; name: string; serverId: string } | null = null;
+  private inviteOffer: { origin: string; code: string } | null = null;
+  private pendingInvite: { origin: string; code: string } | null = null;
+  private createdInvite: string | null = null;
   private error: string | null = null;
   private pending = false;
   private readonly listeners = new Set<(snapshot: ShellSnapshot) => void>();
@@ -127,6 +140,9 @@ export class MeetingModel {
       activeRoomId: this.activeRoom?.id ?? null,
       activeRoomName: this.activeRoom?.name ?? null,
       activeServerId: this.activeRoom?.serverId ?? null,
+      inviteOffer: this.inviteOffer === null ? null : { host: inviteHost(this.inviteOffer.origin), sameInstance: this.inviteOffer.origin === this.origin },
+      inviteWaiting: this.pendingInvite === null ? null : inviteHost(this.pendingInvite.origin),
+      createdInvite: this.createdInvite,
       error: this.error,
       pending: this.pending,
     };
@@ -247,6 +263,102 @@ export class MeetingModel {
     });
   }
 
+  /**
+   * Holds an invite from a link, the browser page, or a pasted code until the person confirms it.
+   * Nothing is sent here: a link from another instance must not move the session on its own.
+   */
+  offerInvite(raw: string): void {
+    const parsed: InviteLink | null = parseInvite(raw);
+    this.error = null;
+    if (parsed === null) {
+      this.error = "invalid_invite";
+    } else if (parsed.origin === null && this.origin === null) {
+      this.error = "invalid_api_base";
+    } else {
+      this.inviteOffer = { origin: parsed.origin ?? this.origin ?? "", code: parsed.code };
+    }
+    this.publish();
+  }
+
+  declineInvite(): void {
+    this.inviteOffer = null;
+    this.publish();
+  }
+
+  async acceptInvite(): Promise<void> {
+    const offer = this.inviteOffer;
+    if (offer === null) return;
+    this.inviteOffer = null;
+    if (offer.origin !== this.origin) {
+      await this.run(async (generation) => {
+        await this.endSession();
+        if (generation !== this.generation) return;
+        this.origin = null;
+        this.instanceName = null;
+        this.bootstrapOpen = false;
+        this.step = "instance";
+      });
+      this.pendingInvite = offer;
+      await this.confirmInstance(offer.origin);
+      return;
+    }
+    this.pendingInvite = offer;
+    if (this.accessToken === null) {
+      this.publish();
+      return;
+    }
+    await this.run(async (generation) => {
+      await this.redeemPendingInvite(generation);
+      if (generation !== this.generation) return;
+      await this.loadServers(generation);
+    });
+  }
+
+  async createInvite(): Promise<void> {
+    await this.run(async (generation) => {
+      const origin = this.pinned();
+      const accessToken = this.accessToken;
+      if (origin === null || accessToken === null) {
+        await this.dropExpiredSession(generation);
+        return;
+      }
+      const server = this.servers.find((item) => item.id === this.selectedServerId);
+      if (server === undefined || (server.role !== "owner" && server.role !== "moderator")) {
+        this.error = "forbidden";
+        return;
+      }
+      this.createdInvite = null;
+      const result = await this.api.request(
+        origin,
+        "POST",
+        `/api/v1/servers/${server.id}/invites`,
+        { expiresInMinutes: INVITE_MINUTES, maxUses: INVITE_USES },
+        accessToken,
+      );
+      if (generation !== this.generation) return;
+      if (result.status !== 201) {
+        if (await this.dropIfUnauthorized(generation, result.body)) return;
+        this.error = readErrorCode(result.body);
+        return;
+      }
+      const code = typeof result.body === "object" && result.body !== null && "code" in result.body ? result.body.code : undefined;
+      if (typeof code !== "string") {
+        this.error = "invalid_instance";
+        return;
+      }
+      try {
+        this.createdInvite = inviteLink(origin, code);
+      } catch {
+        this.error = "invalid_instance";
+      }
+    });
+  }
+
+  clearCreatedInvite(): void {
+    this.createdInvite = null;
+    this.publish();
+  }
+
   async enterRoom(roomId: string, code: string): Promise<void> {
     await this.run(async (generation) => {
       const origin = this.pinned();
@@ -309,6 +421,7 @@ export class MeetingModel {
   }
 
   async signOut(): Promise<void> {
+    this.pendingInvite = null;
     await this.run(async (generation) => {
       await this.endSession();
       if (generation !== this.generation) return;
@@ -317,6 +430,7 @@ export class MeetingModel {
   }
 
   async changeInstance(): Promise<void> {
+    this.pendingInvite = null;
     await this.run(async (generation) => {
       await this.endSession();
       if (generation !== this.generation) return;
@@ -351,7 +465,33 @@ export class MeetingModel {
     this.role = session.user.role;
     this.step = "rooms";
     await this.vault.save(origin, session.refreshToken);
+    await this.redeemPendingInvite(generation);
+    if (generation !== this.generation) return;
     await this.loadServers(generation);
+  }
+
+  private async redeemPendingInvite(generation: number): Promise<void> {
+    const pending = this.pendingInvite;
+    const origin = this.origin;
+    const accessToken = this.accessToken;
+    if (pending === null || origin === null || accessToken === null) return;
+    if (pending.origin !== origin) {
+      this.pendingInvite = null;
+      return;
+    }
+    this.pendingInvite = null;
+    const result = await this.api.request(origin, "POST", "/api/v1/invites/accept", { code: pending.code }, accessToken);
+    if (generation !== this.generation) return;
+    if (result.status !== 200) {
+      if (await this.dropIfUnauthorized(generation, result.body)) return;
+      this.error = readErrorCode(result.body);
+      return;
+    }
+    try {
+      this.selectedServerId = parseServer(result.body).id;
+    } catch {
+      this.error = "invalid_instance";
+    }
   }
 
   private async loadServers(generation: number): Promise<void> {
@@ -418,6 +558,7 @@ export class MeetingModel {
     this.selectedServerId = null;
     this.rooms = [];
     this.activeRoom = null;
+    this.createdInvite = null;
     if (origin === null || refreshToken === null) return;
     await this.vault.clear(origin);
     try {

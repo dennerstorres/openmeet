@@ -11,6 +11,7 @@
     "allow-shell-status",
     "allow-shell-set-consent",
     "allow-shell-tracks",
-    "allow-shell-show"
+    "allow-shell-show",
+    "allow-invite-take"
   ]
 }

@@ -157,13 +157,14 @@ function instancePath(path: string): string {
     path === "/api/v1/auth/refresh" ||
     path === "/api/v1/auth/logout" ||
     path === "/api/v1/rooms" ||
-    path === "/api/v1/servers"
+    path === "/api/v1/servers" ||
+    path === "/api/v1/invites/accept"
   ) {
     return path;
   }
   const join = /^\/api\/v1\/rooms\/([0-9a-f-]{36})\/join$/i.exec(path);
   if (join?.[1] !== undefined && UUID.test(join[1])) return path;
-  const serverRooms = /^\/api\/v1\/servers\/([0-9a-f-]{36})\/rooms$/i.exec(path);
+  const serverRooms = /^\/api\/v1\/servers\/([0-9a-f-]{36})\/(?:rooms|invites)$/i.exec(path);
   if (serverRooms?.[1] !== undefined && UUID.test(serverRooms[1])) return path;
   throw new PocInputError("invalid_api_base", "Request path is not part of the instance API");
 }

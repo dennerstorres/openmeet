@@ -30,7 +30,7 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F02-06 | POC | Decisão GO/NO-GO de Tauri/WebView2 | F02-05 | BLOCKED | Claude | G2 |
 | F08-01 | OSS | Segurança/licença/docs/release candidate | F07-02, F02-06 GO | PENDING | Claude+Codex review | G8 |
 | F09-01 | Servidores | Schema, API, migração Geral e token LiveKit pelo id da sala | F03-03 | IMPLEMENTED | Claude | G9 |
-| F09-02 | Servidores | Convite do servidor por link openmeet:// | F09-01 | READY | Claude | G9 |
+| F09-02 | Servidores | Convite do servidor por link openmeet:// | F09-01 | WAITING_VALIDATION | Claude | G9 |
 | F09-03 | Sala | Três colunas, cards, destaque, grade, fixar e tela cheia | F09-01 | IMPLEMENTED | Claude | G9 |
 | F09-04 | Sala | Presença na sidebar e anel de quem fala | F09-03 | READY | Claude | G9 |
 | F09-05 | Sala | Ensurdecer o áudio remoto só neste PC | F04-02 | READY | Claude | G9 |
@@ -56,6 +56,8 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F10-18 | Segurança | Salas e join no processo nativo (S-06) | F10-17 | PENDING | Grok | G10 |
 
 ## Estado em 2026-10-19
+
+F09-02 ficou `WAITING_VALIDATION` na branch `task/F09-02-convite`, sobre a F09-03: link `openmeet://`, página `/convite/:code`, código colado e aceite depois do login. Falta o clique no link com o instalador novo no Windows.
 
 F09-03 ficou `IMPLEMENTED` na branch `task/F09-03-layout`, sobre a F09-01: três colunas, card por pessoa e por compartilhamento, destaque, grade, fixar e tela cheia. Visto no navegador com dois participantes sem câmera. Câmera e tela reais no WebView2 ainda não foram vistas. F09-04 passou a `READY`.
 

@@ -50,3 +50,19 @@ export function listenShell(handler: (action: string) => void): Promise<Unlisten
     handler(event.payload);
   });
 }
+
+/** An invite link the app was opened with, taken once. The Rust side already kept only openmeet://convite links. */
+export function takeInvite(): Promise<string | null> {
+  return invoke<string | null>("invite_take");
+}
+
+/** The native side only signals; the link itself is taken once through invite_take. */
+export function listenInvite(handler: (link: string) => void): Promise<UnlistenFn> {
+  return listen("invite-link", () => {
+    void takeInvite()
+      .then((link) => {
+        if (link !== null) handler(link);
+      })
+      .catch(() => undefined);
+  });
+}

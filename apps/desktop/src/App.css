@@ -807,3 +807,38 @@ button.ghost:hover:not(:disabled) {
     transition: none;
   }
 }
+
+/* ADR 0012: invite link. */
+
+.invite-offer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 560px;
+  padding: 14px 16px;
+  border: 1px solid #23a559;
+  border-radius: 12px;
+  background: #1a211c;
+}
+
+.invite-offer h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.invite-offer p,
+.invite-waiting {
+  margin: 0;
+  color: #d5e6da;
+  line-height: 1.45;
+}
+
+.invite-out input {
+  font-size: 12px;
+}
+
+.paste-invite input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 13px;
+}

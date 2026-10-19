@@ -7,6 +7,8 @@ export {
   prepareInstanceRequest,
   readErrorCode,
 } from "./instance.js";
+export { inviteLink, isInviteCode, parseInvite } from "./invite.js";
+export type { InviteLink } from "./invite.js";
 export { MeetingModel, MemorySessionVault } from "./meeting.js";
 export { PocInputError, parseApiBase, parseIdentity, parseJoinResponse, parsePastedJoin, parseRoomName, parseSignalUrl } from "./poc.js";
 export type { AccountSession, AccountUser, InstanceCard, PreparedRequest, RoomSummary, ServerSummary } from "./instance.js";

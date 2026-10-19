@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { MeetingModel, MemorySessionVault, type InstanceApi, type MeetingMedia } from "../src/index.js";
+import { inviteLink, MeetingModel, MemorySessionVault, type InstanceApi, type MeetingMedia } from "../src/index.js";
 
 const roomId = "11111111-1111-4111-8111-111111111111";
 const otherRoomId = "33333333-3333-4333-8333-333333333333";
@@ -11,6 +11,7 @@ const accessToken = "access-token-value";
 const refreshToken = "refresh-token-value";
 const nextRefresh = "refresh-token-rotated";
 const joinToken = "header.payload.signature";
+const inviteCode = "C".repeat(43);
 
 function session(role: string, refresh = refreshToken) {
   return {
@@ -52,6 +53,13 @@ function apiFor(role: string): { api: InstanceApi; calls: string[]; bodies: unkn
         return { status: 200, body: [{ id: otherRoomId, name: "Mesa", slug: "geral", kind: "persistent", ended: false }] };
       }
       if (path === `/api/v1/servers/${serverId}/rooms` && method === "POST") return { status: 201, body: room() };
+      if (path === `/api/v1/servers/${serverId}/invites` && method === "POST") return { status: 201, body: { id: roomId, code: inviteCode, maxUses: 10 } };
+      if (path === "/api/v1/invites/accept") {
+        const sent = (body as { code?: string } | null)?.code;
+        return sent === inviteCode
+          ? { status: 200, body: { id: otherServerId, name: "Família", role: "participant" } }
+          : { status: 403, body: { error: "invalid_invite" } };
+      }
       if (path.endsWith("/join")) return { status: 200, body: { url: "wss://sfu.example", token: joinToken } };
       if (path === "/api/v1/auth/logout") return { status: 204, body: null };
       return { status: 404, body: { error: "room_not_found" } };
@@ -257,4 +265,113 @@ test("only the instance admin creates a server and the new one is selected", asy
   assert.equal(calls.includes("POST https://meet.example/api/v1/servers"), true);
   assert.equal(model.snapshot().selectedServerId, otherServerId);
   assert.equal(model.snapshot().rooms[0]?.id, otherRoomId);
+});
+
+test("a link from this instance waits for confirmation, then joins the server and no room", async () => {
+  const { api, calls } = apiFor("participant");
+  const media = mediaFor();
+  const model = new MeetingModel(api, media);
+  await model.confirmInstance("https://meet.example");
+  await model.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  const before = calls.length;
+  model.offerInvite(inviteLink("https://meet.example", inviteCode));
+  assert.equal(calls.length, before);
+  assert.deepEqual(model.snapshot().inviteOffer, { host: "meet.example", sameInstance: true });
+  assert.equal(JSON.stringify(model.snapshot()).includes(inviteCode), false);
+  await model.acceptInvite();
+  assert.equal(calls.includes("POST https://meet.example/api/v1/invites/accept"), true);
+  assert.equal(model.snapshot().inviteOffer, null);
+  assert.equal(model.snapshot().selectedServerId, otherServerId);
+  assert.equal(model.snapshot().step, "rooms");
+  assert.equal(media.connects.length, 0);
+  assert.equal(
+    calls.some((call) => call.endsWith("/join")),
+    false,
+  );
+});
+
+test("a pasted code goes to the current instance, and a bad one is refused locally", async () => {
+  const { api, calls } = apiFor("participant");
+  const model = new MeetingModel(api, mediaFor());
+  model.offerInvite(inviteCode);
+  assert.equal(model.snapshot().error, "invalid_api_base");
+  await model.confirmInstance("https://meet.example");
+  await model.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  model.offerInvite("openmeet://convite?host=meet.example&code=curto");
+  assert.equal(model.snapshot().error, "invalid_invite");
+  assert.equal(model.snapshot().inviteOffer, null);
+  model.offerInvite(`  ${inviteCode} `);
+  await model.acceptInvite();
+  assert.equal(calls.filter((call) => call === "POST https://meet.example/api/v1/invites/accept").length, 1);
+  model.offerInvite("D".repeat(43));
+  await model.acceptInvite();
+  assert.equal(model.snapshot().error, "invalid_invite");
+});
+
+test("a link from another instance switches only after confirmation and accepts after login", async () => {
+  const { api, calls, bodies } = apiFor("participant");
+  const vault = new MemorySessionVault();
+  const model = new MeetingModel(api, mediaFor(), vault);
+  await model.confirmInstance("https://meet.example");
+  await model.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  model.offerInvite(inviteLink("https://other.example", inviteCode));
+  assert.deepEqual(model.snapshot().inviteOffer, { host: "other.example", sameInstance: false });
+  assert.equal(
+    calls.some((call) => call.includes("other.example")),
+    false,
+  );
+  model.declineInvite();
+  assert.equal(model.snapshot().inviteOffer, null);
+  assert.equal(model.snapshot().origin, "https://meet.example");
+
+  model.offerInvite(inviteLink("https://other.example", inviteCode));
+  await model.acceptInvite();
+  assert.equal(model.snapshot().origin, "https://other.example");
+  assert.equal(model.snapshot().step, "account");
+  assert.equal(model.snapshot().inviteWaiting, "other.example");
+  assert.equal(calls.includes("POST https://meet.example/api/v1/auth/logout"), true);
+  assert.equal(calls.includes("POST https://other.example/api/v1/invites/accept"), false);
+  await model.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  const accepted = calls.indexOf("POST https://other.example/api/v1/invites/accept");
+  assert.equal(accepted > calls.indexOf("POST https://other.example/api/v1/auth/login"), true);
+  assert.equal(JSON.stringify(bodies[accepted]).includes(inviteCode), true);
+  assert.equal(
+    calls.some((call) => call === "POST https://meet.example/api/v1/invites/accept"),
+    false,
+  );
+  assert.equal(model.snapshot().inviteWaiting, null);
+  assert.equal(model.snapshot().selectedServerId, otherServerId);
+});
+
+test("changing instance on purpose drops a waiting invite", async () => {
+  const { api, calls } = apiFor("participant");
+  const model = new MeetingModel(api, mediaFor());
+  await model.confirmInstance("https://meet.example");
+  model.offerInvite(inviteCode);
+  await model.acceptInvite();
+  assert.equal(model.snapshot().inviteWaiting, "meet.example");
+  await model.changeInstance();
+  assert.equal(model.snapshot().inviteWaiting, null);
+  await model.confirmInstance("https://meet.example");
+  await model.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  assert.equal(calls.includes("POST https://meet.example/api/v1/invites/accept"), false);
+});
+
+test("owners copy a link for the selected server and participants cannot", async () => {
+  const participant = apiFor("participant");
+  const denied = new MeetingModel(participant.api, mediaFor());
+  await denied.confirmInstance("https://meet.example");
+  await denied.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  await denied.createInvite();
+  assert.equal(denied.snapshot().error, "forbidden");
+
+  const { api, calls } = apiFor("admin");
+  const model = new MeetingModel(api, mediaFor());
+  await model.confirmInstance("https://meet.example");
+  await model.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  await model.createInvite();
+  assert.equal(calls.includes(`POST https://meet.example/api/v1/servers/${serverId}/invites`), true);
+  assert.equal(model.snapshot().createdInvite, `openmeet://convite?host=meet.example&code=${inviteCode}`);
+  await model.signOut();
+  assert.equal(model.snapshot().createdInvite, null);
 });

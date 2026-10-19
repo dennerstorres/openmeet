@@ -42,5 +42,12 @@
         "silent": true
       }
     }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["openmeet"]
+      }
+    }
   }
 }

@@ -3,6 +3,7 @@ import { AuthError, type AuthErrorCode, currentUser, type PublicUser } from "../
 import type { MigrationClient } from "../db/migrate.js";
 import type { AppEnv } from "../poc-join.js";
 import {
+  acceptInviteCode,
   acceptServerInvite,
   createAccount,
   createInvite,
@@ -231,6 +232,17 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
       const actor = await caller(request);
       if (!db) throw new AuthError("auth_unconfigured");
       const joined = await acceptServerInvite(db, actor, param(request, "id"), requiredText(request.body, "code"));
+      return reply.code(200).header("cache-control", "no-store").send(joined);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/invites/accept", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const joined = await acceptInviteCode(db, actor, requiredText(request.body, "code"));
       return reply.code(200).header("cache-control", "no-store").send(joined);
     } catch (error) {
       return sendError(request, reply, error);
