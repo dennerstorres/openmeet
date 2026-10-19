@@ -1,5 +1,9 @@
 # HISTORY — registro cronológico
 
+### 2026-10-19 — F11-01 ícone novo — Claude
+`main`, sem branch. Símbolo C aprovado no Claude Design. SVGs em `apps/desktop/brand/` (`icon`, `icon-white-on-black`, `icon-black-on-white`, `icon-green-on-dark` e `symbol` em `currentColor`). `pnpm exec tauri icon brand/icon.svg` regenerou `src-tauri/icons`. As saídas Android e iOS foram descartadas. Favicon trocado e `vite.svg`/`tauri.svg` removidos. O logo do login usa o mesmo símbolo. A bandeja herda o ícone da janela.
+Comandos, Windows 11: `prettier`, `typecheck` e `eslint` ok, login visto no navegador. `tauri build --bundles nsis` gerou `OpenMeet_0.1.0_x64-setup.exe`, 2,02 MiB, SHA256 `6c68297f5e90bf400616f47b938dea69e70b342190a27eb31c16b83ba9403cc5`, copiado para a Área de Trabalho. O instalador não foi aberto. `WAITING_VALIDATION`.
+
 ### 2026-10-19 — instalador com o visual verde — Claude
 `main` (9e228da), branch `task/visual-verde` integrada e apagada. `pnpm --filter @openmeet/desktop exec tauri build --bundles nsis` gerou `OpenMeet_0.1.0_x64-setup.exe`, 2,02 MiB, SHA256 `299443a4a051a5128c7bebcc1d89c271d302d48107816bebf9feb1c456066285`, copiado para a Área de Trabalho. O instalador não foi aberto.
 

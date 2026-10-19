@@ -279,7 +279,7 @@ a {
   width: 112px;
   height: 112px;
   border-radius: 32px;
-  background: var(--accent);
+  background: #16a34a;
   color: #fff;
   box-shadow:
     0 0 0 32px var(--bg-rail),

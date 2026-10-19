@@ -128,11 +128,13 @@ export function IconExpand({ size }: { size?: number }) {
   );
 }
 
-export function IconLogo({ size }: { size?: number }) {
+// Same symbol as brand/symbol.svg.
+export function IconLogo({ size = 20 }: { size?: number }) {
   return (
-    <Icon size={size}>
-      <circle cx="12" cy="12" r="8" />
-      <path d="M8 12h.01M12 12h.01M16 12h.01" />
-    </Icon>
+    <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+      <circle cx="50" cy="50" r="30" fill="none" stroke="currentColor" strokeWidth={10} />
+      <circle cx="50" cy="50" r="10" fill="currentColor" />
+      <circle cx="76" cy="24" r="8" fill="currentColor" />
+    </svg>
   );
 }

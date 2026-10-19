@@ -54,8 +54,11 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F10-16 | Segurança | Contrato visível da bandeja (S-16) | F05-01 | READY | Grok | G10 |
 | F10-17 | Segurança | Login, refresh e logout no processo nativo (S-05, S-18) | F10-05,F10-07,F10-15 | PENDING | Grok | G10 |
 | F10-18 | Segurança | Salas e join no processo nativo (S-06) | F10-17 | PENDING | Grok | G10 |
+| F11-01 | Marca | Novo ícone do app e variantes | F07-02 | WAITING_VALIDATION | Claude | G7 |
 
 ## Estado em 2026-10-19
+
+F11-01 ficou `WAITING_VALIDATION`: símbolo C (anel com ponto central e ponto de ao vivo) em verde #16a34a com branco. Fontes em `apps/desktop/brand/`: verde, branco no preto, preto no branco, verde no escuro e só o símbolo. Ícones do Tauri regenerados por `tauri icon`. Falta ver o ícone instalado no Windows (atalho, barra de tarefas e bandeja).
 
 F09-07 ficou `WAITING_VALIDATION` na branch `task/F09-07-google`, sobre a F09-06: login Google pelo navegador do sistema, chaves só no servidor. Falta um cliente OAuth real e o clique no instalador. Com isso as sete tarefas F09 têm código; nenhuma está `DONE`.
 
