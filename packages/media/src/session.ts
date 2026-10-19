@@ -54,6 +54,7 @@ export function participantLabel(name: string, local: boolean): string {
 export interface RoomPerson {
   identity: string;
   label: string;
+  local: boolean;
 }
 
 export interface TrackTile {
@@ -224,6 +225,7 @@ export class LiveKitPocSession {
         .map((person) => ({
           identity: person.identity,
           label: participantLabel(person.name || person.identity, person === local),
+          local: person === local,
         })),
       diagnostics: [...this.diagnostics],
       devices: [...this.devices],

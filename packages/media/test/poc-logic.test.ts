@@ -34,6 +34,7 @@ test("a muted remote camera is not left as a live frame", () => {
   session.upsertTile({
     id: "cam",
     identity: "win-b",
+    label: "B",
     source: "camera",
     media: "video",
     local: false,
@@ -56,6 +57,7 @@ test("a screen keeps its source until a different one is published", () => {
   const tile = {
     id: "screen",
     identity: "win-a",
+    label: "A",
     source: "screen" as const,
     media: "video" as const,
     local: true,

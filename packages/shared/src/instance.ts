@@ -32,6 +32,12 @@ export interface RoomSummary {
   ended: boolean;
 }
 
+export interface ServerSummary {
+  id: string;
+  name: string;
+  role: "owner" | "moderator" | "participant";
+}
+
 export interface PreparedRequest {
   url: string;
   method: "GET" | "POST";
@@ -80,6 +86,31 @@ export function parseRoomList(value: unknown): RoomSummary[] {
   return value.map(parseRoom);
 }
 
+export function parseServerList(value: unknown): ServerSummary[] {
+  if (!Array.isArray(value)) {
+    throw new PocInputError("invalid_instance", "Server list is not an array");
+  }
+  return value.map(parseServer);
+}
+
+export function parseServer(value: unknown): ServerSummary {
+  const record = objectRecord(value, "invalid_instance", "Server is not an object");
+  const id = text(record.id);
+  const name = text(record.name);
+  const role = record.role;
+  if (
+    id === undefined ||
+    !UUID.test(id) ||
+    name === undefined ||
+    name.length > 80 ||
+    hasControlCharacter(name) ||
+    (role !== "owner" && role !== "moderator" && role !== "participant")
+  ) {
+    throw new PocInputError("invalid_instance", "Server is incomplete");
+  }
+  return { id, name, role };
+}
+
 export function parseRoomJoin(value: unknown): PocJoinResponse {
   return parseJoinResponse(value);
 }
@@ -125,12 +156,15 @@ function instancePath(path: string): string {
     path === "/api/v1/auth/bootstrap" ||
     path === "/api/v1/auth/refresh" ||
     path === "/api/v1/auth/logout" ||
-    path === "/api/v1/rooms"
+    path === "/api/v1/rooms" ||
+    path === "/api/v1/servers"
   ) {
     return path;
   }
   const join = /^\/api\/v1\/rooms\/([0-9a-f-]{36})\/join$/i.exec(path);
   if (join?.[1] !== undefined && UUID.test(join[1])) return path;
+  const serverRooms = /^\/api\/v1\/servers\/([0-9a-f-]{36})\/rooms$/i.exec(path);
+  if (serverRooms?.[1] !== undefined && UUID.test(serverRooms[1])) return path;
   throw new PocInputError("invalid_api_base", "Request path is not part of the instance API");
 }
 

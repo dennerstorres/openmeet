@@ -3,6 +3,9 @@ import test from "node:test";
 import { MeetingModel, MemorySessionVault, type InstanceApi, type MeetingMedia } from "../src/index.js";
 
 const roomId = "11111111-1111-4111-8111-111111111111";
+const otherRoomId = "33333333-3333-4333-8333-333333333333";
+const serverId = "44444444-4444-4444-8444-444444444444";
+const otherServerId = "55555555-5555-4555-8555-555555555555";
 const userId = "22222222-2222-4222-8222-222222222222";
 const accessToken = "access-token-value";
 const refreshToken = "refresh-token-value";
@@ -33,8 +36,22 @@ function apiFor(role: string): { api: InstanceApi; calls: string[]; bodies: unkn
       if (path === "/api/v1/auth/login" || path === "/api/v1/auth/refresh") {
         return { status: 200, body: session(role, path === "/api/v1/auth/refresh" ? nextRefresh : refreshToken) };
       }
-      if (path === "/api/v1/rooms" && method === "GET") return { status: 200, body: [room()] };
-      if (path === "/api/v1/rooms" && method === "POST") return { status: 201, body: room() };
+      const serverRole = role === "admin" ? "owner" : "participant";
+      if (path === "/api/v1/servers" && method === "GET") {
+        return {
+          status: 200,
+          body: [
+            { id: serverId, name: "Trabalho", role: serverRole },
+            { id: otherServerId, name: "Família", role: "participant" },
+          ],
+        };
+      }
+      if (path === "/api/v1/servers" && method === "POST") return { status: 201, body: { id: otherServerId, name: "Família", role: "owner" } };
+      if (path === `/api/v1/servers/${serverId}/rooms` && method === "GET") return { status: 200, body: [room()] };
+      if (path === `/api/v1/servers/${otherServerId}/rooms` && method === "GET") {
+        return { status: 200, body: [{ id: otherRoomId, name: "Mesa", slug: "geral", kind: "persistent", ended: false }] };
+      }
+      if (path === `/api/v1/servers/${serverId}/rooms` && method === "POST") return { status: 201, body: room() };
       if (path.endsWith("/join")) return { status: 200, body: { url: "wss://sfu.example", token: joinToken } };
       if (path === "/api/v1/auth/logout") return { status: 204, body: null };
       return { status: 404, body: { error: "room_not_found" } };
@@ -103,7 +120,7 @@ test("a saved session is refreshed only on its own instance", async () => {
   await model.createRoom("Outra", "outra", "temporary");
   assert.equal(model.snapshot().error, "forbidden");
   assert.equal(
-    calls.some((call) => call === "POST https://meet.example/api/v1/rooms"),
+    calls.some((call) => call.startsWith("POST https://meet.example/api/v1/servers")),
     false,
   );
 });
@@ -152,7 +169,7 @@ test("an expired session returns to login", async () => {
   const wrapped = api.request.bind(api);
   let expired = false;
   api.request = (origin, method, path, body, accessToken) => {
-    if (expired && path === "/api/v1/rooms" && method === "GET") return Promise.resolve({ status: 401, body: { error: "unauthorized" } });
+    if (expired && path === "/api/v1/servers" && method === "GET") return Promise.resolve({ status: 401, body: { error: "unauthorized" } });
     return wrapped(origin, method, path, body, accessToken);
   };
   const vault = new MemorySessionVault();
@@ -188,4 +205,56 @@ test("media failure stays on the room list", async () => {
   assert.equal(model.snapshot().step, "rooms");
   assert.equal(model.snapshot().error, "connect_failed");
   assert.equal(JSON.stringify(model.snapshot()).includes("ice failed"), false);
+});
+
+test("browsing another server keeps the call and its room", async () => {
+  const { api, calls } = apiFor("admin");
+  const media = mediaFor();
+  const model = new MeetingModel(api, media);
+  await model.confirmInstance("https://meet.example");
+  await model.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  assert.equal(model.snapshot().selectedServerId, serverId);
+  assert.equal(model.snapshot().canCreate, true);
+  assert.equal(model.snapshot().canCreateServer, true);
+  await model.enterRoom(roomId, "");
+  await model.selectServer(otherServerId);
+  const browsing = model.snapshot();
+  assert.equal(browsing.step, "meeting");
+  assert.equal(browsing.selectedServerId, otherServerId);
+  assert.equal(browsing.rooms[0]?.id, otherRoomId);
+  assert.equal(browsing.activeRoomId, roomId);
+  assert.equal(browsing.activeRoomName, "Sala");
+  assert.equal(browsing.activeServerId, serverId);
+  assert.equal(browsing.canCreate, false);
+  assert.equal(media.disconnects, 1);
+  await model.createRoom("Outra", "outra", "temporary");
+  assert.equal(model.snapshot().error, "forbidden");
+  await model.selectServer(serverId);
+  await model.createRoom("Outra", "outra", "temporary");
+  assert.equal(calls.includes(`POST https://meet.example/api/v1/servers/${serverId}/rooms`), true);
+  assert.equal(model.snapshot().step, "meeting");
+  await model.selectServer("66666666-6666-4666-8666-666666666666");
+  assert.equal(model.snapshot().selectedServerId, serverId);
+});
+
+test("only the instance admin creates a server and the new one is selected", async () => {
+  const participant = apiFor("participant");
+  const denied = new MeetingModel(participant.api, mediaFor());
+  await denied.confirmInstance("https://meet.example");
+  await denied.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  assert.equal(denied.snapshot().canCreateServer, false);
+  await denied.createServer("RPG");
+  assert.equal(denied.snapshot().error, "forbidden");
+  assert.equal(participant.calls.includes("POST https://meet.example/api/v1/servers"), false);
+
+  const { api, calls } = apiFor("admin");
+  const model = new MeetingModel(api, mediaFor());
+  await model.confirmInstance("https://meet.example");
+  await model.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  await model.createServer("  ");
+  assert.equal(model.snapshot().error, "invalid_body");
+  await model.createServer("Família");
+  assert.equal(calls.includes("POST https://meet.example/api/v1/servers"), true);
+  assert.equal(model.snapshot().selectedServerId, otherServerId);
+  assert.equal(model.snapshot().rooms[0]?.id, otherRoomId);
 });

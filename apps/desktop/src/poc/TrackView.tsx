@@ -23,7 +23,14 @@ export function TrackView({ tile, playback }: { tile: TrackTile; playback?: Play
     applyPlayback(element, playback);
   }, [tile, playback]);
 
-  const source = tile.source === "screen" ? screenSourceLabel(tile.surface ?? null) : tile.source === "microphone" ? "microfone" : tile.source === "camera" ? "câmera" : "mídia";
+  const source =
+    tile.source === "screen"
+      ? screenSourceLabel(tile.surface ?? null)
+      : tile.source === "microphone"
+        ? "microfone"
+        : tile.source === "camera"
+          ? "câmera"
+          : "mídia";
   const label = `${tile.label} · ${source}`;
   if (!shouldAttachPlayback(tile)) {
     return (

@@ -6,9 +6,12 @@ import {
   parseInstanceCard,
   parseRoomJoin,
   parseRoomList,
+  parseServer,
+  parseServerList,
   readErrorCode,
   type AccountSession,
   type RoomSummary,
+  type ServerSummary,
 } from "./instance.js";
 
 export interface ApiResult {
@@ -46,9 +49,17 @@ export interface ShellSnapshot {
   bootstrapOpen: boolean;
   userLabel: string | null;
   role: string | null;
+  /** The instance admin creates servers. */
+  canCreateServer: boolean;
+  /** Owner and moderator of the selected server create rooms in it. */
   canCreate: boolean;
+  servers: readonly ServerSummary[];
+  selectedServerId: string | null;
+  /** Rooms of the selected server. The call may belong to another server. */
   rooms: readonly RoomSummary[];
   activeRoomId: string | null;
+  activeRoomName: string | null;
+  activeServerId: string | null;
   error: string | null;
   pending: boolean;
 }
@@ -84,8 +95,10 @@ export class MeetingModel {
   private refreshToken: string | null = null;
   private userLabel: string | null = null;
   private role: string | null = null;
+  private servers: ServerSummary[] = [];
+  private selectedServerId: string | null = null;
   private rooms: RoomSummary[] = [];
-  private activeRoomId: string | null = null;
+  private activeRoom: { id: string; name: string; serverId: string } | null = null;
   private error: string | null = null;
   private pending = false;
   private readonly listeners = new Set<(snapshot: ShellSnapshot) => void>();
@@ -98,6 +111,7 @@ export class MeetingModel {
 
   snapshot(): ShellSnapshot {
     const role = this.role;
+    const selected = this.servers.find((server) => server.id === this.selectedServerId);
     return {
       step: this.step,
       origin: this.origin,
@@ -105,9 +119,14 @@ export class MeetingModel {
       bootstrapOpen: this.bootstrapOpen,
       userLabel: this.userLabel,
       role,
-      canCreate: role === "admin" || role === "moderator",
+      canCreateServer: role === "admin",
+      canCreate: selected !== undefined && (selected.role === "owner" || selected.role === "moderator"),
+      servers: this.servers.map((server) => ({ ...server })),
+      selectedServerId: this.selectedServerId,
       rooms: this.rooms.map((room) => ({ ...room })),
-      activeRoomId: this.activeRoomId,
+      activeRoomId: this.activeRoom?.id ?? null,
+      activeRoomName: this.activeRoom?.name ?? null,
+      activeServerId: this.activeRoom?.serverId ?? null,
       error: this.error,
       pending: this.pending,
     };
@@ -169,7 +188,8 @@ export class MeetingModel {
         await this.dropExpiredSession(generation);
         return;
       }
-      if (this.role !== "admin" && this.role !== "moderator") {
+      const server = this.servers.find((item) => item.id === this.selectedServerId);
+      if (server === undefined || (server.role !== "owner" && server.role !== "moderator")) {
         this.error = "forbidden";
         return;
       }
@@ -177,7 +197,7 @@ export class MeetingModel {
         this.error = "invalid_body";
         return;
       }
-      const result = await this.api.request(origin, "POST", "/api/v1/rooms", { name, slug, kind }, accessToken);
+      const result = await this.api.request(origin, "POST", `/api/v1/servers/${server.id}/rooms`, { name, slug, kind }, accessToken);
       if (generation !== this.generation) return;
       if (result.status !== 201) {
         if (await this.dropIfUnauthorized(generation, result.body)) return;
@@ -188,12 +208,57 @@ export class MeetingModel {
     });
   }
 
+  async createServer(name: string): Promise<void> {
+    await this.run(async (generation) => {
+      const origin = this.pinned();
+      const accessToken = this.accessToken;
+      if (origin === null || accessToken === null) {
+        await this.dropExpiredSession(generation);
+        return;
+      }
+      if (this.role !== "admin") {
+        this.error = "forbidden";
+        return;
+      }
+      const trimmed = name.trim();
+      if (trimmed.length < 1 || trimmed.length > 80 || hasControlCharacter(trimmed)) {
+        this.error = "invalid_body";
+        return;
+      }
+      const result = await this.api.request(origin, "POST", "/api/v1/servers", { name: trimmed }, accessToken);
+      if (generation !== this.generation) return;
+      if (result.status !== 201) {
+        if (await this.dropIfUnauthorized(generation, result.body)) return;
+        this.error = readErrorCode(result.body);
+        return;
+      }
+      this.selectedServerId = parseServer(result.body).id;
+      await this.loadServers(generation);
+    });
+  }
+
+  /** Shows the rooms of another server. The call, if any, keeps running. */
+  async selectServer(serverId: string): Promise<void> {
+    if (!this.servers.some((server) => server.id === serverId)) return;
+    await this.run(async (generation) => {
+      this.selectedServerId = serverId;
+      this.rooms = [];
+      await this.loadRooms(generation);
+    });
+  }
+
   async enterRoom(roomId: string, code: string): Promise<void> {
     await this.run(async (generation) => {
       const origin = this.pinned();
       const accessToken = this.accessToken;
       if (origin === null || accessToken === null) {
         await this.dropExpiredSession(generation);
+        return;
+      }
+      const room = this.rooms.find((item) => item.id === roomId);
+      const serverId = this.selectedServerId;
+      if (room === undefined || serverId === null) {
+        this.error = "room_not_found";
         return;
       }
       const invite = code.trim();
@@ -222,7 +287,7 @@ export class MeetingModel {
         await this.media.disconnect();
         return;
       }
-      this.activeRoomId = roomId;
+      this.activeRoom = { id: room.id, name: room.name, serverId };
       this.step = "meeting";
     });
   }
@@ -230,7 +295,7 @@ export class MeetingModel {
   leaveRoom(): void {
     this.generation += 1;
     this.pending = false;
-    this.activeRoomId = null;
+    this.activeRoom = null;
     this.error = null;
     if (this.accessToken !== null) this.step = "rooms";
     this.publish();
@@ -239,7 +304,7 @@ export class MeetingModel {
 
   async reloadRooms(): Promise<void> {
     await this.run(async (generation) => {
-      await this.loadRooms(generation);
+      await this.loadServers(generation);
     });
   }
 
@@ -286,14 +351,38 @@ export class MeetingModel {
     this.role = session.user.role;
     this.step = "rooms";
     await this.vault.save(origin, session.refreshToken);
+    await this.loadServers(generation);
+  }
+
+  private async loadServers(generation: number): Promise<void> {
+    const origin = this.origin;
+    const accessToken = this.accessToken;
+    if (origin === null || accessToken === null) return;
+    const result = await this.api.request(origin, "GET", "/api/v1/servers", null, accessToken);
+    if (generation !== this.generation) return;
+    if (result.status !== 200) {
+      if (await this.dropIfUnauthorized(generation, result.body)) return;
+      this.error = readErrorCode(result.body);
+      return;
+    }
+    this.servers = parseServerList(result.body);
+    if (!this.servers.some((server) => server.id === this.selectedServerId)) {
+      this.selectedServerId = this.activeRoom?.serverId ?? this.servers[0]?.id ?? null;
+    }
+    if (this.selectedServerId === null) {
+      this.rooms = [];
+      if (this.step !== "meeting") this.step = "rooms";
+      return;
+    }
     await this.loadRooms(generation);
   }
 
   private async loadRooms(generation: number): Promise<void> {
     const origin = this.origin;
     const accessToken = this.accessToken;
-    if (origin === null || accessToken === null) return;
-    const result = await this.api.request(origin, "GET", "/api/v1/rooms", null, accessToken);
+    const serverId = this.selectedServerId;
+    if (origin === null || accessToken === null || serverId === null) return;
+    const result = await this.api.request(origin, "GET", `/api/v1/servers/${serverId}/rooms`, null, accessToken);
     if (generation !== this.generation) return;
     if (result.status !== 200) {
       if (await this.dropIfUnauthorized(generation, result.body)) return;
@@ -301,8 +390,7 @@ export class MeetingModel {
       return;
     }
     this.rooms = parseRoomList(result.body);
-    this.activeRoomId = null;
-    this.step = "rooms";
+    if (this.step !== "meeting") this.step = "rooms";
   }
 
   private async dropIfUnauthorized(generation: number, body: unknown): Promise<boolean> {
@@ -326,8 +414,10 @@ export class MeetingModel {
     this.refreshToken = null;
     this.userLabel = null;
     this.role = null;
+    this.servers = [];
+    this.selectedServerId = null;
     this.rooms = [];
-    this.activeRoomId = null;
+    this.activeRoom = null;
     if (origin === null || refreshToken === null) return;
     await this.vault.clear(origin);
     try {

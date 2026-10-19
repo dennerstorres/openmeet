@@ -166,7 +166,14 @@ export function PocApp() {
       <section>
         <h2>Controles</h2>
         {snapshot.audioPlayback ? null : (
-          <button type="button" onClick={() => void session().startRemoteAudio().catch((caught: unknown) => setError(mediaActionError("audio", caught)))}>
+          <button
+            type="button"
+            onClick={() =>
+              void session()
+                .startRemoteAudio()
+                .catch((caught: unknown) => setError(mediaActionError("audio", caught)))
+            }
+          >
             Ativar som
           </button>
         )}

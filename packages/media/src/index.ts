@@ -2,9 +2,20 @@ export { describeMediaError, mediaActionError, redactText, sanitizeDiagnostic } 
 export { buildDiagnosticExport, dropOpenReconnect, EMPTY_RECONNECT, pushReconnect, reconnectLabel, summarizeReconnect } from "./report.js";
 export type { DiagnosticExportInput, ReconnectMark, ReconnectSummary } from "./report.js";
 export { applyPlayback, clampVolume, DEFAULT_PLAYBACK, nextPlayback, publicationControlsEnabled } from "./playback.js";
-export { arrangeTiles, localScreenSurface, screenCaption, screenShareAction, screenSourceLabel } from "./layout.js";
+export {
+  arrangeTiles,
+  buildCards,
+  cardInitial,
+  featuredCard,
+  keepPin,
+  localScreenSurface,
+  placeCards,
+  screenCaption,
+  screenShareAction,
+  screenSourceLabel,
+} from "./layout.js";
 export { formatElapsed, meetingElapsedMs } from "./watch.js";
-export type { LayoutTile, TilePlacement } from "./layout.js";
+export type { CardLayout, CardPerson, CardPlacement, CardTile, LayoutTile, MeetingCard, TilePlacement } from "./layout.js";
 export type { PlaybackLevel } from "./playback.js";
 export { LiveKitPocSession, participantLabel, shouldAttachPlayback, shouldShowLiveVideo } from "./session.js";
 export { emptyStats, summarizeRtcStats } from "./stats.js";

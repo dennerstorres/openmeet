@@ -1,30 +1,33 @@
 import {
-  arrangeTiles,
+  buildCards,
+  cardInitial,
   DEFAULT_PLAYBACK,
   describeMediaError,
   emptyStats,
   formatElapsed,
+  keepPin,
   LiveKitPocSession,
   localScreenSurface,
   mediaActionError,
   EMPTY_RECONNECT,
   meetingElapsedMs,
   nextPlayback,
+  placeCards,
   reconnectLabel,
   publicationControlsEnabled,
   screenCaption,
   screenShareAction,
+  type CardLayout,
   type DeviceKind,
   type DeviceOption,
   type PlaybackLevel,
   type PocSnapshot,
-  type TrackTile,
 } from "@openmeet/media";
 import { MeetingModel, type ShellSnapshot } from "@openmeet/shared";
 import desktopPackage from "../../package.json";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { TrackView } from "../poc/TrackView";
 import { holdMeetingLock } from "../shell/background";
+import { CardStage } from "./Cards";
 import { ShellConsent } from "../shell/ShellConsent";
 import { createDesktopVault, isTauri, listenShell, setShortcutConsent, shellStatus, shellTracks, showWindow, type ShellStatus } from "../shell/native";
 import { createFetchApi, createLiveKitMedia } from "./api";
@@ -53,7 +56,8 @@ const ERROR_TEXT: Record<string, string> = {
   bootstrap_closed: "O primeiro acesso já foi feito.",
   bootstrap_rejected: "O token de instalação não confere.",
   unauthorized: "A sessão expirou.",
-  forbidden: "Sem permissão para esta sala.",
+  forbidden: "Sem permissão para isso.",
+  server_not_found: "O servidor não está disponível.",
   invalid_invite: "O convite não vale.",
   room_ended: "A sala está encerrada.",
   room_not_found: "A sala não está disponível.",
@@ -91,7 +95,11 @@ export function MeetingApp() {
   const [roomName, setRoomName] = useState("");
   const [roomSlug, setRoomSlug] = useState("");
   const [roomKind, setRoomKind] = useState("persistent");
-  const [inviteCode, setInviteCode] = useState("");
+  const [serverName, setServerName] = useState("");
+  const [creating, setCreating] = useState<"server" | "room" | null>(null);
+  const [layout, setLayout] = useState<CardLayout>("spotlight");
+  const [pinnedId, setPinnedId] = useState<string | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
   const [levels, setLevels] = useState<Record<string, PlaybackLevel>>({});
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [controlPending, setControlPending] = useState(false);
@@ -212,11 +220,36 @@ export function MeetingApp() {
   }, [state.origin]);
 
   const notice = errorText(state.error);
-  const active = state.rooms.find((room) => room.id === state.activeRoomId);
+  const inCall = state.step === "meeting";
   const controlsEnabled = publicationControlsEnabled(media.phase);
-  const elapsedMs = meetingElapsedMs(connectedAt, now, state.step === "meeting" ? media.phase : "idle");
+  const elapsedMs = meetingElapsedMs(connectedAt, now, inCall ? media.phase : "idle");
   const elapsedLabel = elapsedMs === null ? null : formatElapsed(elapsedMs);
   const reconnectText = reconnectLabel(media.reconnect);
+  const cards = inCall ? buildCards(media.participants, media.tiles) : [];
+  const pin = keepPin(cards, pinnedId);
+  const placement = placeCards(cards, layout, pin);
+  const selectedServer = state.servers.find((server) => server.id === state.selectedServerId);
+  const browsingAway = inCall && state.activeServerId !== null && state.activeServerId !== state.selectedServerId;
+  const caption = screenCaption(localScreenSurface(media.tiles), media.screen);
+  const isFullscreen = inCall && fullscreen && layout === "spotlight";
+
+  useEffect(() => {
+    if (pinnedId !== null && pin === null) setPinnedId(null);
+  }, [pinnedId, pin]);
+  useEffect(() => {
+    if (!inCall) {
+      setFullscreen(false);
+      setPinnedId(null);
+    }
+  }, [inCall]);
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFullscreen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isFullscreen]);
 
   function exportDiagnostic(): void {
     const body = session().exportDiagnostic(exportConsent, new Date().toISOString());
@@ -263,124 +296,271 @@ export function MeetingApp() {
     }
   }
 
-  return (
-    <main className="app-shell">
-      <aside className="rail">
-        <div className="brand-block">
-          <span className="mark">OM</span>
-          <div>
-            <strong>OpenMeet</strong>
-            <p>{state.instanceName ?? "Sem instância"}</p>
+  const consent =
+    isTauri() && state.step !== "instance" ? (
+      <ShellConsent
+        status={shell}
+        pending={shellPending}
+        onConsent={(consent) => {
+          setShellPending(true);
+          void setShortcutConsent(consent)
+            .then(setShell)
+            .catch(() => {
+              setMediaError("Não foi possível gravar a preferência de atalhos.");
+            })
+            .finally(() => {
+              setShellPending(false);
+            });
+        }}
+      />
+    ) : null;
+
+  if (state.step === "instance" || state.step === "account") {
+    return (
+      <main className="app-shell">
+        <aside className="rail">
+          <div className="brand-block">
+            <span className="mark">OM</span>
+            <div>
+              <strong>OpenMeet</strong>
+              <p>{state.instanceName ?? "Sem instância"}</p>
+            </div>
           </div>
-        </div>
-        {state.userLabel ? <p className="you">{state.userLabel}</p> : null}
-        {state.origin ? <p className="origin">{state.origin}</p> : null}
-      </aside>
-      <section className="workspace">
-        {notice ? <p className="error">{notice}</p> : null}
-        {mediaError ? <p className="error">{mediaError}</p> : null}
-        {isTauri() && state.step !== "instance" ? (
-          <ShellConsent
-            status={shell}
-            pending={shellPending}
-            onConsent={(consent) => {
-              setShellPending(true);
-              void setShortcutConsent(consent)
-                .then(setShell)
-                .catch(() => {
-                  setMediaError("Não foi possível gravar a preferência de atalhos.");
-                })
-                .finally(() => {
-                  setShellPending(false);
+          {state.origin ? <p className="origin">{state.origin}</p> : null}
+        </aside>
+        <section className="workspace">
+          {notice ? <p className="error">{notice}</p> : null}
+          {consent}
+          {state.step === "instance" ? (
+            <InstanceStep address={address} pending={state.pending} onAddress={setAddress} onConfirm={() => void model.confirmInstance(address)} />
+          ) : (
+            <AccountStep
+              bootstrapOpen={state.bootstrapOpen}
+              pending={state.pending}
+              username={username}
+              password={password}
+              displayName={displayName}
+              setupToken={setupToken}
+              onUsername={setUsername}
+              onPassword={setPassword}
+              onDisplayName={setDisplayName}
+              onSetupToken={setSetupToken}
+              onSubmit={(mode) => {
+                void model.submitAccount({ mode, username, password, displayName, token: setupToken }).then(() => {
+                  setPassword("");
+                  setSetupToken("");
                 });
-            }}
-          />
+              }}
+              onChange={() => void model.changeInstance()}
+            />
+          )}
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <main className={`server-shell${isFullscreen ? " is-fullscreen" : ""}`}>
+      <nav className="server-bar" aria-label="Servidores">
+        {state.servers.map((server) => (
+          <button
+            key={server.id}
+            type="button"
+            className={`server-pill${server.id === state.selectedServerId ? " selected" : ""}${server.id === state.activeServerId ? " live" : ""}`}
+            title={server.name}
+            aria-label={server.name}
+            aria-current={server.id === state.selectedServerId ? "true" : undefined}
+            onClick={() => void model.selectServer(server.id)}
+          >
+            {cardInitial(server.name)}
+          </button>
+        ))}
+        {state.canCreateServer ? (
+          <button
+            type="button"
+            className="server-pill add"
+            title="Criar servidor"
+            aria-label="Criar servidor"
+            onClick={() => setCreating(creating === "server" ? null : "server")}
+          >
+            +
+          </button>
         ) : null}
-        {state.step === "instance" ? (
-          <InstanceStep address={address} pending={state.pending} onAddress={setAddress} onConfirm={() => void model.confirmInstance(address)} />
-        ) : null}
-        {state.step === "account" ? (
-          <AccountStep
-            bootstrapOpen={state.bootstrapOpen}
-            pending={state.pending}
-            username={username}
-            password={password}
-            displayName={displayName}
-            setupToken={setupToken}
-            onUsername={setUsername}
-            onPassword={setPassword}
-            onDisplayName={setDisplayName}
-            onSetupToken={setSetupToken}
-            onSubmit={(mode) => {
-              void model.submitAccount({ mode, username, password, displayName, token: setupToken }).then(() => {
-                setPassword("");
-                setSetupToken("");
+      </nav>
+
+      <aside className="room-bar">
+        <header className="room-bar-head">
+          <strong>{selectedServer?.name ?? state.instanceName ?? "OpenMeet"}</strong>
+          {selectedServer ? <span>{roleLabel(selectedServer.role)}</span> : null}
+        </header>
+        {creating === "server" ? (
+          <form
+            className="inline-form"
+            onSubmit={(event: FormEvent) => {
+              event.preventDefault();
+              void model.createServer(serverName).then(() => {
+                setServerName("");
+                setCreating(null);
               });
             }}
-            onChange={() => void model.changeInstance()}
-          />
+          >
+            <label>
+              Nome do servidor
+              <input value={serverName} onChange={(event) => setServerName(event.currentTarget.value)} maxLength={80} autoFocus />
+            </label>
+            <button type="submit" disabled={state.pending}>
+              Criar servidor
+            </button>
+          </form>
         ) : null}
-        {state.step === "rooms" ? (
-          <RoomsStep
-            state={state}
-            roomName={roomName}
-            roomSlug={roomSlug}
-            roomKind={roomKind}
-            inviteCode={inviteCode}
-            onRoomName={setRoomName}
-            onRoomSlug={setRoomSlug}
-            onRoomKind={setRoomKind}
-            onInviteCode={setInviteCode}
-            onCreate={() => void model.createRoom(roomName, roomSlug, roomKind)}
-            onEnter={(roomId) => void model.enterRoom(roomId, inviteCode)}
-            onReload={() => void model.reloadRooms()}
-            onSignOut={() => void model.signOut()}
-            onChange={() => void model.changeInstance()}
-          />
+        {state.servers.length === 0 ? (
+          <p className="hint">
+            {state.canCreateServer ? "Crie o primeiro servidor no botão + à esquerda." : "Você ainda não participa de nenhum servidor. Peça um convite."}
+          </p>
         ) : null}
-        {state.step === "meeting" ? (
-          <section className="meeting">
-            <header className="call-bar">
-              <h2>{active?.name ?? "Reunião"}</h2>
+        <ul className="room-list">
+          {state.rooms.map((room) => (
+            <li key={room.id}>
+              <button
+                type="button"
+                className={`room-item${room.id === state.activeRoomId ? " active" : ""}`}
+                disabled={state.pending || room.ended || room.id === state.activeRoomId}
+                onClick={() => void model.enterRoom(room.id, "")}
+              >
+                <span aria-hidden="true">🔊</span>
+                <span className="room-name">{room.name}</span>
+                {room.ended ? <span className="badge">encerrada</span> : room.kind === "temporary" ? <span className="badge">temporária</span> : null}
+              </button>
+            </li>
+          ))}
+        </ul>
+        {selectedServer && state.rooms.length === 0 ? <p className="hint">Nenhuma sala neste servidor.</p> : null}
+        {state.canCreate ? (
+          creating === "room" ? (
+            <form
+              className="inline-form"
+              onSubmit={(event: FormEvent) => {
+                event.preventDefault();
+                void model.createRoom(roomName, roomSlug, roomKind).then(() => {
+                  setRoomName("");
+                  setRoomSlug("");
+                  setCreating(null);
+                });
+              }}
+            >
+              <label>
+                Nome
+                <input value={roomName} onChange={(event) => setRoomName(event.currentTarget.value)} maxLength={80} autoFocus />
+              </label>
+              <label>
+                Identificador
+                <input value={roomSlug} onChange={(event) => setRoomSlug(event.currentTarget.value)} spellCheck={false} maxLength={64} />
+              </label>
+              <label>
+                Tipo
+                <select value={roomKind} onChange={(event) => setRoomKind(event.currentTarget.value)}>
+                  <option value="persistent">Persistente</option>
+                  <option value="temporary">Temporária</option>
+                </select>
+              </label>
+              <div className="row">
+                <button type="submit" disabled={state.pending}>
+                  Criar sala
+                </button>
+                <button type="button" className="ghost" onClick={() => setCreating(null)}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          ) : (
+            <button type="button" className="ghost add-room" onClick={() => setCreating("room")}>
+              + Nova sala
+            </button>
+          )
+        ) : null}
+        <footer className="account">
+          <div className="you-row">
+            <span className="avatar small" aria-hidden="true">
+              <span>{cardInitial(state.userLabel ?? "?")}</span>
+            </span>
+            <div>
+              <strong>{state.userLabel}</strong>
+              <p className="origin">{state.origin}</p>
+            </div>
+          </div>
+          <div className="row">
+            <button type="button" className="ghost" onClick={() => void model.reloadRooms()} disabled={state.pending}>
+              Atualizar
+            </button>
+            <button type="button" className="ghost" onClick={() => void model.signOut()} disabled={state.pending}>
+              Sair da conta
+            </button>
+            <button type="button" className="ghost" onClick={() => void model.changeInstance()}>
+              Trocar instância
+            </button>
+          </div>
+        </footer>
+      </aside>
+
+      <section className="call-area">
+        {notice ? <p className="error">{notice}</p> : null}
+        {mediaError ? <p className="error">{mediaError}</p> : null}
+        {consent}
+        {inCall ? (
+          <>
+            <header className="call-strip">
+              <button
+                type="button"
+                className={`call-room${browsingAway ? " away" : ""}`}
+                disabled={!browsingAway}
+                onClick={() => state.activeServerId !== null && void model.selectServer(state.activeServerId)}
+                title={browsingAway ? "Voltar ao servidor desta chamada" : undefined}
+              >
+                <span className="live-dot" aria-hidden="true" />
+                {state.activeRoomName ?? "Reunião"}
+                {browsingAway ? <span className="hint"> · voltar ao servidor</span> : null}
+              </button>
               <p>
                 {media.participants.length} na sala
                 {elapsedLabel ? ` · ${elapsedLabel}` : ""}
                 {reconnectText ? ` · ${reconnectText}` : ""}
                 {media.disconnectReason ? ` · ${media.disconnectReason}` : ""}
               </p>
+              <div className="segmented" role="group" aria-label="Layout">
+                <button type="button" aria-pressed={layout === "spotlight"} onClick={() => setLayout("spotlight")}>
+                  Destaque
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={layout === "grid"}
+                  onClick={() => {
+                    setLayout("grid");
+                    setFullscreen(false);
+                  }}
+                >
+                  Grade
+                </button>
+              </div>
+              {layout === "spotlight" ? (
+                <button type="button" className="ghost" onClick={() => setFullscreen(true)} disabled={placement.featuredId === null}>
+                  Tela cheia
+                </button>
+              ) : null}
             </header>
-            <ul className="people">
-              {media.participants.map((person) => (
-                <li key={person.identity}>{person.label}</li>
-              ))}
-            </ul>
-            <MeetingStage tiles={media.tiles} sharing={media.screen} levelFor={levelFor} onChange={changeLevel} />
-            <p className="metrics">
-              {media.stats.userAgent ?? "user agent indisponível"} · app {media.stats.appVersion ?? "—"}
-            </p>
-            {media.stats.available ? (
-              <p className="metrics">
-                perda {media.stats.packetsLost ?? "—"} · jitter {media.stats.jitterMs ?? "—"} ms · RTT {media.stats.rttMs ?? "—"} ms · candidato{" "}
-                {media.stats.candidateType ?? "—"} · saída {media.stats.outboundWidth ?? "—"}x{media.stats.outboundHeight ?? "—"} @{" "}
-                {media.stats.outboundFps ?? "—"} fps · superfície {media.stats.displaySurface ?? "—"}
-              </p>
-            ) : (
-              <p className="metrics">Métricas ainda não disponíveis.</p>
-            )}
-            <label className="export">
-              <input
-                type="checkbox"
-                checked={exportConsent}
-                onChange={(event) => {
-                  setExportConsent(event.currentTarget.checked);
-                }}
-              />
-              Autorizar exportação do diagnóstico
-            </label>
-            <button type="button" disabled={!exportConsent} onClick={() => exportDiagnostic()}>
-              Exportar diagnóstico
-            </button>
-            <div className="dock">
+            {caption ? <p className="sharing">{caption}. Para trocar a origem, pare e escolha de novo.</p> : null}
+            <CardStage
+              cards={cards}
+              tiles={media.tiles}
+              layout={layout}
+              featuredId={placement.featuredId}
+              others={placement.others}
+              pinnedId={pin}
+              fullscreen={isFullscreen}
+              levelFor={levelFor}
+              onLevel={changeLevel}
+              onPin={setPinnedId}
+            />
+            <div className={`dock${isFullscreen ? " thin" : ""}`}>
               {media.audioPlayback ? null : (
                 <button
                   type="button"
@@ -419,12 +599,48 @@ export function MeetingApp() {
               >
                 {media.screen ? "Parar compartilhamento" : "Compartilhar tela"}
               </button>
-              <DeviceSelect label="Entrada" kind="audioinput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
-              <DeviceSelect label="Saída" kind="audiooutput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
-              <DeviceSelect label="Câmera" kind="videoinput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
-              <button type="button" disabled={!controlsEnabled} onClick={() => void refreshDevices()}>
-                Atualizar dispositivos
-              </button>
+              {isFullscreen ? (
+                <button type="button" className="ghost" onClick={() => setFullscreen(false)}>
+                  Sair da tela cheia
+                </button>
+              ) : (
+                <details className="more">
+                  <summary>Dispositivos e diagnóstico</summary>
+                  <div className="more-body">
+                    <DeviceSelect label="Entrada" kind="audioinput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
+                    <DeviceSelect label="Saída" kind="audiooutput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
+                    <DeviceSelect label="Câmera" kind="videoinput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
+                    <button type="button" disabled={!controlsEnabled} onClick={() => void refreshDevices()}>
+                      Atualizar dispositivos
+                    </button>
+                    <p className="metrics">
+                      {media.stats.userAgent ?? "user agent indisponível"} · app {media.stats.appVersion ?? "—"}
+                    </p>
+                    {media.stats.available ? (
+                      <p className="metrics">
+                        perda {media.stats.packetsLost ?? "—"} · jitter {media.stats.jitterMs ?? "—"} ms · RTT {media.stats.rttMs ?? "—"} ms · candidato{" "}
+                        {media.stats.candidateType ?? "—"} · saída {media.stats.outboundWidth ?? "—"}x{media.stats.outboundHeight ?? "—"} @{" "}
+                        {media.stats.outboundFps ?? "—"} fps · superfície {media.stats.displaySurface ?? "—"}
+                      </p>
+                    ) : (
+                      <p className="metrics">Métricas ainda não disponíveis.</p>
+                    )}
+                    <label className="export">
+                      <input
+                        type="checkbox"
+                        checked={exportConsent}
+                        onChange={(event) => {
+                          setExportConsent(event.currentTarget.checked);
+                        }}
+                      />
+                      Autorizar exportação do diagnóstico
+                    </label>
+                    <button type="button" disabled={!exportConsent} onClick={() => exportDiagnostic()}>
+                      Exportar diagnóstico
+                    </button>
+                  </div>
+                </details>
+              )}
               <button
                 type="button"
                 className="danger"
@@ -436,84 +652,21 @@ export function MeetingApp() {
                 Sair da sala
               </button>
             </div>
-          </section>
-        ) : null}
+          </>
+        ) : (
+          <div className="idle">
+            <p>{state.rooms.length > 0 ? "Escolha uma sala à esquerda para entrar." : "Nenhuma chamada em andamento."}</p>
+          </div>
+        )}
       </section>
     </main>
   );
 }
 
-function MeetingStage({
-  tiles,
-  sharing,
-  levelFor,
-  onChange,
-}: {
-  tiles: readonly TrackTile[];
-  sharing: boolean;
-  levelFor: (id: string) => PlaybackLevel;
-  onChange: (id: string, patch: Partial<PlaybackLevel>) => void;
-}) {
-  const placed = arrangeTiles(tiles);
-  const byId = new Map(tiles.map((tile) => [tile.id, tile]));
-  const stage = placed.stageId === null ? undefined : byId.get(placed.stageId);
-  const grid = placed.gridIds.flatMap((id) => {
-    const tile = byId.get(id);
-    return tile === undefined ? [] : [tile];
-  });
-  const audio = tiles.filter((tile) => tile.media === "audio");
-  const caption = screenCaption(localScreenSurface(tiles), sharing);
-  return (
-    <>
-      {caption ? <p className="sharing">{caption}. Para trocar a origem, pare e escolha de novo.</p> : null}
-      {stage ? (
-        <div className="stage">
-          <TileFrame tile={stage} playback={levelFor(stage.id)} onChange={(patch) => onChange(stage.id, patch)} />
-        </div>
-      ) : null}
-      {grid.length > 0 ? (
-        <div className="tiles grid">
-          {grid.map((tile) => (
-            <TileFrame key={tile.id} tile={tile} playback={levelFor(tile.id)} onChange={(patch) => onChange(tile.id, patch)} />
-          ))}
-        </div>
-      ) : null}
-      {audio.length > 0 ? (
-        <div className="voices">
-          {audio.map((tile) => (
-            <TileFrame key={tile.id} tile={tile} playback={levelFor(tile.id)} onChange={(patch) => onChange(tile.id, patch)} />
-          ))}
-        </div>
-      ) : null}
-    </>
-  );
-}
-
-function TileFrame({ tile, playback, onChange }: { tile: TrackTile; playback: PlaybackLevel; onChange: (patch: Partial<PlaybackLevel>) => void }) {
-  const remoteAudio = tile.media === "audio" && !tile.local;
-  return (
-    <div className={tile.media === "video" ? "tile" : "voice"}>
-      <TrackView tile={tile} playback={remoteAudio ? playback : undefined} />
-      {remoteAudio ? (
-        <div className="controls">
-          <button type="button" onClick={() => onChange({ heard: !playback.heard })}>
-            {playback.heard ? "Silenciar neste PC" : "Voltar a ouvir"}
-          </button>
-          <label>
-            Volume neste PC
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={Math.round(playback.volume * 100)}
-              onChange={(event) => onChange({ volume: Number(event.currentTarget.value) / 100 })}
-            />
-          </label>
-        </div>
-      ) : null}
-    </div>
-  );
+function roleLabel(role: string): string {
+  if (role === "owner") return "dono";
+  if (role === "moderator") return "moderador";
+  return "participante";
 }
 
 function DeviceSelect({
@@ -638,82 +791,5 @@ function AccountStep(props: {
         Trocar instância
       </button>
     </form>
-  );
-}
-
-function RoomsStep(props: {
-  state: ShellSnapshot;
-  roomName: string;
-  roomSlug: string;
-  roomKind: string;
-  inviteCode: string;
-  onRoomName: (value: string) => void;
-  onRoomSlug: (value: string) => void;
-  onRoomKind: (value: string) => void;
-  onInviteCode: (value: string) => void;
-  onCreate: () => void;
-  onEnter: (roomId: string) => void;
-  onReload: () => void;
-  onSignOut: () => void;
-  onChange: () => void;
-}) {
-  return (
-    <section className="stack">
-      <label>
-        Código do convite
-        <input value={props.inviteCode} onChange={(event) => props.onInviteCode(event.currentTarget.value)} autoComplete="off" spellCheck={false} />
-      </label>
-      {props.state.rooms.length === 0 ? <p>Nenhuma sala.</p> : null}
-      <ul className="rooms">
-        {props.state.rooms.map((room) => (
-          <li key={room.id}>
-            <span>
-              {room.name} · {room.ended ? "encerrada" : room.kind === "temporary" ? "temporária" : "persistente"}
-            </span>
-            <button type="button" className="primary" disabled={props.state.pending || room.ended} onClick={() => props.onEnter(room.id)}>
-              Entrar
-            </button>
-          </li>
-        ))}
-      </ul>
-      {props.state.canCreate ? (
-        <form
-          className="stack"
-          onSubmit={(event: FormEvent) => {
-            event.preventDefault();
-            props.onCreate();
-          }}
-        >
-          <h2>Nova sala</h2>
-          <label>
-            Nome
-            <input value={props.roomName} onChange={(event) => props.onRoomName(event.currentTarget.value)} />
-          </label>
-          <label>
-            Identificador
-            <input value={props.roomSlug} onChange={(event) => props.onRoomSlug(event.currentTarget.value)} spellCheck={false} />
-          </label>
-          <label>
-            Tipo
-            <select value={props.roomKind} onChange={(event) => props.onRoomKind(event.currentTarget.value)}>
-              <option value="persistent">Persistente</option>
-              <option value="temporary">Temporária</option>
-            </select>
-          </label>
-          <button type="submit" disabled={props.state.pending}>
-            Criar sala
-          </button>
-        </form>
-      ) : null}
-      <button type="button" onClick={props.onReload} disabled={props.state.pending}>
-        Atualizar
-      </button>
-      <button type="button" onClick={props.onSignOut} disabled={props.state.pending}>
-        Sair da conta
-      </button>
-      <button type="button" onClick={props.onChange}>
-        Trocar instância
-      </button>
-    </section>
   );
 }

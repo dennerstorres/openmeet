@@ -71,6 +71,21 @@ test("room join is the only room path accepted", () => {
   );
 });
 
+test("the server list and the rooms of one server are the only server paths accepted", () => {
+  const serverId = "44444444-4444-4444-8444-444444444444";
+  assert.equal(
+    prepareInstanceRequest("https://meet.example", "https://meet.example", "GET", "/api/v1/servers", null, "t").url,
+    "https://meet.example/api/v1/servers",
+  );
+  assert.equal(
+    prepareInstanceRequest("https://meet.example", "https://meet.example", "POST", `/api/v1/servers/${serverId}/rooms`, {}, "t").url,
+    `https://meet.example/api/v1/servers/${serverId}/rooms`,
+  );
+  for (const path of [`/api/v1/servers/${serverId}`, `/api/v1/servers/${serverId}/members/${serverId}`, "/api/v1/servers/../admin/users"]) {
+    assert.throws(() => prepareInstanceRequest("https://meet.example", "https://meet.example", "GET", path, null, "t"), PocInputError, path);
+  }
+});
+
 test("error codes stay inside a short token", () => {
   assert.equal(readErrorCode({ error: "invalid_credentials" }), "invalid_credentials");
   assert.equal(readErrorCode({ error: "Bearer secret-token" }), "request_failed");
