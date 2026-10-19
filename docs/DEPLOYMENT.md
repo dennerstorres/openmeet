@@ -34,6 +34,18 @@ node infra/compose/pg-copy.mjs restore
 
 O dump vai para `infra/compose/generated/openmeet.sql`. O comando não recebe a senha. Se o arquivo contiver a senha, ele é apagado e a operação falha. Restaurar reescreve os objetos do dump.
 
+## Contas (S-02)
+
+O administrador desativa, reativa e troca a senha de outra conta pela API: `GET /api/v1/admin/users`, `POST /api/v1/admin/users/:id/disable`, `/enable` e `/password`. Desativar revoga todas as sessões e tira a pessoa das salas abertas; se o LiveKit falhar, a resposta é 502, a conta continua desativada e repetir o POST tenta de novo. Reativar responde 502 enquanto esse corte não confirmou. A própria pessoa troca a senha em `POST /api/v1/auth/password`, com a senha atual; as outras sessões dela caem.
+
+A conta de administrador não é alvo dessas rotas. Se a senha dele se perdeu, recuperar no host, com a senha nova num arquivo de uma linha que só o operador lê:
+
+```bash
+docker compose exec -T api node dist/db/recover-admin.js < senha-nova.txt
+```
+
+A senha entra pelo stdin, nunca por argumento nem variável. O comando monta a conexão com as `POSTGRES_*` do Compose, troca a senha, revoga as sessões do administrador e grava `admin_password_recover` na auditoria. Não imprime senha, hash nem URL, e não reabre o bootstrap. Apagar o arquivo depois.
+
 ## O que ainda não foi provado
 TLS e ICE/TURN numa VPS, NAT, rede celular e duas redes externas continuam sem evidência. Não declarar a fase pronta antes desse teste e de uma restauração no ambiente real. O instalador Windows está em `docs/RELEASE.md`.
 

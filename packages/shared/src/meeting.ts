@@ -137,6 +137,7 @@ export class MeetingModel {
     private readonly api: InstanceApi,
     private readonly media: MeetingMedia = idleMedia,
     private readonly vault: SessionVault = new MemorySessionVault(),
+    private readonly wait: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   ) {}
 
   snapshot(): ShellSnapshot {
@@ -550,6 +551,11 @@ export class MeetingModel {
     if (refreshToken === null) return false;
     const result = await this.api.request(origin, "POST", "/api/v1/auth/refresh", { refreshToken }, null);
     if (generation !== this.generation) return true;
+    if (result.status === 401) {
+      // A cut from an earlier logout may still be pending on the server. Finish it before forgetting the token.
+      await this.finishLogout(origin, refreshToken);
+      return false;
+    }
     if (result.status !== 200) {
       await this.vault.clear(origin);
       return false;
@@ -662,12 +668,34 @@ export class MeetingModel {
     this.presence = null;
     this.presenceAsk += 1;
     if (origin === null || refreshToken === null) return;
-    await this.vault.clear(origin);
+    await this.finishLogout(origin, refreshToken);
+  }
+
+  /**
+   * S-18: the vault keeps the refresh until the server answers 204. A 502 or a network failure means the
+   * call cut is still pending; the logout is repeated in the background with a growing wait, with no limit.
+   */
+  private async finishLogout(origin: string, refreshToken: string): Promise<void> {
+    if (await this.tryLogout(origin, refreshToken)) return;
+    void (async () => {
+      for (let attempt = 0; ; attempt += 1) {
+        await this.wait(Math.min(1000 * 2 ** attempt, 60_000));
+        if (await this.tryLogout(origin, refreshToken)) return;
+      }
+    })();
+  }
+
+  private async tryLogout(origin: string, refreshToken: string): Promise<boolean> {
+    let status: number;
     try {
-      await this.api.request(origin, "POST", "/api/v1/auth/logout", { refreshToken }, null);
+      status = (await this.api.request(origin, "POST", "/api/v1/auth/logout", { refreshToken }, null)).status;
     } catch {
-      // The local session is already gone.
+      status = 0;
     }
+    if (status === 0 || status >= 500) return false;
+    // A later sign-in on the same instance may have saved a new token; that one stays.
+    if ((await this.vault.load(origin)) === refreshToken) await this.vault.clear(origin);
+    return true;
   }
 
   private async run(work: (generation: number) => Promise<void>): Promise<void> {

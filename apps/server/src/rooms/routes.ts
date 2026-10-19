@@ -7,6 +7,10 @@ import {
   acceptInviteCode,
   acceptServerInvite,
   createAccount,
+  disableAccount,
+  enableAccount,
+  listAccounts,
+  resetAccountPassword,
   createInvite,
   createRoom,
   createServer,
@@ -40,6 +44,7 @@ const AUTH_STATUS: Record<AuthErrorCode, number> = {
   invalid_session: 401,
   unauthorized: 401,
   rate_limited: 429,
+  media_disconnect_failed: 502,
 };
 
 const ROOM_STATUS: Record<RoomErrorCode, number> = {
@@ -56,6 +61,7 @@ const ROOM_STATUS: Record<RoomErrorCode, number> = {
   room_unconfigured: 503,
   media_disconnect_failed: 502,
   presence_unavailable: 503,
+  user_not_found: 404,
 };
 
 function configuredSecret(env: AppEnv): string | undefined {
@@ -118,6 +124,52 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
         role: requiredText(request.body, "role"),
       });
       return reply.code(201).header("cache-control", "no-store").send(user);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.get("/api/v1/admin/users", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await listAccounts(db, actor));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/admin/users/:id/password", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      await resetAccountPassword(db, actor, param(request, "id"), requiredText(request.body, "password"));
+      return reply.code(204).header("cache-control", "no-store").send();
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/admin/users/:id/disable", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      await disableAccount(db, actor, param(request, "id"), media);
+      return reply.code(204).header("cache-control", "no-store").send();
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/admin/users/:id/enable", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      await enableAccount(db, actor, param(request, "id"));
+      return reply.code(204).header("cache-control", "no-store").send();
     } catch (error) {
       return sendError(request, reply, error);
     }

@@ -495,3 +495,59 @@ test("a refused or cancelled Google sign-in stays on the account screen", async 
   assert.equal(model.snapshot().step, "account");
   assert.equal(model.snapshot().userLabel, null);
 });
+
+test("sign out keeps the refresh in the vault until logout answers 204, and repeats after a 502 (S-18)", async () => {
+  const { api, calls } = apiFor("admin");
+  const wrapped = api.request.bind(api);
+  const answers = [502, 0, 204];
+  api.request = (origin, method, path, body, accessToken) => {
+    if (path === "/api/v1/auth/logout") {
+      calls.push(`${method} ${origin}${path}`);
+      const status = answers.shift() ?? 204;
+      if (status === 0) return Promise.reject(new Error("offline"));
+      return Promise.resolve({ status, body: status === 204 ? null : { error: "media_disconnect_failed" } });
+    }
+    return wrapped(origin, method, path, body, accessToken);
+  };
+  const waits: number[] = [];
+  let release: () => void = () => {};
+  const settled = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const vault = new MemorySessionVault();
+  const model = new MeetingModel(api, mediaFor(), vault, async (ms) => {
+    waits.push(ms);
+  });
+  await model.confirmInstance("https://meet.example");
+  await model.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  const saved = await vault.load("https://meet.example");
+  assert.notEqual(saved, null);
+  const clear = vault.clear.bind(vault);
+  vault.clear = async (origin) => {
+    await clear(origin);
+    release();
+  };
+  await model.signOut();
+  assert.equal(model.snapshot().step, "account");
+  assert.equal(model.snapshot().userLabel, null);
+  await settled;
+  assert.equal(calls.filter((call) => call.endsWith("/api/v1/auth/logout")).length, 3);
+  assert.deepEqual(waits, [1000, 2000]);
+  assert.equal(await vault.load("https://meet.example"), null);
+});
+
+test("a revoked refresh on the next start finishes the pending logout before the vault forgets it", async () => {
+  const { api, calls } = apiFor("admin");
+  const wrapped = api.request.bind(api);
+  api.request = (origin, method, path, body, accessToken) => {
+    if (path === "/api/v1/auth/refresh") return Promise.resolve({ status: 401, body: { error: "invalid_session" } });
+    return wrapped(origin, method, path, body, accessToken);
+  };
+  const vault = new MemorySessionVault();
+  await vault.save("https://meet.example", "r".repeat(43));
+  const model = new MeetingModel(api, mediaFor(), vault, async () => {});
+  await model.confirmInstance("https://meet.example");
+  assert.equal(calls.includes("POST https://meet.example/api/v1/auth/logout"), true);
+  assert.equal(await vault.load("https://meet.example"), null);
+  assert.equal(model.snapshot().step, "account");
+});

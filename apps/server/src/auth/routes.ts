@@ -2,7 +2,8 @@ import type { FastifyInstance } from "fastify";
 import type { AppEnv } from "../poc-join.js";
 import type { MigrationClient } from "../db/migrate.js";
 import { clientAddress, type AttemptPolicy } from "./limit.js";
-import { AuthError, type AuthErrorCode, bootstrapAdmin, currentUser, login, logout, refreshSession } from "./service.js";
+import type { RoomMedia } from "../rooms/media.js";
+import { AuthError, type AuthErrorCode, bootstrapAdmin, changePassword, currentUser, login, logout, refreshSession } from "./service.js";
 
 const STATUS: Record<AuthErrorCode, number> = {
   auth_unconfigured: 503,
@@ -16,6 +17,7 @@ const STATUS: Record<AuthErrorCode, number> = {
   invalid_session: 401,
   unauthorized: 401,
   rate_limited: 429,
+  media_disconnect_failed: 502,
 };
 
 function configuredSecret(env: AppEnv): string | undefined {
@@ -51,7 +53,13 @@ function bearer(header: string | string[] | undefined): string | undefined {
   return token.length > 0 ? token : undefined;
 }
 
-export function registerAuth(app: FastifyInstance, env: AppEnv, db: MigrationClient | undefined, attempts: AttemptPolicy): void {
+export function registerAuth(
+  app: FastifyInstance,
+  env: AppEnv,
+  db: MigrationClient | undefined,
+  attempts: AttemptPolicy,
+  media: RoomMedia | undefined = undefined,
+): void {
   function address(request: { ip: string; headers: { [key: string]: string | string[] | undefined } }): string {
     return clientAddress(request.ip, headerValue(request.headers["x-forwarded-for"]), attempts.trustProxy);
   }
@@ -114,8 +122,29 @@ export function registerAuth(app: FastifyInstance, env: AppEnv, db: MigrationCli
   app.post("/api/v1/auth/logout", async (request, reply) => {
     try {
       if (!db) throw new AuthError("auth_unconfigured");
-      await logout(db, requireField(request.body, "refreshToken"));
+      await logout(db, requireField(request.body, "refreshToken"), media);
       return reply.code(204).header("cache-control", "no-store").send();
+    } catch (error) {
+      return sendAuthError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/auth/password", async (request, reply) => {
+    try {
+      const database = db;
+      const secret = configuredSecret(env);
+      if (!database || !secret) throw new AuthError("auth_unconfigured");
+      const token = bearer(request.headers.authorization);
+      if (!token) throw new AuthError("unauthorized");
+      const ip = address(request);
+      const session = await changePassword(
+        database,
+        secret,
+        token,
+        { currentPassword: requireField(request.body, "currentPassword"), newPassword: requireField(request.body, "newPassword") },
+        () => attempts.loginIp.allow(`password:${ip}`, attempts.now()),
+      );
+      return reply.code(200).header("cache-control", "no-store").send(session);
     } catch (error) {
       return sendAuthError(request, reply, error);
     }

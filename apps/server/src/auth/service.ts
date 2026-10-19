@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { parseLabel } from "@openmeet/shared";
+import type { RoomMedia } from "../rooms/media.js";
+import { heldRooms, releaseHold } from "./media-hold.js";
 import type { MigrationClient } from "../db/migrate.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import { ACCESS_TOKEN_TTL_SECONDS, hashSecret, newRefreshToken, readAccessToken, secretsMatch, signAccessToken } from "./tokens.js";
@@ -15,7 +17,8 @@ export type AuthErrorCode =
   | "invalid_credentials"
   | "invalid_session"
   | "unauthorized"
-  | "rate_limited";
+  | "rate_limited"
+  | "media_disconnect_failed";
 
 export class AuthError extends Error {
   readonly code: AuthErrorCode;
@@ -251,14 +254,49 @@ export async function refreshSession(db: MigrationClient, secret: string, refres
   return result;
 }
 
-export async function logout(db: MigrationClient, refreshToken: string): Promise<void> {
+// S-18: logout revokes only the presented family, then cuts the account from every open room.
+// livekit_hold stops new room tokens until the SFU confirms. With no open room it is lowered in the same commit.
+// An already revoked refresh repeats the cut only while the hold is still on.
+export async function logout(db: MigrationClient, refreshToken: string, media: RoomMedia | undefined = undefined): Promise<void> {
   if (refreshToken.length < 32) return;
-  await db.transaction(async (tx) => {
-    const revoked = await tx.query("update refresh_sessions set revoked_at = now() where token_hash = $1 and revoked_at is null returning user_id", [
-      hashSecret(refreshToken),
-    ]);
-    const actorId = text(revoked.rows[0]?.user_id);
-    if (actorId) await audit(tx, actorId, "logout");
+  const tokenHash = hashSecret(refreshToken);
+  const pending = await db.transaction(async (tx) => {
+    const found = await tx.query("select user_id from refresh_sessions where token_hash = $1", [tokenHash]);
+    const userId = text(found.rows[0]?.user_id);
+    if (!userId) return undefined;
+    const user = await tx.query("select livekit_hold from users where id = $1 for update", [userId]);
+    const revoked = await tx.query("update refresh_sessions set revoked_at = now() where token_hash = $1 and revoked_at is null returning id", [tokenHash]);
+    if (revoked.rows.length === 1) await audit(tx, userId, "logout");
+    else if (!isTrue(user.rows[0]?.livekit_hold)) return undefined;
+    const rooms = await heldRooms(tx, userId);
+    await tx.query("update users set livekit_hold = $2 where id = $1", [userId, rooms.length > 0]);
+    return rooms.length > 0 ? { userId, rooms } : undefined;
+  });
+  if (pending && !(await releaseHold(db, pending.userId, media, pending.rooms))) throw new AuthError("media_disconnect_failed");
+}
+
+// S-02: the current password is required, every family of the account is revoked, and only the caller gets a new session.
+export async function changePassword(
+  db: MigrationClient,
+  secret: string,
+  accessToken: string,
+  input: { currentPassword: string; newPassword: string },
+  allow: (() => boolean) | undefined = undefined,
+): Promise<SessionBody> {
+  const actor = await currentUser(db, secret, accessToken);
+  const password = parsePassword(input.newPassword);
+  if (input.currentPassword.length === 0 || input.currentPassword.length > 128) throw new AuthError("invalid_credentials");
+  if (allow && !allow()) throw new AuthError("rate_limited");
+  const stored = await findUserById(db, actor.id);
+  if (!stored || stored.disabled || !(await verifyPassword(stored.passwordHash, input.currentPassword))) throw new AuthError("invalid_credentials");
+  const passwordHash = await hashPassword(password);
+  return db.transaction(async (tx) => {
+    await tx.query("select id from users where id = $1 for update", [actor.id]);
+    await tx.query("update users set password_hash = $2, updated_at = now() where id = $1", [actor.id, passwordHash]);
+    await tx.query("update refresh_sessions set revoked_at = now() where user_id = $1 and revoked_at is null", [actor.id]);
+    const user = await findUserById(tx, actor.id);
+    if (!user || user.disabled) throw new AuthError("invalid_credentials");
+    return startSession(tx, secret, user, undefined, "password_change");
   });
 }
 

@@ -6,6 +6,7 @@ import type { MigrationClient } from "../db/migrate.js";
 import { AuthError, type PublicUser } from "../auth/service.js";
 import { hashPassword } from "../auth/password.js";
 import { hashSecret } from "../auth/tokens.js";
+import { heldRooms, releaseHold, revokeAfter } from "../auth/media-hold.js";
 import type { RoomMedia } from "./media.js";
 
 export type RoomErrorCode =
@@ -21,7 +22,8 @@ export type RoomErrorCode =
   | "conflict"
   | "room_unconfigured"
   | "media_disconnect_failed"
-  | "presence_unavailable";
+  | "presence_unavailable"
+  | "user_not_found";
 
 export class RoomError extends Error {
   readonly code: RoomErrorCode;
@@ -131,6 +133,80 @@ export async function createAccount(
     if (sqlState(error) === "23505") throw new RoomError("conflict");
     throw error;
   }
+}
+
+// Accounts (S-02). Only the instance admin. The admin account itself is never a target here:
+// it is the only admin, and its password changes through its own session or the host recovery command.
+
+export interface AccountRow {
+  id: string;
+  username: string;
+  displayName: string;
+  role: string;
+  disabled: boolean;
+}
+
+export async function listAccounts(db: MigrationClient, actor: PublicUser): Promise<AccountRow[]> {
+  if (actor.role !== "admin") throw new RoomError("forbidden");
+  const listed = await db.query("select id, username, display_name, role, disabled_at is not null as disabled from users order by username, id");
+  return listed.rows.flatMap((row) => {
+    const id = text(row.id);
+    const username = text(row.username);
+    const displayName = text(row.display_name);
+    const role = text(row.role);
+    return id && username && displayName && role ? [{ id, username, displayName, role, disabled: isTrue(row.disabled) }] : [];
+  });
+}
+
+async function lockAccount(tx: MigrationClient, actor: PublicUser, id: string): Promise<{ disabled: boolean; hold: boolean }> {
+  if (actor.role !== "admin") throw new RoomError("forbidden");
+  if (!UUID.test(id)) throw new RoomError("user_not_found");
+  if (id === actor.id) throw new RoomError("forbidden");
+  const found = await tx.query("select role, disabled_at is not null as disabled, livekit_hold from users where id = $1 for update", [id]);
+  const row = found.rows[0];
+  if (!row) throw new RoomError("user_not_found");
+  if (row.role === "admin") throw new RoomError("forbidden");
+  return { disabled: isTrue(row.disabled), hold: isTrue(row.livekit_hold) };
+}
+
+export async function resetAccountPassword(db: MigrationClient, actor: PublicUser, id: string, password: string): Promise<void> {
+  if (password.length < 12 || password.length > 128) throw new RoomError("weak_password");
+  const passwordHash = await hashPassword(password);
+  await db.transaction(async (tx) => {
+    await lockAccount(tx, actor, id);
+    await tx.query("update users set password_hash = $2, updated_at = now() where id = $1", [id, passwordHash]);
+    await tx.query("update refresh_sessions set revoked_at = now() where user_id = $1 and revoked_at is null", [id]);
+    await audit(tx, actor.id, "user_password_reset", "user", id);
+  });
+}
+
+// S-02 and S-18: disabled_at stays even when the SFU fails. A repeat calls the SFU again while the hold is on.
+export async function disableAccount(db: MigrationClient, actor: PublicUser, id: string, media: RoomMedia | undefined): Promise<void> {
+  const pending = await db.transaction(async (tx) => {
+    const account = await lockAccount(tx, actor, id);
+    if (!account.disabled) {
+      await tx.query("update users set disabled_at = now(), updated_at = now() where id = $1", [id]);
+      await audit(tx, actor.id, "user_disable", "user", id);
+    } else if (!account.hold) {
+      return undefined;
+    }
+    await tx.query("update refresh_sessions set revoked_at = now() where user_id = $1 and revoked_at is null", [id]);
+    const rooms = await heldRooms(tx, id);
+    await tx.query("update users set livekit_hold = $2 where id = $1", [id, rooms.length > 0]);
+    return rooms.length > 0 ? rooms : undefined;
+  });
+  if (pending && !(await releaseHold(db, id, media, pending))) throw new RoomError("media_disconnect_failed");
+}
+
+// While the cut is pending the account stays disabled. No session is created.
+export async function enableAccount(db: MigrationClient, actor: PublicUser, id: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    const account = await lockAccount(tx, actor, id);
+    if (account.hold) throw new RoomError("media_disconnect_failed");
+    if (!account.disabled) return;
+    await tx.query("update users set disabled_at = null, updated_at = now() where id = $1", [id]);
+    await audit(tx, actor.id, "user_enable", "user", id);
+  });
 }
 
 // Servers
@@ -299,13 +375,6 @@ async function removeFromServer(db: MigrationClient, actor: PublicUser, access: 
     access.server.id,
     memberId,
   ]);
-}
-
-/** Strictly after every `nbf` already signed. With none recorded, after this second. */
-function revokeAfter(nbf: unknown): bigint {
-  if (typeof nbf === "bigint") return nbf + 1n;
-  if ((typeof nbf === "number" || typeof nbf === "string") && /^[0-9]+$/.test(String(nbf))) return BigInt(nbf) + 1n;
-  return BigInt(Math.floor(Date.now() / 1000)) + 1n;
 }
 
 export interface RoomOccupant {
