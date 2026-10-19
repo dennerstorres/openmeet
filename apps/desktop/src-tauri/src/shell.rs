@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{TrayIcon, TrayIconBuilder};
 use tauri::Wry;
@@ -162,7 +162,7 @@ fn apply_shortcuts(app: &AppHandle, consent: bool, announce: bool) -> Result<(),
         }
     }
     if announce && !blocked.is_empty() {
-        notify(app, &format!("Atalho em uso, não registrado: {}", blocked.join(", ")));
+        notify(app, &format!("Atalho em uso, nÃ£o registrado: {}", blocked.join(", ")));
     }
     Ok(())
 }
@@ -227,8 +227,99 @@ fn notify(app: &AppHandle, body: &str) {
     let _ = app.notification().builder().title("OpenMeet").body(body).show();
 }
 
-fn entry(origin: &str) -> Result<keyring::Entry, String> {
-    keyring::Entry::new(SERVICE, origin).map_err(|_| "store_failed".to_string())
+/// S-05: one keyring item for the whole app. It holds the instance origin with its refresh token,
+/// so the page can never ask for the token of another instance. Signing in elsewhere replaces it.
+const ACTIVE_SLOT: &str = "active";
+
+#[derive(Serialize, Deserialize)]
+struct Slot {
+    origin: String,
+    refresh: String,
+}
+
+trait SlotStore {
+    fn read(&self) -> Result<Option<String>, String>;
+    fn write(&self, value: &str) -> Result<(), String>;
+    fn erase(&self) -> Result<(), String>;
+}
+
+struct KeyringSlot;
+
+impl KeyringSlot {
+    fn entry() -> Result<keyring::Entry, String> {
+        keyring::Entry::new(SERVICE, ACTIVE_SLOT).map_err(|_| "store_failed".to_string())
+    }
+}
+
+impl SlotStore for KeyringSlot {
+    fn read(&self) -> Result<Option<String>, String> {
+        match Self::entry()?.get_password() {
+            Ok(value) => Ok(Some(value)),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(_) => Err("store_failed".to_string()),
+        }
+    }
+
+    fn write(&self, value: &str) -> Result<(), String> {
+        Self::entry()?.set_password(value).map_err(|_| "store_failed".to_string())
+    }
+
+    fn erase(&self) -> Result<(), String> {
+        match Self::entry()?.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(_) => Err("store_failed".to_string()),
+        }
+    }
+}
+
+/// Before S-05 each origin had its own item. They are never read again; saving or clearing an origin removes its old one.
+fn drop_legacy_item(origin: &str) {
+    if let Ok(entry) = keyring::Entry::new(SERVICE, origin) {
+        let _ = entry.delete_credential();
+    }
+}
+
+fn load_slot(store: &dyn SlotStore, origin: &str) -> Result<Option<String>, String> {
+    if !accept_origin(origin) {
+        return Err("invalid_origin".to_string());
+    }
+    let Some(raw) = store.read()? else {
+        return Ok(None);
+    };
+    let slot: Slot = serde_json::from_str(&raw).map_err(|_| "invalid_token".to_string())?;
+    // The error names the refusal, never the stored token or origin.
+    if slot.origin != origin {
+        return Err("invalid_origin".to_string());
+    }
+    if !accept_token(&slot.refresh) {
+        return Err("invalid_token".to_string());
+    }
+    Ok(Some(slot.refresh))
+}
+
+fn save_slot(store: &dyn SlotStore, origin: &str, refresh_token: &str) -> Result<(), String> {
+    if !accept_origin(origin) {
+        return Err("invalid_origin".to_string());
+    }
+    if !accept_token(refresh_token) {
+        return Err("invalid_token".to_string());
+    }
+    let slot = Slot { origin: origin.to_string(), refresh: refresh_token.to_string() };
+    store.write(&serde_json::to_string(&slot).map_err(|_| "store_failed".to_string())?)
+}
+
+fn clear_slot(store: &dyn SlotStore, origin: &str) -> Result<(), String> {
+    if !accept_origin(origin) {
+        return Err("invalid_origin".to_string());
+    }
+    let Some(raw) = store.read()? else {
+        return Ok(());
+    };
+    // A slot that does not parse is not anyone's session; it goes. Another origin's slot stays.
+    match serde_json::from_str::<Slot>(&raw) {
+        Ok(slot) if slot.origin != origin => Ok(()),
+        _ => store.erase(),
+    }
 }
 
 fn accept_origin(origin: &str) -> bool {
@@ -257,9 +348,9 @@ fn track_label(kind: &str, live: bool, on: bool) -> &'static str {
         ("microphone", true, true) => "Desligar microfone",
         ("microphone", true, false) => "Ligar microfone",
         ("microphone", false, _) => "Alternar microfone",
-        ("camera", true, true) => "Desligar câmera",
-        ("camera", true, false) => "Ligar câmera",
-        _ => "Alternar câmera",
+        ("camera", true, true) => "Desligar cÃ¢mera",
+        ("camera", true, false) => "Ligar cÃ¢mera",
+        _ => "Alternar cÃ¢mera",
     }
 }
 
@@ -267,45 +358,29 @@ fn track_notice(kind: &str, on: bool) -> Option<&'static str> {
     match (kind, on) {
         ("microphone", true) => Some("Microfone ligado"),
         ("microphone", false) => Some("Microfone desligado"),
-        ("camera", true) => Some("Câmera ligada"),
-        ("camera", false) => Some("Câmera desligada"),
+        ("camera", true) => Some("CÃ¢mera ligada"),
+        ("camera", false) => Some("CÃ¢mera desligada"),
         _ => None,
     }
 }
 
 #[tauri::command]
 pub fn session_load(origin: String) -> Result<Option<String>, String> {
-    if !accept_origin(&origin) {
-        return Err("invalid_origin".to_string());
-    }
-    match entry(&origin)?.get_password() {
-        Ok(token) if accept_token(&token) => Ok(Some(token)),
-        Ok(_) => Err("invalid_token".to_string()),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(_) => Err("store_failed".to_string()),
-    }
+    load_slot(&KeyringSlot, &origin)
 }
 
 #[tauri::command]
 pub fn session_save(origin: String, refresh_token: String) -> Result<(), String> {
-    if !accept_origin(&origin) {
-        return Err("invalid_origin".to_string());
-    }
-    if !accept_token(&refresh_token) {
-        return Err("invalid_token".to_string());
-    }
-    entry(&origin)?.set_password(&refresh_token).map_err(|_| "store_failed".to_string())
+    save_slot(&KeyringSlot, &origin, &refresh_token)?;
+    drop_legacy_item(&origin);
+    Ok(())
 }
 
 #[tauri::command]
 pub fn session_clear(origin: String) -> Result<(), String> {
-    if !accept_origin(&origin) {
-        return Err("invalid_origin".to_string());
-    }
-    match entry(&origin)?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(_) => Err("store_failed".to_string()),
-    }
+    clear_slot(&KeyringSlot, &origin)?;
+    drop_legacy_item(&origin);
+    Ok(())
 }
 
 #[tauri::command]
@@ -344,7 +419,52 @@ pub fn shell_tracks(app: AppHandle, live: bool, microphone: bool, camera: bool, 
 
 #[cfg(test)]
 mod tests {
-    use super::{accept_origin, accept_token, track_label, track_notice, SHORTCUTS};
+    use super::{accept_origin, accept_token, clear_slot, load_slot, save_slot, track_label, track_notice, SlotStore, SHORTCUTS};
+    use std::cell::RefCell;
+
+    #[derive(Default)]
+    struct FakeSlot(RefCell<Option<String>>);
+
+    impl SlotStore for FakeSlot {
+        fn read(&self) -> Result<Option<String>, String> {
+            Ok(self.0.borrow().clone())
+        }
+
+        fn write(&self, value: &str) -> Result<(), String> {
+            *self.0.borrow_mut() = Some(value.to_string());
+            Ok(())
+        }
+
+        fn erase(&self) -> Result<(), String> {
+            *self.0.borrow_mut() = None;
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn the_slot_answers_only_its_own_origin() {
+        let store = FakeSlot::default();
+        assert_eq!(load_slot(&store, "https://a.example"), Ok(None));
+        save_slot(&store, "https://a.example", "refresh-a").expect("save");
+        assert_eq!(load_slot(&store, "https://a.example"), Ok(Some("refresh-a".to_string())));
+        let refused = load_slot(&store, "https://b.example");
+        assert_eq!(refused, Err("invalid_origin".to_string()));
+        assert!(!format!("{refused:?}").contains("refresh-a"));
+        assert_eq!(load_slot(&store, "https://a.example/path"), Err("invalid_origin".to_string()));
+
+        clear_slot(&store, "https://b.example").expect("clear other");
+        assert_eq!(load_slot(&store, "https://a.example"), Ok(Some("refresh-a".to_string())));
+
+        save_slot(&store, "https://b.example", "refresh-b").expect("switch");
+        assert_eq!(load_slot(&store, "https://a.example"), Err("invalid_origin".to_string()));
+        assert_eq!(load_slot(&store, "https://b.example"), Ok(Some("refresh-b".to_string())));
+        assert!(!store.0.borrow().clone().unwrap_or_default().contains("refresh-a"));
+
+        clear_slot(&store, "https://b.example").expect("clear own");
+        assert_eq!(load_slot(&store, "https://b.example"), Ok(None));
+        assert_eq!(save_slot(&store, "https://b.example", "has space"), Err("invalid_token".to_string()));
+        assert_eq!(save_slot(&store, "http://meet.example", "refresh"), Err("invalid_origin".to_string()));
+    }
 
     #[test]
     fn shortcuts_use_three_modifiers_and_parse() {
@@ -388,7 +508,7 @@ mod tests {
     fn tray_label_says_toggle_until_the_meeting_is_live() {
         assert_eq!(track_label("microphone", false, true), "Alternar microfone");
         assert_eq!(track_label("microphone", true, true), "Desligar microfone");
-        assert_eq!(track_label("camera", true, false), "Ligar câmera");
+        assert_eq!(track_label("camera", true, false), "Ligar cÃ¢mera");
         assert_eq!(track_notice("microphone", false), Some("Microfone desligado"));
         assert_eq!(track_notice("screen", true), None);
     }

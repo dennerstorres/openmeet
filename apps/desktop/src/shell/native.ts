@@ -17,8 +17,14 @@ export interface ShellStatus {
 
 export function createDesktopVault(): SessionVault {
   return {
-    load(origin) {
-      return invoke<string | null>("session_load", { origin });
+    // S-05: the vault holds one instance. Asking for another one is refused in Rust; here it reads as "no session".
+    async load(origin) {
+      try {
+        return await invoke<string | null>("session_load", { origin });
+      } catch (error) {
+        if (error === "invalid_origin") return null;
+        throw error;
+      }
     },
     async save(origin, refreshToken) {
       await invoke("session_save", { origin, refreshToken });
