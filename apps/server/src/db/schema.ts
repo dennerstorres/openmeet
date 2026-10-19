@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, index, integer, pgEnum, pgTable, primaryKey, smallint, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, index, integer, pgEnum, pgTable, primaryKey, smallint, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 const createdAt = () => timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow();
@@ -20,6 +20,7 @@ export const users = pgTable(
     displayName: text("display_name").notNull(),
     role: userRole("role").notNull().default("participant"),
     disabledAt: timestamp("disabled_at", { withTimezone: true, mode: "date" }),
+    livekitHold: boolean("livekit_hold").notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -75,6 +76,8 @@ export const serverMembers = pgTable(
       .references(() => users.id),
     role: serverRole("role").notNull(),
     removedAt: timestamp("removed_at", { withTimezone: true, mode: "date" }),
+    mediaCutAt: timestamp("media_cut_at", { withTimezone: true, mode: "date" }),
+    lastJoinNbf: bigint("last_join_nbf", { mode: "bigint" }),
     createdAt: createdAt(),
   },
   (table) => [
@@ -123,6 +126,8 @@ export const rooms = pgTable(
       .notNull()
       .references(() => users.id),
     endedAt: timestamp("ended_at", { withTimezone: true, mode: "date" }),
+    mediaClosedAt: timestamp("media_closed_at", { withTimezone: true, mode: "date" }),
+    lastJoinNbf: bigint("last_join_nbf", { mode: "bigint" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

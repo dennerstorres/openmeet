@@ -1,9 +1,13 @@
 import { RoomServiceClient, ServerError } from "livekit-server-sdk";
 import type { AppEnv } from "../poc-join.js";
 
+/**
+ * `revokeAt` is chosen by the caller from the `nbf` of the tokens it signed (S-04).
+ * LiveKit refuses a token whose `nbf` is earlier than it; equal still passes, so the caller adds one.
+ */
 export interface RoomMedia {
-  disconnect(room: string, identity: string): Promise<void>;
-  closeRoom(room: string): Promise<void>;
+  disconnect(room: string, identity: string, revokeAt: bigint): Promise<void>;
+  closeRoom(room: string, revokeAt: bigint): Promise<void>;
   /** Identities in the SFU room right now. A room that does not exist yet is empty. */
   occupants?(room: string): Promise<string[]>;
 }
@@ -18,13 +22,11 @@ function isAbsent(error: unknown): boolean {
   return error instanceof ServerError && error.status === 404;
 }
 
-export function roomMedia(client: LiveKitRooms, now = () => Date.now()): RoomMedia {
-  const revokeAt = () => BigInt(Math.floor(now() / 1000));
-
+export function roomMedia(client: LiveKitRooms): RoomMedia {
   return {
-    async disconnect(room, identity) {
+    async disconnect(room, identity, revokeAt) {
       try {
-        await client.removeParticipant(room, identity, { revokeTokenTs: revokeAt() });
+        await client.removeParticipant(room, identity, { revokeTokenTs: revokeAt });
       } catch (error) {
         if (!isAbsent(error)) throw error;
       }
@@ -38,7 +40,7 @@ export function roomMedia(client: LiveKitRooms, now = () => Date.now()): RoomMed
         throw error;
       }
     },
-    async closeRoom(room) {
+    async closeRoom(room, revokeAt) {
       let people: { identity: string }[] = [];
       try {
         people = await client.listParticipants(room);
@@ -48,7 +50,7 @@ export function roomMedia(client: LiveKitRooms, now = () => Date.now()): RoomMed
       for (const person of people) {
         if (person.identity.length === 0) continue;
         try {
-          await client.removeParticipant(room, person.identity, { revokeTokenTs: revokeAt() });
+          await client.removeParticipant(room, person.identity, { revokeTokenTs: revokeAt });
         } catch (error) {
           if (!isAbsent(error)) throw error;
         }

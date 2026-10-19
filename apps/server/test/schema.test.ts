@@ -57,6 +57,7 @@ test("identity migration matches the schema and rejects a second admin, duplicat
       "0003_google_login.sql",
       "0004_display_name.sql",
       "0005_session_family.sql",
+      "0006_media_cut.sql",
     ]);
     assert.deepEqual(await applyMigrations(client), []);
 
@@ -143,7 +144,7 @@ test("identity migration matches the schema and rejects a second admin, duplicat
     const applied = await client.query("select name from schema_migrations");
     assert.deepEqual(
       applied.rows.map((row) => row.name),
-      ["0001_identity.sql", "0002_servers.sql", "0003_google_login.sql", "0004_display_name.sql", "0005_session_family.sql"],
+      ["0001_identity.sql", "0002_servers.sql", "0003_google_login.sql", "0004_display_name.sql", "0005_session_family.sql", "0006_media_cut.sql"],
     );
   } finally {
     await db.close();
@@ -173,7 +174,13 @@ test("the servers migration moves existing rooms into Geral and revokes room inv
       adminId,
     ]);
 
-    assert.deepEqual(await applyMigrations(client), ["0002_servers.sql", "0003_google_login.sql", "0004_display_name.sql", "0005_session_family.sql"]);
+    assert.deepEqual(await applyMigrations(client), [
+      "0002_servers.sql",
+      "0003_google_login.sql",
+      "0004_display_name.sql",
+      "0005_session_family.sql",
+      "0006_media_cut.sql",
+    ]);
 
     const servers = await client.query("select id, name, created_by from servers");
     assert.equal(servers.rows.length, 1);
@@ -233,7 +240,7 @@ test("the session family migration names every chain by its root", async () => {
     const a = await session("a", b);
     const alone = await session("alone", null);
 
-    assert.deepEqual(await applyMigrations(client), ["0005_session_family.sql"]);
+    assert.deepEqual(await applyMigrations(client), ["0005_session_family.sql", "0006_media_cut.sql"]);
     const rows = await client.query("select id, family_id from refresh_sessions");
     const family = new Map(rows.rows.map((row) => [row.id, row.family_id]));
     assert.equal(family.get(a), a);

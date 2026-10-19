@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { AuthError, type AuthErrorCode, currentUser, type PublicUser } from "../auth/service.js";
+import { readAccessToken } from "../auth/tokens.js";
 import type { MigrationClient } from "../db/migrate.js";
 import type { AppEnv } from "../poc-join.js";
 import {
@@ -356,7 +357,10 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
       const actor = await caller(request);
       if (!db) throw new AuthError("auth_unconfigured");
       const code = textField(request.body, "code");
-      const joined = await joinRoom(db, env, actor, param(request, "id"), code);
+      const secret = configuredSecret(env);
+      const token = bearer(request.headers.authorization);
+      const sessionId = secret && token ? readAccessToken(secret, token)?.sessionId : undefined;
+      const joined = await joinRoom(db, env, actor, param(request, "id"), code, sessionId);
       return reply.code(200).header("cache-control", "no-store").send(joined);
     } catch (error) {
       return sendError(request, reply, error);

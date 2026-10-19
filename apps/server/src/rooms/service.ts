@@ -3,7 +3,7 @@ import { parseLabel, parseSignalUrl } from "@openmeet/shared";
 import { AccessToken } from "livekit-server-sdk";
 import type { AppEnv } from "../poc-join.js";
 import type { MigrationClient } from "../db/migrate.js";
-import type { PublicUser } from "../auth/service.js";
+import { AuthError, type PublicUser } from "../auth/service.js";
 import { hashPassword } from "../auth/password.js";
 import { hashSecret } from "../auth/tokens.js";
 import type { RoomMedia } from "./media.js";
@@ -245,8 +245,10 @@ export async function acceptServerInvite(db: MigrationClient, actor: PublicUser,
   const access = await loadServerAccess(db, actor, serverId(id));
   const role = activeRole(access.membership);
   if (role) return { ...access.server, role };
-  await redeemInvite(db, access.server.id, actor.id, code);
-  await audit(db, actor.id, "server_join", "server", access.server.id);
+  await db.transaction(async (tx) => {
+    await redeemInvite(tx, access.server.id, actor.id, code);
+    await audit(tx, actor.id, "server_join", "server", access.server.id);
+  });
   return { ...access.server, role: "participant" };
 }
 
@@ -266,27 +268,44 @@ export async function removeServerMember(db: MigrationClient, actor: PublicUser,
   await removeFromServer(db, actor, access, memberId, media);
 }
 
+// S-04: the removal commits first and stays. The member is cut from the SFU after the commit;
+// until the SFU confirms, the same member gets no token and no invite brings them back.
 async function removeFromServer(db: MigrationClient, actor: PublicUser, access: ServerAccess, memberId: string, media: RoomMedia): Promise<void> {
   if (!canManage(access.membership)) throw new RoomError("forbidden");
   if (!UUID.test(memberId) || memberId === actor.id) throw new RoomError("forbidden");
-  const target = await db.query("select role, removed_at is not null as removed from server_members where server_id = $1 and user_id = $2", [
+  const pending = await db.transaction(async (tx) => {
+    const target = await tx.query(
+      `select role, removed_at is not null as removed, media_cut_at is not null as cut, last_join_nbf
+       from server_members where server_id = $1 and user_id = $2 for update`,
+      [access.server.id, memberId],
+    );
+    const row = target.rows[0];
+    const targetRole = text(row?.role);
+    if (!row || !targetRole) throw new RoomError("server_not_found");
+    if (targetRole === "owner") throw new RoomError("forbidden");
+    if (targetRole === "moderator" && access.membership?.role !== "owner") throw new RoomError("forbidden");
+    if (!isTrue(row.removed)) {
+      await tx.query("update server_members set removed_at = now(), media_cut_at = null where server_id = $1 and user_id = $2", [access.server.id, memberId]);
+      await audit(tx, actor.id, "member_remove", "user", memberId);
+    } else if (isTrue(row.cut)) {
+      return undefined;
+    }
+    const openRooms = await tx.query("select id from rooms where server_id = $1 and ended_at is null order by created_at, id", [access.server.id]);
+    return { revokeAt: revokeAfter(row.last_join_nbf), rooms: openRooms.rows.flatMap((room) => (text(room.id) ? [String(room.id)] : [])) };
+  });
+  if (!pending) return;
+  for (const room of pending.rooms) await disconnectMedia(() => media.disconnect(room, memberId, pending.revokeAt));
+  await db.query("update server_members set media_cut_at = now() where server_id = $1 and user_id = $2 and removed_at is not null and media_cut_at is null", [
     access.server.id,
     memberId,
   ]);
-  const targetRole = text(target.rows[0]?.role);
-  if (!targetRole) throw new RoomError("server_not_found");
-  if (targetRole === "owner") throw new RoomError("forbidden");
-  if (targetRole === "moderator" && access.membership?.role !== "owner") throw new RoomError("forbidden");
-  const updated = await db.query(
-    "update server_members set removed_at = now() where server_id = $1 and user_id = $2 and removed_at is null returning user_id",
-    [access.server.id, memberId],
-  );
-  if (updated.rows.length === 1) await audit(db, actor.id, "member_remove", "user", memberId);
-  const openRooms = await db.query("select id from rooms where server_id = $1 and ended_at is null order by created_at, id", [access.server.id]);
-  for (const row of openRooms.rows) {
-    const room = text(row.id);
-    if (room) await disconnectMedia(() => media.disconnect(room, memberId));
-  }
+}
+
+/** Strictly after every `nbf` already signed. With none recorded, after this second. */
+function revokeAfter(nbf: unknown): bigint {
+  if (typeof nbf === "bigint") return nbf + 1n;
+  if ((typeof nbf === "number" || typeof nbf === "string") && /^[0-9]+$/.test(String(nbf))) return BigInt(nbf) + 1n;
+  return BigInt(Math.floor(Date.now() / 1000)) + 1n;
 }
 
 export interface RoomOccupant {
@@ -413,9 +432,25 @@ export async function endRoom(db: MigrationClient, actor: PublicUser, id: string
   const { room, access } = await loadRoomAccess(db, actor, roomId(id));
   if (!activeRole(access.membership)) throw new RoomError("room_not_found");
   if (!canManage(access.membership)) throw new RoomError("forbidden");
-  const updated = await db.query("update rooms set ended_at = now(), updated_at = now() where id = $1 and ended_at is null returning id", [room.id]);
-  if (updated.rows.length === 1) await audit(db, actor.id, "room_end", "room", room.id);
-  await disconnectMedia(() => media.closeRoom(room.id));
+  // S-04: the end commits first and stays. A retry reads the newest nbf again before calling the SFU.
+  const revokeAt = await db.transaction(async (tx) => {
+    const locked = await tx.query(
+      "select ended_at is not null as ended, media_closed_at is not null as closed, last_join_nbf from rooms where id = $1 for update",
+      [room.id],
+    );
+    const row = locked.rows[0];
+    if (!row) throw new RoomError("room_not_found");
+    if (!isTrue(row.ended)) {
+      await tx.query("update rooms set ended_at = now(), updated_at = now() where id = $1", [room.id]);
+      await audit(tx, actor.id, "room_end", "room", room.id);
+    } else if (isTrue(row.closed)) {
+      return undefined;
+    }
+    return revokeAfter(row.last_join_nbf);
+  });
+  if (revokeAt === undefined) return;
+  await disconnectMedia(() => media.closeRoom(room.id, revokeAt));
+  await db.query("update rooms set media_closed_at = now() where id = $1 and media_closed_at is null", [room.id]);
 }
 
 // The room routes below predate servers. They act on the server that owns the room.
@@ -453,52 +488,96 @@ async function disconnectMedia(run: () => Promise<void>): Promise<void> {
   }
 }
 
+// S-04: invite, membership and signature under one lock, in the order user, session, room, membership.
+// Logout, deactivation, removal and ending take the same rows in the same order.
 export async function joinRoom(
   db: MigrationClient,
   env: AppEnv,
   actor: PublicUser,
   id: string,
   code: string | undefined,
+  sessionId: string | undefined = undefined,
 ): Promise<{ url: string; token: string; expiresIn: number }> {
-  const { room, access } = await loadRoomAccess(db, actor, roomId(id));
-  // S-01: no instance role skips this. Without a membership or a code the room's state stays hidden.
-  const member = activeRole(access.membership) !== undefined;
-  if (!member && !code) throw new RoomError("forbidden");
-  if (room.ended) throw new RoomError("room_ended");
-  if (!member && code) {
-    await redeemInvite(db, room.serverId, actor.id, code);
-    await audit(db, actor.id, "server_join", "server", room.serverId);
-  }
-  const token = await issueRoomToken(env, room.id, actor.id, actor.displayName);
-  await audit(db, actor.id, "room_join", "room", room.id);
-  return token;
+  const target = roomId(id);
+  return db.transaction(async (tx) => {
+    const user = await tx.query("select display_name, disabled_at is not null as disabled, livekit_hold from users where id = $1 for update", [actor.id]);
+    const userRow = user.rows[0];
+    if (!userRow || isTrue(userRow.disabled)) throw new AuthError("unauthorized");
+    if (sessionId !== undefined) {
+      const session = await tx.query(
+        "select revoked_at is not null or expires_at <= now() as dead from refresh_sessions where id = $1 and user_id = $2 for update",
+        [sessionId, actor.id],
+      );
+      if (!session.rows[0] || isTrue(session.rows[0].dead)) throw new AuthError("unauthorized");
+    }
+    if (isTrue(userRow.livekit_hold)) throw new RoomError("forbidden");
+    const found = await tx.query("select id, server_id, name, slug, kind, ended_at is not null as ended from rooms where id = $1 for update", [target]);
+    const room = readRoom(found.rows[0]);
+    if (!room) throw new RoomError("room_not_found");
+    const membership = await tx.query(
+      "select removed_at is not null as removed, media_cut_at is null as cut_pending from server_members where server_id = $1 and user_id = $2 for update",
+      [room.serverId, actor.id],
+    );
+    const memberRow = membership.rows[0];
+    const member = memberRow !== undefined && !isTrue(memberRow.removed);
+    // S-01: without a membership or a code the state of the room stays hidden.
+    if (!member && !code) throw new RoomError("forbidden");
+    if (memberRow !== undefined && isTrue(memberRow.removed) && isTrue(memberRow.cut_pending)) throw new RoomError("forbidden");
+    if (room.ended) throw new RoomError("room_ended");
+    if (!member && code) {
+      await redeemInvite(tx, room.serverId, actor.id, code);
+      await audit(tx, actor.id, "server_join", "server", room.serverId);
+    }
+    const signed = await issueRoomToken(env, room.id, actor.id, text(userRow.display_name) ?? "");
+    const nbf = tokenNotBefore(signed.token);
+    await tx.query("update server_members set last_join_nbf = greatest(coalesce(last_join_nbf, 0), $3) where server_id = $1 and user_id = $2", [
+      room.serverId,
+      actor.id,
+      nbf,
+    ]);
+    await tx.query("update rooms set last_join_nbf = greatest(coalesce(last_join_nbf, 0), $2) where id = $1", [room.id, nbf]);
+    await audit(tx, actor.id, "room_join", "room", room.id);
+    return signed;
+  });
 }
 
-async function redeemInvite(db: MigrationClient, id: string, userId: string, code: string): Promise<void> {
-  await db.transaction(async (tx) => {
-    const updated = await tx.query(
-      `update server_invites
-       set use_count = use_count + 1
-       where server_id = $1 and code_hash = $2 and revoked_at is null and expires_at > now() and use_count < max_uses
-       returning id`,
-      [id, hashSecret(code)],
-    );
-    const inviteId = text(updated.rows[0]?.id);
-    if (updated.rows.length !== 1 || !inviteId) throw new RoomError("invalid_invite");
-    // A removed member comes back only with an invite created after the removal.
-    const joined = await tx.query(
-      `insert into server_members (server_id, user_id, role) values ($1, $2, 'participant')
-       on conflict (server_id, user_id) do update set removed_at = null, role = 'participant'
-       where server_members.removed_at is not null
-         and exists (
-           select 1 from server_invites
-           where server_invites.id = $3 and server_invites.created_at > server_members.removed_at
-         )
-       returning user_id`,
-      [id, userId, inviteId],
-    );
-    if (joined.rows.length !== 1) throw new RoomError("forbidden");
-  });
+// The `nbf` LiveKit compares with revokeTokenTs, read from the token just signed. The token is never logged.
+function tokenNotBefore(token: string): string {
+  const payload: unknown = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8"));
+  const nbf = typeof payload === "object" && payload !== null && "nbf" in payload ? payload.nbf : undefined;
+  if (typeof nbf !== "number" || !Number.isInteger(nbf) || nbf < 1) throw new RoomError("room_unconfigured");
+  return String(nbf);
+}
+
+// Runs inside the transaction of the caller. A removed member whose SFU cut is still pending cannot come back.
+async function redeemInvite(tx: MigrationClient, id: string, userId: string, code: string): Promise<void> {
+  const current = await tx.query(
+    "select removed_at is not null and media_cut_at is null as cut_pending from server_members where server_id = $1 and user_id = $2 for update",
+    [id, userId],
+  );
+  if (isTrue(current.rows[0]?.cut_pending)) throw new RoomError("forbidden");
+  const updated = await tx.query(
+    `update server_invites
+     set use_count = use_count + 1
+     where server_id = $1 and code_hash = $2 and revoked_at is null and expires_at > now() and use_count < max_uses
+     returning id`,
+    [id, hashSecret(code)],
+  );
+  const inviteId = text(updated.rows[0]?.id);
+  if (updated.rows.length !== 1 || !inviteId) throw new RoomError("invalid_invite");
+  // A removed member comes back only with an invite created after the removal.
+  const joined = await tx.query(
+    `insert into server_members (server_id, user_id, role) values ($1, $2, 'participant')
+     on conflict (server_id, user_id) do update set removed_at = null, role = 'participant'
+     where server_members.removed_at is not null
+       and exists (
+         select 1 from server_invites
+         where server_invites.id = $3 and server_invites.created_at > server_members.removed_at
+       )
+     returning user_id`,
+    [id, userId, inviteId],
+  );
+  if (joined.rows.length !== 1) throw new RoomError("forbidden");
 }
 
 // The LiveKit room is the room id. Slugs repeat across servers; ids do not.

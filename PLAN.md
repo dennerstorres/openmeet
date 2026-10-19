@@ -39,9 +39,9 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F10-01 | Segurança | Recusar controle e bidi nos nomes (S-21) | F03-03 | IMPLEMENTED | Claude | G10 |
 | F10-02 | Segurança | Sala só para membro, sem username (S-01, S-10) | F03-03 | IMPLEMENTED | Claude | G10 |
 | F10-03 | Segurança | Reuso de refresh revoga a família (S-03) | F03-02 | IMPLEMENTED | Claude | G10 |
-| F10-04 | Segurança | Corte no SFU repetível e join na mesma trava (S-04) | F10-02 | READY | Grok | G10 |
-| F10-05 | Segurança | Desativar conta, senha, recuperação e corte no logout (S-02, S-18) | F10-03,F10-04 | PENDING | Grok | G10 |
-| F10-06 | Segurança | Grant só com as fontes autorizadas (S-09) | F10-04 | PENDING | Grok | G10 |
+| F10-04 | Segurança | Corte no SFU repetível e join na mesma trava (S-04) | F10-02 | WAITING_VALIDATION | Claude | G10 |
+| F10-05 | Segurança | Desativar conta, senha, recuperação e corte no logout (S-02, S-18) | F10-03,F10-04 | READY | Grok | G10 |
+| F10-06 | Segurança | Grant só com as fontes autorizadas (S-09) | F10-04 | READY | Grok | G10 |
 | F10-07 | Segurança | Limite só atrás do segredo do proxy (S-11) | F07-01 | READY | Grok | G10 |
 | F10-08 | Segurança | Bootstrap sem oráculo e sem stdout (S-12) | F07-01 | READY | Grok | G10 |
 | F10-09 | Segurança | Contexto de build sem o .env da stack (S-19) | F07-01 | READY | Grok | G10 |
@@ -57,6 +57,8 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F11-01 | Marca | Novo ícone do app e variantes | F07-02 | WAITING_VALIDATION | Claude | G7 |
 
 ## Estado em 2026-10-19
+
+F10-04 ficou `WAITING_VALIDATION` na branch `task/F10-04-corte`: o código e os testes com SFU falso estão prontos; falta ver o LiveKit real recusar o token antigo depois do corte. F10-05 e F10-06 passaram a `READY` com essa espera, como a F05-01 foi liberada antes.
 
 F10-03 ficou `IMPLEMENTED` na branch `task/F10-03-refresh`: refresh já substituído revoga a família inteira, as outras famílias seguem. Migration `0005_session_family.sql`.
 
