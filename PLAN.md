@@ -69,7 +69,7 @@ F09-02 ficou `WAITING_VALIDATION` na branch `task/F09-02-convite`, sobre a F09-0
 
 F09-03 ficou `IMPLEMENTED` na branch `task/F09-03-layout`, sobre a F09-01: três colunas, card por pessoa e por compartilhamento, destaque, grade, fixar e tela cheia. Visto no navegador com dois participantes sem câmera. Câmera e tela reais no WebView2 ainda não foram vistas. F09-04 passou a `READY`.
 
-F09-01 ficou `IMPLEMENTED` na branch `task/F09-01-servidores`: migration `0002_servers.sql`, rotas de servidor e token LiveKit pelo id da sala. F09-02 e F09-03 passaram a `READY`. A F10 precisa renumerar as migrations do desenho a partir de `0003`. O admin já não entra em servidor de que não é membro, o que adianta parte do S-01.
+F09-01 ficou `IMPLEMENTED` na branch `task/F09-01-servidores`: migration `0002_servers.sql`, rotas de servidor e token LiveKit pelo id da sala. F09-02 e F09-03 passaram a `READY`. A F10 precisa renumerar as migrations do desenho a partir de `0004`. O admin já não entra em servidor de que não é membro, o que adianta parte do S-01.
 
 F10 entrou com os 18 PRs do desenho de segurança (`plans/phase-10-seguranca.md`). Treze estão `READY`. F10-04, F10-05, F10-06, F10-17 e F10-18 esperam outra F10. Nada implementado.
 
