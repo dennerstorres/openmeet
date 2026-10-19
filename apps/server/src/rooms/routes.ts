@@ -39,7 +39,7 @@ const AUTH_STATUS: Record<AuthErrorCode, number> = {
   invalid_display_name: 400,
   weak_password: 400,
   bootstrap_rejected: 401,
-  bootstrap_closed: 409,
+  bootstrap_closed: 404,
   invalid_credentials: 401,
   invalid_session: 401,
   unauthorized: 401,

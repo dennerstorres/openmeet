@@ -11,7 +11,19 @@ node infra/compose/host.mjs --api-domain api.exemplo.com --livekit-domain liveki
 
 O script cria `infra/compose/.env` com senha, `AUTH_SECRET`, chave do LiveKit e `BOOTSTRAP_TOKEN`. Também gera o YAML em `infra/compose/generated/`. Os dois ficam fora do Git. Um arquivo já existente conserva os segredos. `LIVEKIT_URL` fica `wss://` no domínio do signaling. `POC_JOIN` não pode ser `1`.
 
-Na primeira execução o script imprime só o `BOOTSTRAP_TOKEN`. Ele entra na tela do aplicativo para criar o administrador. A API recebe esse token pelo Compose. Sem `--up` os arquivos são gravados e a stack não sobe.
+O script não imprime segredo (S-12). O `BOOTSTRAP_TOKEN` fica só em `infra/compose/.env`, de onde o operador o copia para a tela do aplicativo e cria o administrador. A API recebe esse token pelo Compose. Sem `--up` os arquivos são gravados e a stack não sobe.
+
+Depois de criar o administrador, a rota de bootstrap responde sempre 404, com qualquer token, e o processo da API já não guarda o token. Para tirá-lo também do `.env` e do `docker inspect`:
+
+```bash
+node infra/compose/host.mjs --clear-bootstrap
+```
+
+```bash
+docker compose --env-file infra/compose/.env -f infra/compose/docker-compose.yml up -d --force-recreate api
+```
+
+O primeiro comando lê o estado dentro do container do Postgres (`docker compose exec -T postgres psql`), sem abrir porta, e só apaga a chave quando o banco responde que o bootstrap fechou. Rodar `host.mjs` de novo não recria o token.
 
 A API escuta `0.0.0.0:3000` só na rede do Compose, monta `DATABASE_URL` no entrypoint e aplica as migrations antes de subir. O readiness é `GET /health/ready`.
 

@@ -160,6 +160,12 @@ export async function startSessionFor(db: MigrationClient, secret: string, userI
   return startSession(db, secret, user, undefined, action);
 }
 
+/** S-12: once closed, the bootstrap never looks at a token again, so its answer confirms nothing. */
+export async function bootstrapClosed(db: MigrationClient): Promise<boolean> {
+  const settings = await db.query("select bootstrap_completed from instance_settings where id = 1");
+  return isTrue(settings.rows[0]?.bootstrap_completed);
+}
+
 export async function bootstrapAdmin(
   db: MigrationClient,
   secret: string,

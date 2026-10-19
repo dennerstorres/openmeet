@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fillHostEnv, formatEnv, parseEnv, publicReport } from "../infra/compose/host.mjs";
+import { bootstrapStateCommand, clearBootstrap, fillHostEnv, formatEnv, parseEnv, publicReport } from "../infra/compose/host.mjs";
 import { renderLiveKitYaml } from "../infra/compose/render-livekit.mjs";
 
 const domains = { apiDomain: "api.example.com", livekitDomain: "livekit.example.com" };
@@ -17,10 +17,12 @@ test("host setup creates secrets once and publishes only the bootstrap token", (
   assert.equal(again.BOOTSTRAP_TOKEN, created.BOOTSTRAP_TOKEN);
   assert.equal(again.POSTGRES_PASSWORD, created.POSTGRES_PASSWORD);
   const report = publicReport({}, created);
+  // S-12: the report never carries the bootstrap token.
   assert.equal(
-    report.some((line) => line === `BOOTSTRAP_TOKEN=${created.BOOTSTRAP_TOKEN}`),
-    true,
+    report.some((line) => line.includes(created.BOOTSTRAP_TOKEN)),
+    false,
   );
+  assert.equal(report.includes("BOOTSTRAP_TOKEN written to infra/compose/.env"), true);
   assert.equal(
     report.some((line) => line.includes(created.AUTH_SECRET)),
     false,
@@ -107,4 +109,37 @@ test("the proxy secret is created once, never printed, and the API and database 
   assert.equal(caddy.slice(caddy.indexOf("{$LIVEKIT_DOMAIN}")).includes("PROXY_AUTH"), false);
   const entrypoint = await readFile(new URL("../apps/server/docker-entrypoint.sh", import.meta.url), "utf8");
   assert.match(entrypoint, /TRUST_PROXY:-0\}" = "1" \] && \[ "\$\{#PROXY_AUTH\}" -lt 32 \]/);
+});
+
+test("--clear-bootstrap removes the token only when postgres says the bootstrap is closed (S-12)", async () => {
+  const created = fillHostEnv({}, domains);
+  const command = bootstrapStateCommand();
+  assert.deepEqual(command.slice(command.indexOf("exec"), command.indexOf("exec") + 3), ["exec", "-T", "postgres"]);
+  assert.equal(command.includes("-p"), false);
+  assert.equal(command.includes("--publish"), false);
+  assert.equal(
+    command.some((part) => part.includes(created.POSTGRES_PASSWORD)),
+    false,
+  );
+  for (const result of [
+    { code: 0, stdout: "f\n" },
+    { code: 0, stdout: "" },
+    { code: 1, stdout: "t\n" },
+  ]) {
+    const kept = await clearBootstrap(created, async () => result);
+    assert.equal(kept.cleared, false);
+    assert.equal(kept.env.BOOTSTRAP_TOKEN, created.BOOTSTRAP_TOKEN);
+  }
+  let asked;
+  const done = await clearBootstrap(created, async (args) => {
+    asked = args;
+    return { code: 0, stdout: "t\n" };
+  });
+  assert.deepEqual(asked, command);
+  assert.equal(done.cleared, true);
+  assert.equal("BOOTSTRAP_TOKEN" in done.env, false);
+  assert.equal(formatEnv(done.env).includes(created.BOOTSTRAP_TOKEN), false);
+  const rerun = fillHostEnv(done.env, {});
+  assert.equal("BOOTSTRAP_TOKEN" in rerun, false);
+  assert.deepEqual(publicReport(done.env, rerun).at(-1), "BOOTSTRAP_TOKEN cleared");
 });

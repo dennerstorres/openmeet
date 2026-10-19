@@ -95,7 +95,16 @@ test("bootstrap, login, refresh and logout keep only hashes", async () => {
       url: "/api/v1/auth/bootstrap",
       payload: { token: bootstrapToken, username: "other", password, displayName: "Other" },
     });
-    assert.equal(closed.statusCode, 409);
+    assert.equal(closed.statusCode, 404);
+    // S-12: once closed, the right token, a wrong one, and no body at all get the same answer.
+    for (const payload of [{ token: "wrong-bootstrap-token-value", username: "other", password, displayName: "Other" }, {}, { token: bootstrapToken }]) {
+      const same = await app.inject({ method: "POST", url: "/api/v1/auth/bootstrap", payload });
+      assert.equal(same.statusCode, closed.statusCode);
+      assert.equal(same.body, closed.body);
+    }
+    assert.deepEqual(closed.json(), { error: "bootstrap_closed" });
+    const users = await db.query("select count(*)::int as n from users");
+    assert.equal(users.rows[0]?.n, 1);
 
     const stored = await db.query("select password_hash from users where username = 'admin'");
     const passwordHash = stored.rows[0]?.password_hash;

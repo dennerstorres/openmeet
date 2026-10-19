@@ -3,7 +3,7 @@ import type { AppEnv } from "../poc-join.js";
 import type { MigrationClient } from "../db/migrate.js";
 import { clientAddress, headerValue, ProxyRejected, type AttemptPolicy } from "./limit.js";
 import type { RoomMedia } from "../rooms/media.js";
-import { AuthError, type AuthErrorCode, bootstrapAdmin, changePassword, currentUser, login, logout, refreshSession } from "./service.js";
+import { AuthError, type AuthErrorCode, bootstrapAdmin, bootstrapClosed, changePassword, currentUser, login, logout, refreshSession } from "./service.js";
 
 const STATUS: Record<AuthErrorCode, number> = {
   auth_unconfigured: 503,
@@ -12,7 +12,7 @@ const STATUS: Record<AuthErrorCode, number> = {
   invalid_display_name: 400,
   weak_password: 400,
   bootstrap_rejected: 401,
-  bootstrap_closed: 409,
+  bootstrap_closed: 404,
   invalid_credentials: 401,
   invalid_session: 401,
   unauthorized: 401,
@@ -75,8 +75,11 @@ export function registerAuth(
     try {
       const database = db;
       const secret = configuredSecret(env);
+      if (!database || !secret) throw new AuthError("auth_unconfigured");
+      // Closed: the same 404 for any token and any body, before the token or the body is read.
+      if (await bootstrapClosed(database)) throw new AuthError("bootstrap_closed");
       const expected = configuredBootstrap(env);
-      if (!database || !secret || !expected) throw new AuthError("auth_unconfigured");
+      if (!expected) throw new AuthError("auth_unconfigured");
       const ip = address(request);
       const session = await bootstrapAdmin(
         database,

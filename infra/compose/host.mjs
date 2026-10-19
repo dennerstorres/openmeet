@@ -94,15 +94,63 @@ export function fillHostEnv(existing, input) {
   } else {
     env.LIVEKIT_API_SECRET = currentSecret;
   }
-  keepOrCreate(env, "BOOTSTRAP_TOKEN", bootstrapToken, token(16));
+  // After --clear-bootstrap the token is gone for good; it is not created again.
+  if (env.BOOTSTRAP_DONE === "1") delete env.BOOTSTRAP_TOKEN;
+  else keepOrCreate(env, "BOOTSTRAP_TOKEN", bootstrapToken, token(16));
   return env;
 }
 
+// S-12: the report never carries a secret. The operator reads the bootstrap token from the .env file.
 export function publicReport(before, after) {
   const lines = ["wrote infra/compose/.env", "wrote infra/compose/generated/livekit.yaml"];
-  if ((before.BOOTSTRAP_TOKEN ?? "").trim().length === 0) lines.push(`BOOTSTRAP_TOKEN=${after.BOOTSTRAP_TOKEN}`);
+  if (after.BOOTSTRAP_DONE === "1") lines.push("BOOTSTRAP_TOKEN cleared");
+  else if ((before.BOOTSTRAP_TOKEN ?? "").trim().length === 0) lines.push("BOOTSTRAP_TOKEN written to infra/compose/.env");
   else lines.push("BOOTSTRAP_TOKEN kept");
   return lines;
+}
+
+/** Reads the flag inside the postgres container. No port is published and no password goes in an argument. */
+export function bootstrapStateCommand() {
+  return [
+    "compose",
+    "--env-file",
+    envPath,
+    "-f",
+    path.join(composeDir, "docker-compose.yml"),
+    "exec",
+    "-T",
+    "postgres",
+    "psql",
+    "-U",
+    "openmeet",
+    "-d",
+    "openmeet",
+    "-v",
+    "ON_ERROR_STOP=1",
+    "-tAc",
+    "select bootstrap_completed from instance_settings where id = 1",
+  ];
+}
+
+/** Removes the token only when the database says the bootstrap is closed. Anything else leaves the env as it was. */
+export async function clearBootstrap(env, exec) {
+  const result = await exec(bootstrapStateCommand());
+  if (result.code !== 0 || result.stdout.trim() !== "t") return { env, cleared: false };
+  const next = { ...env, BOOTSTRAP_DONE: "1" };
+  delete next.BOOTSTRAP_TOKEN;
+  return { env: next, cleared: true };
+}
+
+function dockerExec(args) {
+  return new Promise((resolve) => {
+    const child = spawn("docker", args, { cwd: repoRoot, stdio: ["ignore", "pipe", "inherit"] });
+    let stdout = "";
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString("utf8");
+    });
+    child.on("exit", (code) => resolve({ code: code ?? 1, stdout }));
+    child.on("error", () => resolve({ code: 1, stdout: "" }));
+  });
 }
 
 function option(argv, name) {
@@ -136,7 +184,18 @@ function runCompose() {
 async function main() {
   const argv = process.argv.slice(2);
   if (argv.includes("--help")) {
-    process.stdout.write("usage: node infra/compose/host.mjs --api-domain host --livekit-domain host [--up]\n");
+    process.stdout.write("usage: node infra/compose/host.mjs --api-domain host --livekit-domain host [--up] | --clear-bootstrap\n");
+    return;
+  }
+  if (argv.includes("--clear-bootstrap")) {
+    const { env, cleared } = await clearBootstrap(await readExisting(), dockerExec);
+    if (!cleared) {
+      process.stderr.write("bootstrap still open or not readable; infra/compose/.env unchanged\n");
+      process.exitCode = 1;
+      return;
+    }
+    await writeFile(envPath, formatEnv(env), { encoding: "utf8", mode: 0o600 });
+    process.stdout.write("BOOTSTRAP_TOKEN removed from infra/compose/.env; recreate the api service to drop it from the container\n");
     return;
   }
   const before = await readExisting();

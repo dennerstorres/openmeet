@@ -31,7 +31,8 @@ services:
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?set LIVEKIT_API_KEY}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?set LIVEKIT_API_SECRET}
       LIVEKIT_URL: ${LIVEKIT_URL:?set LIVEKIT_URL}
-      BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:?set BOOTSTRAP_TOKEN}
+      # S-12: may be empty after host.mjs --clear-bootstrap.
+      BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-}
       TRUST_PROXY: "1"
       # S-11: shared with Caddy. The API refuses to start without 32 characters of it.
       PROXY_AUTH: ${PROXY_AUTH:?set PROXY_AUTH}

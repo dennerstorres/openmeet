@@ -6,12 +6,6 @@ if [ "${#AUTH_SECRET}" -lt 32 ]; then
   exit 1
 fi
 
-bootstrap="${BOOTSTRAP_TOKEN:-}"
-if [ "${#bootstrap}" -lt 20 ]; then
-  echo "BOOTSTRAP_TOKEN must be at least 20 characters" >&2
-  exit 1
-fi
-
 if [ -z "${LIVEKIT_API_KEY:-}" ] || [ -z "${LIVEKIT_API_SECRET:-}" ] || [ -z "${LIVEKIT_URL:-}" ]; then
   echo "LIVEKIT_API_KEY, LIVEKIT_API_SECRET and LIVEKIT_URL are required" >&2
   exit 1
@@ -40,4 +34,16 @@ process.stdout.write(`postgres://${encodeURIComponent(user)}:${encodeURIComponen
 export DATABASE_URL
 
 node dist/db/cli.js
+
+# S-12: the bootstrap token is looked at only while the bootstrap is open. Once closed it leaves the
+# Node process. A short or missing token does not stop the API; the bootstrap route answers 503.
+if [ "$(node dist/db/bootstrap-state.js)" = "closed" ]; then
+  unset BOOTSTRAP_TOKEN
+else
+  bootstrap="${BOOTSTRAP_TOKEN:-}"
+  if [ "${#bootstrap}" -lt 20 ]; then
+    echo "BOOTSTRAP_TOKEN is shorter than 20 characters; the bootstrap stays unavailable" >&2
+  fi
+fi
+
 exec node dist/main.js
