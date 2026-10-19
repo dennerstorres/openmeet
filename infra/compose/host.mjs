@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { restrictToOwner } from "./acl.mjs";
 import { generatedConfigPath, renderLiveKitYaml } from "./render-livekit.mjs";
 
 const composeDir = path.dirname(fileURLToPath(import.meta.url));
@@ -20,6 +21,7 @@ const order = [
   "POSTGRES_PASSWORD",
   "AUTH_SECRET",
   "PROXY_AUTH",
+  "BACKUP_KEY",
   "LIVEKIT_API_KEY",
   "LIVEKIT_API_SECRET",
   "BOOTSTRAP_TOKEN",
@@ -82,6 +84,8 @@ export function fillHostEnv(existing, input) {
   keepOrCreate(env, "POSTGRES_PASSWORD", password, token(24));
   keepOrCreate(env, "AUTH_SECRET", authSecret, token(24));
   keepOrCreate(env, "PROXY_AUTH", authSecret, token(24));
+  // S-17: encrypts the database backup. Never printed, never the database password.
+  keepOrCreate(env, "BACKUP_KEY", authSecret, token(24));
   keepOrCreate(env, "LIVEKIT_API_KEY", livekitCredential, token(16));
   const currentSecret = env.LIVEKIT_API_SECRET?.trim() ?? "";
   if (currentSecret.length === 0) {
@@ -195,6 +199,7 @@ async function main() {
       return;
     }
     await writeFile(envPath, formatEnv(env), { encoding: "utf8", mode: 0o600 });
+    restrictToOwner(envPath);
     process.stdout.write("BOOTSTRAP_TOKEN removed from infra/compose/.env; recreate the api service to drop it from the container\n");
     return;
   }
@@ -204,6 +209,7 @@ async function main() {
   if (yaml.includes("--dev")) throw new Error("rendered LiveKit config is not production");
   await mkdir(path.dirname(generatedConfigPath()), { recursive: true });
   await writeFile(envPath, formatEnv(env), { encoding: "utf8", mode: 0o600 });
+  restrictToOwner(envPath);
   await writeFile(generatedConfigPath(), yaml, { encoding: "utf8", mode: 0o600 });
   for (const line of publicReport(before, env)) process.stdout.write(`${line}\n`);
   if (!argv.includes("--up")) {

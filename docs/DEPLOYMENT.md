@@ -39,14 +39,18 @@ TURN fica desligado até o operador escolher um modo. Com certificado próprio, 
 A API não pode ganhar `ports` no Compose nem ser publicada fora do Caddy (S-11). O Caddy entrega `X-OpenMeet-Proxy` com o `PROXY_AUTH` do `.env` e reescreve `X-Forwarded-For`; um teste do repositório falha se `api` ou `postgres` publicarem porta. Uma `.env` antiga ganha `PROXY_AUTH` ao rodar `host.mjs` de novo; sem ele a API não sobe.
 
 ## Backup
-Com a stack no ar e `POSTGRES_PASSWORD` só no ambiente do processo:
+Com a stack no ar:
 
 ```
 node infra/compose/pg-copy.mjs backup
 node infra/compose/pg-copy.mjs restore
 ```
 
-O dump vai para `infra/compose/generated/openmeet.sql`. O comando não recebe a senha. Se o arquivo contiver a senha, ele é apagado e a operação falha. Restaurar reescreve os objetos do dump.
+O dump vai cifrado para `infra/compose/generated/openmeet.sql.enc` (S-17): AES-256-GCM com chave derivada de `BACKUP_KEY`, que o `host.mjs` gera, não imprime e não é a senha do Postgres. O comando lê `POSTGRES_PASSWORD` e `BACKUP_KEY` do ambiente ou de `infra/compose/.env` e não passa a senha ao Docker. Nenhum SQL em claro toca o disco. Se o dump contiver a senha do banco, o arquivo parcial é apagado e a operação falha. Restaurar confere a chave e a integridade antes de mandar qualquer linha ao `psql`. Um `.sql.enc` só restaura com a `BACKUP_KEY` da época em que foi gravado: guarde a chave junto do backup, em outro lugar. Um `openmeet.sql` antigo, de antes da cifra, ainda restaura sem chave com `restore infra/compose/generated/openmeet.sql`. No Windows, o `.env` e o backup ficam só com leitura e escrita do usuário atual (`icacls`); no Linux, modo `0600`.
+
+## Firewall do host
+
+O repositório não configura o firewall da VPS; o operador abre só: `80/tcp`, `443/tcp`, `443/udp`, `7881/tcp` e `7882/udp`, e mais `3478/udp` e `5349/tcp` apenas com o TURN de certificado ligado. `3000` (API) e `5432` (Postgres) nunca. O compose de `infra/livekit` é de POC, usa `--dev` e loopback: não use numa VPS.
 
 ## Contas (S-02)
 
