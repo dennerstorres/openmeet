@@ -1,5 +1,20 @@
 # HISTORY — registro cronológico
 
+### 2026-10-18 — F05 a F07-02 no remoto — Grok
+O shell, o diagnóstico, o compose e o instalador entraram nesta branch. Nada passou a `DONE`. Sem GO/NO-GO. O teste nos dois PCs ainda não rodou.
+
+### 2026-10-18 — instalador Windows e CI de release — Grok
+F07-02 ficou `IMPLEMENTED` na branch `task/F07-02-installer`. O bundle é NSIS por usuário, sem assinatura. `pnpm --filter @openmeet/desktop exec tauri build --bundles nsis` gerou `OpenMeet_0.1.0_x64-setup.exe`, 1,94 MiB. SHA256 `96762deb4217ae39e38131f70e3979d014b4b1de92e8a642da82786a415950ce`. `node --test scripts/installer-checksum.test.mjs` 3 pass. O workflow publica só numa tag `v*` e as actions estão presas por SHA. O GitHub Actions não rodou. O instalador não foi aberto. A01 segue sem PASS. Windows, Node v24.18.0, rustc 1.98.1. F08 segue `PENDING`. Sem commit. Sem GO/NO-GO.
+
+### 2026-10-18 — Compose, TLS, TURN e backup — Grok
+F07-01 ficou `IMPLEMENTED` na branch `task/F07-01-compose`. A stack de um nó está em `infra/compose`: Postgres 17.6, API, LiveKit v1.13.10 sem `--dev` e Caddy 2.10.2. O POC em `infra/livekit` não mudou. O YAML do LiveKit sai fora do Git. TURN só liga com domínio e certificados, ou com TLS externo. `node --test scripts/livekit-config.test.mjs scripts/pg-copy.test.mjs` 4 pass. O restore local apagou a linha 7 e a restauração devolveu 7. A imagem da API subiu, aplicou migration e `/health/ready` respondeu `database ok`. Windows, Node v24.18.0, Docker 29.8.1. A VPS, o certificado público e as duas redes não rodaram. F07-02 ficou `READY`. Sem commit. Sem GO/NO-GO.
+
+### 2026-10-18 — diagnóstico e medição da reconexão — Grok
+F06-01 ficou `IMPLEMENTED` na branch `task/F06-01-resilience`. A reunião mostra a última reconexão e exporta `openmeet-diagnostico.json` só com consentimento. O arquivo não leva token, JWT, Bearer nem e-mail. Sair durante a reconexão não vira falha. `pnpm --filter @openmeet/media test` 32 pass. `pnpm --filter @openmeet/media build` e `pnpm --filter @openmeet/desktop typecheck` exit 0. Windows, Node v24.18.0. A janela não foi aberta. A queda de 5 s não rodou. M01–M12 seguem NOT_RUN. F07-01 ficou READY. Sem commit. Sem GO/NO-GO.
+
+### 2026-10-18 — bandeja, atalhos e sessão nativa — Grok
+F05-01 ficou `IMPLEMENTED` na branch `task/F05-01-shell`, com a F04-04 ainda em espera. Fechar a janela esconde o app. A bandeja mostra, alterna microfone e câmera, e sai. Os atalhos globais só registram com consentimento; conflito não entra. O refresh vai para o cofre do Windows, uma entrada por origem, e o access token não é gravado. A preferência fica em JSON local. `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --lib shell::tests` 5 pass. `pnpm --filter @openmeet/desktop typecheck` exit 0. Windows, Node v24.18.0, rustc 1.98.1. A janela não foi aberta. O instalador não rodou. M01–M12 seguem NOT_RUN. F06-01 ficou READY. Sem commit. Sem GO/NO-GO.
+
 ### 2026-10-18 — duração, métricas e dispositivos na reunião — Grok
 F04-04 ficou `WAITING_VALIDATION` na `main`. A reunião troca entrada, saída e câmera sem novo join. O relógio continua na reconexão e some ao sair ou numa falha fatal. As métricas saem a cada 5 s. Sair de uma sala persistente deixa a sala na lista. Cinco câmeras cabem na grade. Áudio de sistema segue desligado. O refresh continua só na memória. `pnpm --filter @openmeet/media test` 28 pass. `pnpm --filter @openmeet/shared test` 18 pass. `pnpm --filter @openmeet/media build` e `pnpm --filter @openmeet/desktop typecheck` exit 0. Windows, Node v24.18.0. A janela não foi aberta. Os 60 min com cinco pessoas não rodaram. M01–M12 seguem NOT_RUN. F05-01 não começou. Sem GO/NO-GO.
 

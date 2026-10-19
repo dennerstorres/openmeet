@@ -1,0 +1,34 @@
+[[permission]]
+identifier = "allow-session-load"
+description = "Enables the session_load command without any pre-configured scope."
+commands.allow = ["session_load"]
+
+[[permission]]
+identifier = "allow-session-save"
+description = "Enables the session_save command without any pre-configured scope."
+commands.allow = ["session_save"]
+
+[[permission]]
+identifier = "allow-session-clear"
+description = "Enables the session_clear command without any pre-configured scope."
+commands.allow = ["session_clear"]
+
+[[permission]]
+identifier = "allow-shell-status"
+description = "Enables the shell_status command without any pre-configured scope."
+commands.allow = ["shell_status"]
+
+[[permission]]
+identifier = "allow-shell-set-consent"
+description = "Enables the shell_set_consent command without any pre-configured scope."
+commands.allow = ["shell_set_consent"]
+
+[[permission]]
+identifier = "allow-shell-tracks"
+description = "Enables the shell_tracks command without any pre-configured scope."
+commands.allow = ["shell_tracks"]
+
+[[permission]]
+identifier = "allow-shell-show"
+description = "Enables the shell_show command without any pre-configured scope."
+commands.allow = ["shell_show"]

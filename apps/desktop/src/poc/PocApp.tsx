@@ -1,5 +1,14 @@
 import { parseApiBase, parseIdentity, parseJoinResponse, parsePastedJoin, parseRoomName, PocInputError } from "@openmeet/shared";
-import { describeMediaError, emptyStats, LiveKitPocSession, mediaActionError, type DeviceKind, type DeviceOption, type PocSnapshot } from "@openmeet/media";
+import {
+  describeMediaError,
+  EMPTY_RECONNECT,
+  emptyStats,
+  LiveKitPocSession,
+  mediaActionError,
+  type DeviceKind,
+  type DeviceOption,
+  type PocSnapshot,
+} from "@openmeet/media";
 import desktopPackage from "../../package.json";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { TrackView } from "./TrackView";
@@ -12,6 +21,7 @@ const idleSnapshot: PocSnapshot = {
   diagnostics: [],
   devices: [],
   stats: emptyStats(),
+  reconnect: EMPTY_RECONNECT,
   microphone: false,
   camera: false,
   screen: false,

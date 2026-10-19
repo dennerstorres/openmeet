@@ -3,5 +3,14 @@
   "identifier": "default",
   "description": "Capability for the main window",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "allow-session-load",
+    "allow-session-save",
+    "allow-session-clear",
+    "allow-shell-status",
+    "allow-shell-set-consent",
+    "allow-shell-tracks",
+    "allow-shell-show"
+  ]
 }

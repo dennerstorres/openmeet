@@ -7,8 +7,10 @@ import {
   LiveKitPocSession,
   localScreenSurface,
   mediaActionError,
+  EMPTY_RECONNECT,
   meetingElapsedMs,
   nextPlayback,
+  reconnectLabel,
   publicationControlsEnabled,
   screenCaption,
   screenShareAction,
@@ -22,6 +24,9 @@ import { MeetingModel, type ShellSnapshot } from "@openmeet/shared";
 import desktopPackage from "../../package.json";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { TrackView } from "../poc/TrackView";
+import { holdMeetingLock } from "../shell/background";
+import { ShellConsent } from "../shell/ShellConsent";
+import { createDesktopVault, isTauri, listenShell, setShortcutConsent, shellStatus, shellTracks, showWindow, type ShellStatus } from "../shell/native";
 import { createFetchApi, createLiveKitMedia } from "./api";
 
 const idleSnapshot: PocSnapshot = {
@@ -32,6 +37,7 @@ const idleSnapshot: PocSnapshot = {
   diagnostics: [],
   devices: [],
   stats: emptyStats(),
+  reconnect: EMPTY_RECONNECT,
   microphone: false,
   camera: false,
   screen: false,
@@ -90,6 +96,11 @@ export function MeetingApp() {
   const [controlPending, setControlPending] = useState(false);
   const [connectedAt, setConnectedAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [shell, setShell] = useState<ShellStatus | null>(null);
+  const [shellPending, setShellPending] = useState(false);
+  const [exportConsent, setExportConsent] = useState(false);
+  const mediaRef = useRef(media);
+  mediaRef.current = media;
 
   function session(): LiveKitPocSession {
     sessionRef.current ??= new LiveKitPocSession({ appVersion: desktopPackage.version });
@@ -97,13 +108,68 @@ export function MeetingApp() {
   }
 
   if (modelRef.current === null) {
-    modelRef.current = new MeetingModel(createFetchApi(), createLiveKitMedia(session));
+    modelRef.current = new MeetingModel(createFetchApi(), createLiveKitMedia(session), isTauri() ? createDesktopVault() : undefined);
   }
   const model = modelRef.current;
   const [state, setState] = useState<ShellSnapshot>(model.snapshot());
 
+  const shellActionRef = useRef<(action: string) => Promise<void>>(async () => undefined);
+  shellActionRef.current = async (action) => {
+    const kind = action === "toggle-microphone" ? "microphone" : action === "toggle-camera" ? "camera" : null;
+    if (kind === null) return;
+    const current = mediaRef.current;
+    const live = state.step === "meeting" && publicationControlsEnabled(current.phase);
+    if (!live) {
+      setMediaError("Não há reunião ativa.");
+      await showWindow().catch(() => undefined);
+      return;
+    }
+    const enable = kind === "microphone" ? !current.microphone : !current.camera;
+    try {
+      if (kind === "microphone") await session().setMicrophone(enable);
+      else await session().setCamera(enable);
+      const microphone = kind === "microphone" ? enable : current.microphone;
+      const camera = kind === "camera" ? enable : current.camera;
+      await shellTracks(true, microphone, camera, kind).catch(() => undefined);
+    } catch (caught) {
+      setMediaError(mediaActionError(kind, caught));
+      await showWindow().catch(() => undefined);
+    }
+  };
+
   useEffect(() => model.subscribe(setState), [model]);
   useEffect(() => session().subscribe(setMedia), []);
+  useEffect(() => {
+    if (!isTauri()) return;
+    void shellStatus()
+      .then(setShell)
+      .catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    if (!isTauri()) return;
+    let stop: (() => void) | undefined;
+    let closed = false;
+    void listenShell((action) => {
+      void shellActionRef.current(action);
+    }).then((unlisten) => {
+      if (closed) unlisten();
+      else stop = unlisten;
+    });
+    return () => {
+      closed = true;
+      stop?.();
+    };
+  }, []);
+  useEffect(() => {
+    const live = state.step === "meeting" && publicationControlsEnabled(media.phase);
+    if (!live) return;
+    return holdMeetingLock();
+  }, [state.step, media.phase]);
+  useEffect(() => {
+    if (!isTauri()) return;
+    const live = state.step === "meeting" && publicationControlsEnabled(media.phase);
+    void shellTracks(live, media.microphone, media.camera, null).catch(() => undefined);
+  }, [state.step, media.phase, media.microphone, media.camera]);
   useEffect(() => {
     const live = state.step === "meeting" && (media.phase === "connected" || media.phase === "reconnecting");
     if (!live) {
@@ -149,6 +215,18 @@ export function MeetingApp() {
   const controlsEnabled = publicationControlsEnabled(media.phase);
   const elapsedMs = meetingElapsedMs(connectedAt, now, state.step === "meeting" ? media.phase : "idle");
   const elapsedLabel = elapsedMs === null ? null : formatElapsed(elapsedMs);
+  const reconnectText = reconnectLabel(media.reconnect);
+
+  function exportDiagnostic(): void {
+    const body = session().exportDiagnostic(exportConsent, new Date().toISOString());
+    if (body === null) return;
+    const url = URL.createObjectURL(new Blob([body], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "openmeet-diagnostico.json";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 
   function levelFor(id: string): PlaybackLevel {
     return levels[id] ?? DEFAULT_PLAYBACK;
@@ -194,6 +272,23 @@ export function MeetingApp() {
       </header>
       {notice ? <p className="error">{notice}</p> : null}
       {mediaError ? <p className="error">{mediaError}</p> : null}
+      {isTauri() && state.step !== "instance" ? (
+        <ShellConsent
+          status={shell}
+          pending={shellPending}
+          onConsent={(consent) => {
+            setShellPending(true);
+            void setShortcutConsent(consent)
+              .then(setShell)
+              .catch(() => {
+                setMediaError("Não foi possível gravar a preferência de atalhos.");
+              })
+              .finally(() => {
+                setShellPending(false);
+              });
+          }}
+        />
+      ) : null}
       {state.step === "instance" ? (
         <InstanceStep address={address} pending={state.pending} onAddress={setAddress} onConfirm={() => void model.confirmInstance(address)} />
       ) : null}
@@ -243,6 +338,7 @@ export function MeetingApp() {
             Estado: <strong>{media.phase}</strong>
             {media.disconnectReason ? ` · ${media.disconnectReason}` : ""}
             {elapsedLabel ? ` · ${elapsedLabel}` : ""}
+            {reconnectText ? ` · ${reconnectText}` : ""}
           </p>
           <p>{media.participants.length} na sala</p>
           {media.participants.length === 0 ? (
@@ -297,6 +393,19 @@ export function MeetingApp() {
           ) : (
             <p>Métricas ainda não disponíveis.</p>
           )}
+          <label>
+            <input
+              type="checkbox"
+              checked={exportConsent}
+              onChange={(event) => {
+                setExportConsent(event.currentTarget.checked);
+              }}
+            />
+            Autorizar exportação do diagnóstico
+          </label>
+          <button type="button" disabled={!exportConsent} onClick={() => exportDiagnostic()}>
+            Exportar diagnóstico
+          </button>
           <button
             type="button"
             onClick={() => {

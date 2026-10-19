@@ -19,10 +19,10 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F04-02 | Reuniões | Controles de volume/mute/câmera | F04-01 | IMPLEMENTED | Grok | G4 |
 | F04-03 | Reuniões | Compartilhamento e layouts | F04-01 | IMPLEMENTED | Grok | G4 |
 | F04-04 | Reuniões | E2E 5 participantes e persistência | F04-02,F04-03 | WAITING_VALIDATION | Codex review | G4 |
-| F05-01 | Desktop | Bandeja, atalhos, notificações, sessão | F04-04 | PENDING | Grok | G5 |
-| F06-01 | Resiliência | Stats WebRTC/logs/reconexão/export | F05-01 | PENDING | Grok | G6 |
-| F07-01 | Infra | Compose/TLS/TURN/backup/restauração | F06-01 | PENDING | Grok | G7 |
-| F07-02 | Distribuição | Instalador Windows + CI release | F07-01 | PENDING | Grok | G7 |
+| F05-01 | Desktop | Bandeja, atalhos, notificações, sessão | F04-04 | IMPLEMENTED | Grok | G5 |
+| F06-01 | Resiliência | Stats WebRTC/logs/reconexão/export | F05-01 | IMPLEMENTED | Grok | G6 |
+| F07-01 | Infra | Compose/TLS/TURN/backup/restauração | F06-01 | IMPLEMENTED | Grok | G7 |
+| F07-02 | Distribuição | Instalador Windows + CI release | F07-01 | IMPLEMENTED | Grok | G7 |
 | F02-02 | POC | Conectar dois clientes Windows ao mesmo room | F02-01 | WAITING_VALIDATION | Grok | G2 |
 | F02-03 | POC | Áudio bidirecional, mic/câmera e devices | F02-02 | WAITING_VALIDATION | Grok | G2 |
 | F02-04 | POC | Captura de monitor e janela | F02-02 | WAITING_VALIDATION | Grok | G2 |
@@ -32,7 +32,7 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 
 ## Estado em 2026-10-18
 
-Nenhuma tarefa está `DONE`. F01-01–F01-04, F02-01, F03-01–F03-04 e F04-01–F04-03 estão `IMPLEMENTED`. O ADR 0005 abre `https:` e `wss:` na CSP e tira o domínio de teste. O ADR 0006 prende o access token à sessão. F03-04 saiu de `BLOCKED`: as correções do parecer estão no código e o G3 ainda não foi reaprovado. F04-04 está `WAITING_VALIDATION`: a reunião mostra relógio, métricas e troca de dispositivo, e a sala persistente continua na lista, mas os 60 min com cinco pessoas não rodaram. F05-01 segue `PENDING`. F02-02–F02-05 seguem `WAITING_VALIDATION`. M01–M12 continuam `NOT_RUN`. F02-06 segue `BLOCKED`, sem GO e sem NO-GO. O aceite final e o F08 continuam dependendo da evidência de dois PCs. Se esse teste falhar, para e registra alternativa. Não marcar GO.
+Nenhuma tarefa está `DONE`. F01-01–F01-04, F02-01, F03-01–F03-04 e F04-01–F04-03 estão `IMPLEMENTED`. O ADR 0005 abre `https:` e `wss:` na CSP e tira o domínio de teste. O ADR 0006 prende o access token à sessão. F03-04 saiu de `BLOCKED`: as correções do parecer estão no código e o G3 ainda não foi reaprovado. F04-04 está `WAITING_VALIDATION`: a reunião mostra relógio, métricas e troca de dispositivo, e a sala persistente continua na lista, mas os 60 min com cinco pessoas não rodaram. F05-01 foi autorizada com essa espera e ficou `IMPLEMENTED`: bandeja, atalhos só com consentimento, notificação e refresh no cofre do Windows. A janela não foi aberta. F06-01 ficou `IMPLEMENTED`: a reunião mede a reconexão e exporta o diagnóstico só com consentimento, sem token. A queda de rede de 5 s não rodou. F07-01 ficou `IMPLEMENTED`: Compose de um nó, LiveKit sem `--dev`, proxy TLS, TURN opcional e backup. O restore local devolveu a linha e a API ficou ready. A VPS não foi usada. F07-02 ficou `IMPLEMENTED`: o NSIS local saiu e o workflow de release só publica numa tag. O CI não rodou no GitHub e o instalador não foi aberto numa máquina sem toolchain. F08 segue `PENDING`. F02-02–F02-05 seguem `WAITING_VALIDATION`. M01–M12 continuam `NOT_RUN`. F02-06 segue `BLOCKED`, sem GO e sem NO-GO. O aceite final e o F08 continuam dependendo da evidência de dois PCs. Se esse teste falhar, para e registra alternativa. Não marcar GO.
 
 ### Revisões — correções em 2026-10-18
 

@@ -6,15 +6,19 @@ export interface DiagnosticEvent {
   message: string;
 }
 
-export function sanitizeDiagnostic(message: string, secrets: readonly string[] = []): string {
-  let sanitized = message.replace(JWT_PATTERN, "[redacted-jwt]");
+export function redactText(value: string, secrets: readonly string[] = []): string {
+  let sanitized = value.replace(JWT_PATTERN, "[redacted-jwt]");
+  sanitized = sanitized.replace(/Bearer\s+\S+/gi, "Bearer [redacted]");
+  sanitized = sanitized.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, "[redacted-email]");
   for (const secret of secrets) {
-    if (secret.length < 4) {
-      continue;
-    }
+    if (secret.length < 4) continue;
     sanitized = sanitized.split(secret).join("[redacted]");
   }
-  return sanitized.slice(0, 300);
+  return sanitized;
+}
+
+export function sanitizeDiagnostic(message: string, secrets: readonly string[] = []): string {
+  return redactText(message, secrets).slice(0, 300);
 }
 
 export function mediaActionError(action: string, error: unknown): string {

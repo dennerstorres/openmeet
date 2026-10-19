@@ -6,7 +6,7 @@
 - `packages/shared`: tipos OpenAPI e validação.
 - `packages/media`: adapters `MediaProvider` e implementação LiveKit, desacoplados da UI.
 - `packages/ui`: componentes sem dependências de backend.
-- `infra`: Compose, configuração LiveKit, reverse proxy, provisionamento e backup.
+- `infra`: Compose, configuração LiveKit, reverse proxy, provisionamento e backup. `infra/compose` é a stack de um nó. `infra/livekit` continua o POC em loopback com `--dev`.
 
 ## Fluxo de reunião
 1. Desktop conecta HTTPS à instância configurada; usuário autentica.
@@ -19,14 +19,14 @@
 ## Estado
 - PostgreSQL: usuários, refresh sessions, rooms, memberships, invites, auditoria, configurações.
 - LiveKit: participantes ativos, tracks, qualidade/conexão.
-- Cliente: preferências locais e estado transitório.
+- Cliente: preferências locais e estado transitório. O diagnóstico exportado leva fase, métricas e tempos de reconexão, e só sai com consentimento. Token, JWT, Bearer e e-mail não entram.
 - Não salvar estado de participante em Postgres como verdade online; não adicionar Socket.IO sem necessidade específica.
 
 ## Segurança
 - Sem master account global; cada instalação é independente.
 - Proteger bootstrap inicial com token de instalação de uso único ou mecanismo equivalente, não página aberta indefinidamente.
 - Segredos de aplicação em env/secret store, não versionar credenciais.
-- Refresh token rotativo e revogável. O access token aponta para essa sessão e deixa de valer no logout e na rotação. O armazenamento nativo do refresh ainda não existe: ele fica só na memória da janela.
+- Refresh token rotativo e revogável. O access token aponta para essa sessão e deixa de valer no logout e na rotação. No aplicativo Tauri, o refresh fica no cofre de credenciais do Windows, uma entrada por origem. Fora do Tauri, ele continua só na memória. O access token não é gravado. A preferência de atalho fica num JSON local, sem segredo.
 - Encerrar a sala ou remover um membro grava a decisão e pede ao LiveKit para desconectar. Se o SFU falhar, a API responde 502 e a decisão no banco permanece.
 - Login e bootstrap têm limite de tentativas. `TRUST_PROXY=1` considera só o primeiro hop encaminhado.
 - Sem E2EE declarado no MVP; proteger signaling, REST e media transport; limitar retenção de logs.

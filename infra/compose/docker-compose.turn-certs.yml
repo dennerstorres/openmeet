@@ -1,0 +1,5 @@
+services:
+  livekit:
+    volumes:
+      - ${TURN_CERT_FILE:?set TURN_CERT_FILE}:/certs/turn.pem:ro
+      - ${TURN_KEY_FILE:?set TURN_KEY_FILE}:/certs/turn.key:ro

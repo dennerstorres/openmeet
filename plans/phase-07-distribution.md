@@ -2,11 +2,20 @@
 
 Objetivo: Infra Docker + instalador.
 
-## Execução
-Consultar as tarefas `F07-*` em `PLAN.md`, seus pré-requisitos e os quality gates. Dividir implementações em pequenos commits e evidenciar testes.
+## F07-01
+`IMPLEMENTED` em 2026-10-18 na branch `task/F07-01-compose`.
+
+A stack de um nó está em `infra/compose`: Postgres, API, LiveKit sem `--dev` e Caddy. O POC em `infra/livekit` não mudou. O YAML do LiveKit é gerado fora do Git e recusa chave vazia. TURN só entra com domínio e um modo completo, certificados ou TLS externo. O backup usa `pg_dump` no serviço Postgres e recusa um dump que contenha a senha.
+
+No Docker local, o `pg_dump` restaurou a linha 7 e a API ficou healthy em `/health/ready`. A VPS, o certificado público e as duas redes não rodaram. Essa parte segue sem PASS.
+
+## F07-02
+`IMPLEMENTED` em 2026-10-18 na branch `task/F07-02-installer`.
+
+O bundle Windows é NSIS por usuário, sem assinatura. O build local gerou `OpenMeet_0.1.0_x64-setup.exe`. O workflow `.github/workflows/release.yml` gera o instalador e o `SHA256SUMS`. A publicação só ocorre numa tag `v*`. O GitHub Actions não rodou e o instalador não foi executado numa máquina sem toolchain.
 
 ## Critério de saída
-Restore test e uso VPS externa.
+Restore test e uso VPS externa. Um restore local não fecha a fase.
 
 ## Observação
 Não concluir fase por implementação superficial ou mocks. Dependências externas e validações reais precisam de evidência ou status WAITING_VALIDATION.

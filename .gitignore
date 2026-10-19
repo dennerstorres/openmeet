@@ -4,6 +4,7 @@ target/
 .env
 .env.*
 !.env.example
+infra/compose/generated/
 *.log
 coverage/
 .DS_Store

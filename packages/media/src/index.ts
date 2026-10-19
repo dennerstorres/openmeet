@@ -1,4 +1,6 @@
-export { describeMediaError, mediaActionError, sanitizeDiagnostic } from "./diagnostics.js";
+export { describeMediaError, mediaActionError, redactText, sanitizeDiagnostic } from "./diagnostics.js";
+export { buildDiagnosticExport, dropOpenReconnect, EMPTY_RECONNECT, pushReconnect, reconnectLabel, summarizeReconnect } from "./report.js";
+export type { DiagnosticExportInput, ReconnectMark, ReconnectSummary } from "./report.js";
 export { applyPlayback, clampVolume, DEFAULT_PLAYBACK, nextPlayback, publicationControlsEnabled } from "./playback.js";
 export { arrangeTiles, localScreenSurface, screenCaption, screenShareAction, screenSourceLabel } from "./layout.js";
 export { formatElapsed, meetingElapsedMs } from "./watch.js";

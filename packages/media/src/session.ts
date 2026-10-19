@@ -10,6 +10,7 @@ import {
   type TrackPublication,
 } from "livekit-client";
 import { describeMediaError, mediaActionError, sanitizeDiagnostic, type DiagnosticEvent } from "./diagnostics.js";
+import { buildDiagnosticExport, dropOpenReconnect, pushReconnect, summarizeReconnect, type ReconnectMark, type ReconnectSummary } from "./report.js";
 import { classifyDisconnect, nextPhase, type ConnectionPhase } from "./phase.js";
 import { collectTrackReports, emptyStats, readDisplaySurface, readUserAgent, summarizeRtcStats, type RtcSnapshot } from "./stats.js";
 
@@ -62,6 +63,7 @@ export interface PocSnapshot {
   diagnostics: DiagnosticEvent[];
   devices: DeviceOption[];
   stats: RtcSnapshot;
+  reconnect: ReconnectSummary;
   microphone: boolean;
   camera: boolean;
   screen: boolean;
@@ -107,6 +109,7 @@ export class LiveKitPocSession {
   private explicitLeave = false;
   private devices: DeviceOption[] = [];
   private stats: RtcSnapshot;
+  private marks: ReconnectMark[] = [];
 
   constructor(options?: { appVersion?: string; room?: Room }) {
     this.room = options?.room ?? new Room();
@@ -114,20 +117,25 @@ export class LiveKitPocSession {
     this.stats = { ...emptyStats(), userAgent: readUserAgent(), appVersion: this.appVersion };
     this.room.on(RoomEvent.Reconnecting, () => {
       this.phase = nextPhase(this.phase, "reconnecting");
+      this.marks = pushReconnect(this.marks, "start", Date.now());
       this.note("info", "reconnecting");
     });
     this.room.on(RoomEvent.SignalReconnecting, () => {
       this.phase = nextPhase(this.phase, "reconnecting");
+      this.marks = pushReconnect(this.marks, "start", Date.now());
       this.note("info", "signal reconnecting");
     });
     this.room.on(RoomEvent.Reconnected, () => {
       this.phase = nextPhase(this.phase, "reconnected");
       this.disconnectReason = null;
+      this.marks = pushReconnect(this.marks, "recovered", Date.now());
       this.note("info", "reconnected");
     });
     this.room.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
-      const outcome = classifyDisconnect(reason, this.explicitLeave);
+      const explicitLeave = this.explicitLeave;
+      const outcome = classifyDisconnect(reason, explicitLeave);
       this.explicitLeave = false;
+      this.marks = explicitLeave ? dropOpenReconnect(this.marks) : pushReconnect(this.marks, "fatal", Date.now());
       this.phase = nextPhase(this.phase, outcome.event);
       this.disconnectReason = outcome.reason;
       this.tiles.clear();
@@ -191,14 +199,34 @@ export class LiveKitPocSession {
       diagnostics: [...this.diagnostics],
       devices: [...this.devices],
       stats: this.stats,
+      reconnect: summarizeReconnect(this.marks),
       microphone: local.isMicrophoneEnabled,
       camera: local.isCameraEnabled,
       screen: local.isScreenShareEnabled,
     };
   }
 
+  exportDiagnostic(consent: boolean, exportedAt: string): string | null {
+    const snapshot = this.snapshot();
+    return buildDiagnosticExport(
+      {
+        exportedAt,
+        phase: snapshot.phase,
+        disconnectReason: snapshot.disconnectReason,
+        appVersion: snapshot.stats.appVersion,
+        userAgent: snapshot.stats.userAgent,
+        stats: snapshot.stats,
+        events: snapshot.diagnostics,
+        reconnect: snapshot.reconnect,
+        secrets: this.secrets,
+      },
+      consent,
+    );
+  }
+
   async connect(url: string, token: string): Promise<void> {
     this.secrets.push(token);
+    this.marks = [];
     this.explicitLeave = false;
     this.disconnectReason = null;
     this.phase = nextPhase(this.phase, "connect_started");
