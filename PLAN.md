@@ -14,7 +14,7 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F03-01 | Identidade | Schema e migrations Postgres | F02-01 | IMPLEMENTED | Grok | G3 |
 | F03-02 | Identidade | Bootstrap/admin, login e sessões seguras | F03-01 | IMPLEMENTED | Grok | G3 |
 | F03-03 | Identidade | Rooms, convites, RBAC e token LiveKit | F03-02 | IMPLEMENTED | Grok | G3 |
-| F03-04 | Identidade | Testes de abuso e auth | F03-03 | PENDING | Codex review | G3 |
+| F03-04 | Identidade | Testes de abuso e auth | F03-03 | BLOCKED | Codex review | G3 |
 | F04-01 | Reuniões | UI de instância, salas, reunião | F03-03 | PENDING | Grok | G4 |
 | F04-02 | Reuniões | Controles de volume/mute/câmera | F04-01 | PENDING | Grok | G4 |
 | F04-03 | Reuniões | Compartilhamento e layouts | F04-01 | PENDING | Grok | G4 |
@@ -33,6 +33,10 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 ## Estado em 2026-10-18
 
 Nenhuma tarefa está `DONE`. F01-01–F01-04, F02-01 e F03-01–F03-03 estão `IMPLEMENTED`. F03-04 segue `PENDING` e é revisão do Codex. F02-02–F02-05 seguem `WAITING_VALIDATION` e foram para o fim do plano: M01–M12 continuam `NOT_RUN`. F02-06 segue `BLOCKED`, sem GO e sem NO-GO. Salas e auth rodaram no PGlite; a API no ar não conecta no banco. O aceite final e o F08 continuam dependendo da evidência de dois PCs. Se esse teste falhar, para e registra alternativa. Não marcar GO.
+
+### Revisão F03-04 — 2026-10-18
+
+F03-04 passou por READY e IN_PROGRESS e está BLOCKED: revisão executada, G3 não aprovado. O estado PENDING descrito acima é anterior à revisão. Quatro achados altos (banco ausente no runtime, moderação sem operação no SFU, access token após logout e readmissão por convite anterior) e dois médios estão em `docs/reviews/F03-04-parecer.md`. Testes server: 15/15; typecheck e build passaram. Reproduções de falha não equivalem a aceite. Próximo passo: correções pelo executor e nova revisão; nenhuma tarefa promovida a DONE.
 
 ## Regras de promoção
 - `READY`: dependências `IMPLEMENTED` ou `DONE`. O GO de F02-06 só é exigido no F08.

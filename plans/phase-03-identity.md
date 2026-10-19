@@ -18,4 +18,6 @@ Bootstrap único em `POST /api/v1/auth/bootstrap`, depois login, refresh e logou
 Salas, convite de uso limitado, remoção de participante e encerramento. O token LiveKit sai só depois da autorização, com TTL de 10 minutos, sala única e identidade igual ao id do usuário. O código do convite não fica no banco. RBAC de abuso e a revisão do Codex continuam em F03-04. A fase não fecha aqui.
 
 ## Observação
+F03-04: revisão Codex em 2026-10-18, BLOCKED, G3 não aprovado. Parecer em `docs/reviews/F03-04-parecer.md`: quatro achados altos e dois médios. Testes de auth/rooms ampliados, 15 testes server passando, inclusive caracterizações dos defeitos. Typecheck e build passaram. Falta corrigir, validar PostgreSQL no runtime e moderação real do LiveKit, e concluir revisão antes do aceite.
+
 Não concluir fase por implementação superficial ou mocks. Dependências externas e validações reais precisam de evidência ou status WAITING_VALIDATION.

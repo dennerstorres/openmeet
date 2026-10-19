@@ -141,6 +141,9 @@ test("invite join issues a room-scoped token and hides the invite code", async (
     assert.equal(grants.video?.room, "sala");
     assert.equal(grants.video?.roomJoin, true);
     assert.equal(grants.video?.canPublishData, false);
+    assert.equal(grants.video?.roomAdmin, undefined);
+    assert.equal(grants.video?.roomCreate, undefined);
+    assert.equal(Number(grants.exp) - Number(grants.nbf), 600);
 
     const again = await app.inject({ method: "POST", url: `/api/v1/rooms/${roomId}/join`, headers: auth(memberToken), payload: {} });
     assert.equal(again.statusCode, 200);
@@ -162,15 +165,90 @@ test("invite join issues a room-scoped token and hides the invite code", async (
     const reused = await app.inject({ method: "POST", url: `/api/v1/rooms/${roomId}/join`, headers: auth(otherToken), payload: { code } });
     assert.equal(reused.statusCode, 403);
 
+    for (const token of [memberToken, otherToken]) {
+      const escalation = await app.inject({
+        method: "POST",
+        url: "/api/v1/admin/users",
+        headers: auth(token),
+        payload: { username: "escalation", password: memberPassword, displayName: "Escalation", role: "moderator" },
+      });
+      assert.equal(escalation.statusCode, 403);
+      const forbiddenEnd = await app.inject({ method: "PATCH", url: `/api/v1/rooms/${roomId}`, headers: auth(token), payload: { ended: true } });
+      assert.equal(forbiddenEnd.statusCode, token === memberToken ? 403 : 404);
+    }
+    const anonymousJoin = await app.inject({ method: "POST", url: `/api/v1/rooms/${roomId}/join`, payload: {} });
+    assert.equal(anonymousJoin.statusCode, 401);
+    const hiddenRoom = await app.inject({ method: "GET", url: `/api/v1/rooms/${roomId}`, headers: auth(otherToken) });
+    assert.equal(hiddenRoom.statusCode, 404);
+    const hiddenList = await app.inject({ method: "GET", url: "/api/v1/rooms", headers: auth(otherToken) });
+    assert.deepEqual(hiddenList.json(), []);
+
+    for (const state of ["revoked", "expired", "wrong-room"] as const) {
+      const invitation = await app.inject({
+        method: "POST",
+        url: `/api/v1/rooms/${roomId}/invites`,
+        headers: auth(adminToken),
+        payload: { expiresInMinutes: 30 },
+      });
+      assert.equal(invitation.statusCode, 201);
+      const inviteBody = invitation.json() as { id: string; code: string };
+      let targetRoom = roomId;
+      if (state === "revoked") {
+        const revoke = await app.inject({ method: "DELETE", url: `/api/v1/rooms/${roomId}/invites/${inviteBody.id}`, headers: auth(adminToken) });
+        assert.equal(revoke.statusCode, 204);
+      } else if (state === "expired") {
+        await db.query("update invites set expires_at = now() - interval '1 second' where id = $1", [inviteBody.id]);
+      } else {
+        const another = await app.inject({
+          method: "POST",
+          url: "/api/v1/rooms",
+          headers: auth(adminToken),
+          payload: { name: "Another", slug: "another", kind: "persistent" },
+        });
+        assert.equal(another.statusCode, 201);
+        targetRoom = (another.json() as { id: string }).id;
+      }
+      const invalidInvite = await app.inject({
+        method: "POST",
+        url: `/api/v1/rooms/${targetRoom}/join`,
+        headers: auth(otherToken),
+        payload: { code: inviteBody.code },
+      });
+      assert.equal(invalidInvite.statusCode, 403);
+      const uses = await db.query("select use_count from invites where id = $1", [inviteBody.id]);
+      assert.equal(uses.rows[0]?.use_count, 0);
+    }
+
+    const reusable = await app.inject({
+      method: "POST",
+      url: `/api/v1/rooms/${roomId}/invites`,
+      headers: auth(adminToken),
+      payload: { expiresInMinutes: 30, maxUses: 2 },
+    });
+    assert.equal(reusable.statusCode, 201);
+    const reusableCode = (reusable.json() as { code: string }).code;
+
     const removed = await app.inject({ method: "DELETE", url: `/api/v1/rooms/${roomId}/members/${memberId}`, headers: auth(adminToken) });
     assert.equal(removed.statusCode, 204);
     const blocked = await app.inject({ method: "POST", url: `/api/v1/rooms/${roomId}/join`, headers: auth(memberToken), payload: {} });
     assert.equal(blocked.statusCode, 403);
+    // Review reproduction, not acceptance: a valid invite restores a removed membership.
+    const restored = await app.inject({ method: "POST", url: `/api/v1/rooms/${roomId}/join`, headers: auth(memberToken), payload: { code: reusableCode } });
+    assert.equal(restored.statusCode, 200, "F03-04 A4: removed member can redeem an existing invite");
     const ended = await app.inject({ method: "PATCH", url: `/api/v1/rooms/${roomId}`, headers: auth(adminToken), payload: { ended: true } });
     assert.equal(ended.statusCode, 204);
     const closed = await app.inject({ method: "POST", url: `/api/v1/rooms/${roomId}/join`, headers: auth(adminToken), payload: {} });
     assert.equal(closed.statusCode, 403);
     assert.equal(closed.json().error, "room_ended");
+    // The previously issued JWT remains cryptographically valid; this does not test a live SFU.
+    const stillValid = await new TokenVerifier(apiKey, apiSecret).verify(body.token);
+    assert.equal(stillValid.video?.roomJoin, true);
+    const preflight = await app.inject({
+      method: "OPTIONS",
+      url: `/api/v1/rooms/${roomId}`,
+      headers: { origin: "http://localhost:1420", "access-control-request-method": "PATCH" },
+    });
+    assert.equal(preflight.headers["access-control-allow-methods"], "GET, POST", "F03-04 M1: browser cannot PATCH/DELETE");
 
     const audit = await db.query("select action from audit_events");
     const blob = audit.rows.map((row) => String(row.action)).join(" ");

@@ -1,5 +1,19 @@
 # HISTORY — registro cronológico
 
+### 2026-10-18 — revisão F03-04 concluída com bloqueios — Codex
+Branch: `task/F03-04-auth-review`; base `d746a5eb35230b7c9806383286c45642ed20763d`, sem commit novo. Plataforma Windows/PowerShell, Node v24.18.0, pnpm 10.30.2.
+Alterados: testes auth/rooms, PLAN, plano fase 03, HISTORY; criado `docs/reviews/F03-04-parecer.md`. Nenhuma alteração em código de produção.
+Comandos/resultados: `pnpm --filter @openmeet/server test` exit 0, 15/15; `pnpm lint`, `pnpm typecheck`, `pnpm build` exit 0. Build avisa chunk >500 kB, não inclui instalador. `pnpm exec prettier --write apps/server/test/auth.test.ts apps/server/test/rooms.test.ts` exit 0.
+Achados: A1 runtime sem banco; A2 moderação sem ação SFU; A3 access token sobrevive logout; A4 convite anterior readmite removido; M1 CORS impede PATCH/DELETE; M2 ausência de limitação de tentativas. Evidências e critérios no parecer. Caracterizações passam ao reproduzir defeitos, não aprovam segurança.
+Estado final: F03-04 BLOCKED, G3 não aprovado; nenhum DONE. PGlite/inject e assinatura real, sem PostgreSQL externo, concorrência real ou mídia em dois PCs. M01–M12 não alterados; sem GO/NO-GO.
+Próximo passo: executor corrige achados, atualiza expectativas dos testes e entrega para nova revisão/validação operacional.
+
+### 2026-10-18 — início F03-04 — Codex
+Branch: `task/F03-04-auth-review`. Dependência F03-03 IMPLEMENTED; F03-04 promovida de PENDING para READY antes da execução.
+Escopo: revisão de auth/RBAC/convites/tokens, testes negativos e reprodução dos achados, sem alterar segurança em produção.
+Arquivos previstos: `apps/server/test/auth.test.ts`, `apps/server/test/rooms.test.ts`, `docs/reviews/F03-04-parecer.md`, `PLAN.md`, `plans/phase-03-identity.md`, `HISTORY.md`.
+Plano de testes: suíte server com PGlite e assinaturas reais, lint, typecheck e build; distinguir reprodução de falha de aceite. Sem validação de mídia por mocks; PostgreSQL externo e dois PCs não presumidos.
+
 ### 2026-10-18 — salas, convite e token LiveKit — Grok
 F03-03 ficou `IMPLEMENTED`. Admin cria sala e conta. Convite guarda só o hash e vale uma vez. Participante entra com token de 10 minutos, sala e identidade opaca. Remoção e sala encerrada bloqueiam o join. `pnpm --filter @openmeet/server test` 15 pass, fail 0, Windows, PGlite. `/health/ready` segue `not_configured`. A API no ar não recebeu banco. F03-04 não começou. M01–M12 seguem NOT_RUN. Sem GO/NO-GO.
 

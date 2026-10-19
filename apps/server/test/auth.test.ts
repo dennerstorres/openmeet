@@ -148,6 +148,23 @@ test("bootstrap, login, refresh and logout keep only hashes", async () => {
     const afterLogout = await app.inject({ method: "POST", url: "/api/v1/auth/refresh", payload: { refreshToken: third.refreshToken } });
     assert.equal(afterLogout.statusCode, 401);
 
+    // Review reproduction: logout revokes refresh, but the access token remains usable.
+    const accessAfterLogout = await app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: `Bearer ${third.accessToken}` } });
+    assert.equal(accessAfterLogout.statusCode, 200, "F03-04 A3: access token survives logout");
+
+    for (const token of ["invalid", `${third.accessToken}tampered`, signAccessToken("another-instance-secret", me.json().id as string)]) {
+      const invalid = await app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: `Bearer ${token}` } });
+      assert.equal(invalid.statusCode, 401);
+    }
+    const malformed = await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { username: { sql: "admin" }, password } });
+    assert.equal(malformed.statusCode, 400);
+    const absent = await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { username: "absent", password } });
+    assert.equal(absent.statusCode, 401);
+    assert.equal(absent.json().error, badLogin.json().error);
+    await db.query("update refresh_sessions set expires_at = now() - interval '1 second' where token_hash = $1", [hashSecret(session.refreshToken)]);
+    const expiredRefresh = await app.inject({ method: "POST", url: "/api/v1/auth/refresh", payload: { refreshToken: session.refreshToken } });
+    assert.equal(expiredRefresh.statusCode, 401);
+
     await db.query("update users set disabled_at = now() where username = 'admin'");
     const blocked = await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { username: "admin", password } });
     assert.equal(blocked.statusCode, 401);
