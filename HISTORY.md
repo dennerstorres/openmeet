@@ -1,5 +1,59 @@
 # HISTORY — registro cronológico
 
+### 2026-10-19 — desenho das correções de segurança — Grok e Claude
+O desenho de S-01 a S-21 está em `docs/reviews/security-fixes-design-2026-10-19.md`, com 18 PRs e a ordem mínima entre eles. Grok escreveu e passou por três revisões. A última caiu no limite do Grok; Claude fechou os dois pontos menores abertos: restore de `.sql` antigo fora do guard do backup, e teste do `PROXY_AUTH` separado entre API e Caddy. Sem código. Sem commit. Sem GO/NO-GO.
+
+### 2026-10-19 — auditoria de segurança — Grok
+Leitura estática, sem teste de invasão e sem mudança de comportamento. O registro está em `docs/reviews/security-audit-2026-10-19.md`. Não achei invasão sem credencial. Cinco pontos altos: admin entra em qualquer sala, não há corte de conta, refresh reapresentado não mata a sessão nova, o SFU pode deixar a pessoa na chamada, e o cofre entrega refresh de outra origem ao JavaScript. Sem commit. Sem GO/NO-GO.
+
+### 2026-10-19 — F09 no SPEC e no PLAN — Grok
+Os ADR 0007–0013 entraram no SPEC como RF-11 a RF-18 e no PLAN como F09-01 a F09-07. O detalhe está em `plans/phase-09-servidores.md`. Nada foi implementado. Sem commit. Sem GO/NO-GO.
+
+### 2026-10-19 — presença, link e ensurdecer — Grok
+O ADR 0011 mostra quem está na sala e o anel de quem fala. O ADR 0012 troca o código colado por um link `openmeet://`. O ADR 0013 corta o som remoto neste PC sem mexer no microfone. Sem código. Sem commit. Sem GO/NO-GO.
+
+### 2026-10-19 — desenho do login Google — Grok
+O ADR 0010 propõe entrar com Google pelo navegador do sistema. As chaves ficam no servidor. Sem elas, o botão não aparece. O primeiro administrador continua no token de instalação. Sem código. Sem commit. Sem GO/NO-GO.
+
+### 2026-10-19 — desenho do layout da sala — Grok
+O ADR 0009 propõe três colunas: servidores, salas e cards. Cada pessoa tem card, cada compartilhamento tem o seu. Há destaque, grade, fixar e tela cheia. Dá para ver outro servidor sem sair da chamada. Sem código. Sem commit. Sem GO/NO-GO.
+
+### 2026-10-19 — desenho do áudio do PC — Grok
+O ADR 0008 propõe a marca "Incluir áudio do PC", desligada por padrão. Se a origem não entregar a faixa, a imagem continua e a tela avisa. Sem faixa, não há captura nativa. Sem código. Sem commit. Sem GO/NO-GO.
+
+### 2026-10-19 — desenho dos servidores — Grok
+O ADR 0007 propõe vários servidores dentro de uma API, com salas dentro de cada um. O convite é do servidor. A chamada passa a usar o id da sala. O áudio do PC ficou de fora. Sem código. Sem commit. Sem GO/NO-GO.
+
+### 2026-10-19 — script de self-host — Grok
+`node infra/compose/host.mjs` gera `infra/compose/.env` e o YAML do LiveKit fora do Git. Na primeira vez imprime só o `BOOTSTRAP_TOKEN`. O Compose passa esse token para a API. `--up` sobe a stack. Sem essa flag, nada sobe. `node --test scripts/host.test.mjs` 2 pass. A stack não foi iniciada. Sem commit. Sem GO/NO-GO.
+
+### 2026-10-19 — README do self-host — Grok
+O README deixou de dizer que o aplicativo não existe. O repositório segue privado. O Compose ainda não recebe `BOOTSTRAP_TOKEN`. Sem commit. Sem GO/NO-GO.
+
+### 2026-10-19 — sessão expirada volta ao login — Grok
+Um pedido recusado com `unauthorized` encerra a sessão, apaga o acesso guardado e volta para o login com "A sessão expirou." `pnpm --filter @openmeet/shared test` 19 pass. O instalador foi gerado de novo, SHA256 `534b35446d55291c101989408205962ec4c456846cb144da7439f6d3052f1118`, e copiado para a Área de Trabalho. Sem commit. Sem GO/NO-GO.
+
+### 2026-10-19 — instalador com a tela nova — Grok
+`pnpm --filter @openmeet/desktop exec tauri build --bundles nsis` gerou de novo `OpenMeet_0.1.0_x64-setup.exe`, 1,94 MiB, SHA256 `7b6099f428d4c3269e9e5299f5dfa006a287b2e10a7d881319e64fbf35508e3d`. A cópia foi para a Área de Trabalho. A tela de instância, o login, a sala e a barra com Ativar som foram vistos no navegador. O exe já instalado nos PCs não muda sozinho. Sem commit. Sem GO/NO-GO.
+
+### 2026-10-19 — visual da reunião — Grok
+A reunião passou a usar fundo escuro, destaque verde, lista à esquerda e controles embaixo. O nome do participante vai no token da sala. Um id cru aparece como Você ou Participante. Sem GO/NO-GO.
+
+### 2026-10-19 — som remoto sem ligar o microfone — Grok
+O outro PC só ouvia depois de ligar o próprio microfone. A reunião agora mostra **Ativar som**, que chama `startAudio` no clique. O instalador já aberto não tem esse botão. Sem GO/NO-GO.
+
+### 2026-10-19 — áudio de um lado não chega — Grok
+No teste de 10 minutos, o microfone deste PC não saiu no outro. Câmera e tela já tinham passado. M03 segue aberto. Sem GO/NO-GO.
+
+### 2026-10-19 — janela compartilhada nos dois PCs — Grok
+M06 ficou `PASS`. Os dois lados compartilharam uma janela, a imagem apareceu no outro PC e sumiu ao parar. M03 em diante segue aberto. Sem GO/NO-GO.
+
+### 2026-10-19 — monitor compartilhado nos dois PCs — Grok
+M05 ficou `PASS`. Os dois lados compartilharam o monitor inteiro, a imagem apareceu no outro PC e sumiu ao parar. M06 em diante segue `NOT_RUN`. Sem GO/NO-GO.
+
+### 2026-10-19 — dois PCs com mídia — Grok
+O instalador abriu nos dois PCs e os dois entraram na mesma sala. Microfone, câmera e compartilhamento de tela funcionaram. Não houve medida de duração, resolução, rede distinta, parar e republicar, janela contra monitor, queda de 5 s, TURN, troca de dispositivo, minimizar nem diagnóstico. M01–M12 seguem `NOT_RUN`. F02-06 segue `BLOCKED`. Sem GO/NO-GO.
+
 ### 2026-10-18 — F05 a F07-02 no remoto — Grok
 O shell, o diagnóstico, o compose e o instalador entraram nesta branch. Nada passou a `DONE`. Sem GO/NO-GO. O teste nos dois PCs ainda não rodou.
 
