@@ -4,6 +4,7 @@ import {
   canonicalInstanceUrl,
   hasControlCharacter,
   parseAccountSession,
+  parseBrokeredSession,
   parseGoogleStart,
   parseInstanceCard,
   parseRoomJoin,
@@ -12,7 +13,7 @@ import {
   parseServer,
   parseServerList,
   readErrorCode,
-  type AccountSession,
+  type BrokeredSession,
   type RoomOccupant,
   type RoomSummary,
   type ServerSummary,
@@ -30,6 +31,18 @@ export interface InstanceApi {
 export interface MeetingMedia {
   connect(url: string, token: string): Promise<void>;
   disconnect(): Promise<void>;
+}
+
+/**
+ * S-05: who holds the refresh token. In the desktop it is the native process and the page never sees it;
+ * in a plain browser it is `vaultSessionBroker`. Answers carry the session without its refresh.
+ */
+export interface SessionBroker {
+  start(origin: string, kind: "login" | "bootstrap" | "google", body: Record<string, string>): Promise<ApiResult>;
+  /** `null` when nothing is stored for this instance. */
+  refresh(origin: string): Promise<ApiResult | null>;
+  /** Logs out with the stored refresh. The store forgets it only once the server is done (S-18). */
+  logout(origin: string): Promise<ApiResult>;
 }
 
 export interface SessionVault {
@@ -108,6 +121,44 @@ export class MemorySessionVault implements SessionVault {
   }
 }
 
+const START_PATH = { login: "/api/v1/auth/login", bootstrap: "/api/v1/auth/bootstrap", google: "/api/v1/auth/google/poll" } as const;
+
+function withoutRefresh(body: unknown): unknown {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) return body;
+  return Object.fromEntries(Object.entries(body).filter(([key]) => key !== "refreshToken"));
+}
+
+/** The browser and test broker: same contract as the native one, with the refresh in a SessionVault. */
+export function vaultSessionBroker(api: InstanceApi, vault: SessionVault): SessionBroker {
+  return {
+    async start(origin, kind, body) {
+      const result = await api.request(origin, "POST", START_PATH[kind], body, null);
+      if (result.status !== 200 && result.status !== 201) return { status: result.status, body: withoutRefresh(result.body) };
+      await vault.save(origin, parseAccountSession(result.body).refreshToken);
+      return { status: result.status, body: withoutRefresh(result.body) };
+    },
+    async refresh(origin) {
+      const refreshToken = await vault.load(origin);
+      if (refreshToken === null) return null;
+      const result = await api.request(origin, "POST", "/api/v1/auth/refresh", { refreshToken }, null);
+      if (result.status === 200) await vault.save(origin, parseAccountSession(result.body).refreshToken);
+      return { status: result.status, body: withoutRefresh(result.body) };
+    },
+    async logout(origin) {
+      const refreshToken = await vault.load(origin);
+      if (refreshToken === null) return { status: 204, body: null };
+      const result = await api.request(origin, "POST", "/api/v1/auth/logout", { refreshToken }, null);
+      // A later sign-in on the same instance may have saved a new token; that one stays.
+      if (result.status < 500 && (await vault.load(origin)) === refreshToken) await vault.clear(origin);
+      return result;
+    },
+  };
+}
+
+function isBroker(store: SessionVault | SessionBroker): store is SessionBroker {
+  return "start" in store && "logout" in store;
+}
+
 export class MeetingModel {
   private generation = 0;
   private step: ShellSnapshot["step"] = "instance";
@@ -117,7 +168,8 @@ export class MeetingModel {
   private googleLogin = false;
   private googleWaiting = false;
   private accessToken: string | null = null;
-  private refreshToken: string | null = null;
+  private sessionEpoch = 0;
+  private readonly broker: SessionBroker;
   private userLabel: string | null = null;
   private role: string | null = null;
   private servers: ServerSummary[] = [];
@@ -136,9 +188,11 @@ export class MeetingModel {
   constructor(
     private readonly api: InstanceApi,
     private readonly media: MeetingMedia = idleMedia,
-    private readonly vault: SessionVault = new MemorySessionVault(),
+    store: SessionVault | SessionBroker = new MemorySessionVault(),
     private readonly wait: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-  ) {}
+  ) {
+    this.broker = isBroker(store) ? store : vaultSessionBroker(api, store);
+  }
 
   snapshot(): ShellSnapshot {
     const role = this.role;
@@ -206,18 +260,17 @@ export class MeetingModel {
         this.error = "invalid_api_base";
         return;
       }
-      const path = input.mode === "bootstrap" ? "/api/v1/auth/bootstrap" : "/api/v1/auth/login";
       const payload =
         input.mode === "bootstrap"
           ? { token: input.token, username: input.username, password: input.password, displayName: input.displayName }
           : { username: input.username, password: input.password };
-      const result = await this.api.request(origin, "POST", path, payload, null);
+      const result = await this.broker.start(origin, input.mode, payload);
       if (generation !== this.generation) return;
       if (result.status !== 200 && result.status !== 201) {
         this.error = readErrorCode(result.body);
         return;
       }
-      await this.acceptSession(origin, parseAccountSession(result.body), generation);
+      await this.acceptSession(origin, parseBrokeredSession(result.body), generation);
     });
   }
 
@@ -248,14 +301,14 @@ export class MeetingModel {
         while (Date.now() < deadline) {
           await wait(GOOGLE_POLL_MS);
           if (generation !== this.generation) return;
-          const result = await this.api.request(origin, "POST", "/api/v1/auth/google/poll", { poll }, null);
+          const result = await this.broker.start(origin, "google", { poll });
           if (generation !== this.generation) return;
           if (result.status === 202) continue;
           if (result.status !== 200) {
             this.error = readErrorCode(result.body);
             return;
           }
-          await this.acceptSession(origin, parseAccountSession(result.body), generation);
+          await this.acceptSession(origin, parseBrokeredSession(result.body), generation);
           return;
         }
         this.error = "google_expired";
@@ -547,30 +600,25 @@ export class MeetingModel {
   }
 
   private async restore(origin: string, generation: number): Promise<boolean> {
-    const refreshToken = await this.vault.load(origin);
-    if (refreshToken === null) return false;
-    const result = await this.api.request(origin, "POST", "/api/v1/auth/refresh", { refreshToken }, null);
+    const result = await this.broker.refresh(origin);
+    if (result === null) return false;
     if (generation !== this.generation) return true;
     if (result.status === 401) {
       // A cut from an earlier logout may still be pending on the server. Finish it before forgetting the token.
-      await this.finishLogout(origin, refreshToken);
+      await this.finishLogout(origin);
       return false;
     }
-    if (result.status !== 200) {
-      await this.vault.clear(origin);
-      return false;
-    }
-    await this.acceptSession(origin, parseAccountSession(result.body), generation);
+    if (result.status !== 200) return false;
+    await this.acceptSession(origin, parseBrokeredSession(result.body), generation);
     return true;
   }
 
-  private async acceptSession(origin: string, session: AccountSession, generation: number): Promise<void> {
+  private async acceptSession(origin: string, session: BrokeredSession, generation: number): Promise<void> {
+    this.sessionEpoch += 1;
     this.accessToken = session.accessToken;
-    this.refreshToken = session.refreshToken;
     this.userLabel = session.user.displayName;
     this.role = session.user.role;
     this.step = "rooms";
-    await this.vault.save(origin, session.refreshToken);
     await this.redeemPendingInvite(generation);
     if (generation !== this.generation) return;
     await this.loadServers(generation);
@@ -655,9 +703,8 @@ export class MeetingModel {
   private async endSession(): Promise<void> {
     await this.media.disconnect();
     const origin = this.origin;
-    const refreshToken = this.refreshToken;
+    const signedIn = this.accessToken !== null;
     this.accessToken = null;
-    this.refreshToken = null;
     this.userLabel = null;
     this.role = null;
     this.servers = [];
@@ -667,35 +714,35 @@ export class MeetingModel {
     this.createdInvite = null;
     this.presence = null;
     this.presenceAsk += 1;
-    if (origin === null || refreshToken === null) return;
-    await this.finishLogout(origin, refreshToken);
+    if (origin === null || !signedIn) return;
+    await this.finishLogout(origin);
   }
 
   /**
-   * S-18: the vault keeps the refresh until the server answers 204. A 502 or a network failure means the
+   * S-18: the store keeps the refresh until the server answers 204. A 502 or a network failure means the
    * call cut is still pending; the logout is repeated in the background with a growing wait, with no limit.
+   * A new sign-in stops the repeats, so they never log out the session that came after.
    */
-  private async finishLogout(origin: string, refreshToken: string): Promise<void> {
-    if (await this.tryLogout(origin, refreshToken)) return;
+  private async finishLogout(origin: string): Promise<void> {
+    const epoch = this.sessionEpoch;
+    if (await this.tryLogout(origin)) return;
     void (async () => {
       for (let attempt = 0; ; attempt += 1) {
         await this.wait(Math.min(1000 * 2 ** attempt, 60_000));
-        if (await this.tryLogout(origin, refreshToken)) return;
+        if (epoch !== this.sessionEpoch) return;
+        if (await this.tryLogout(origin)) return;
       }
     })();
   }
 
-  private async tryLogout(origin: string, refreshToken: string): Promise<boolean> {
+  private async tryLogout(origin: string): Promise<boolean> {
     let status: number;
     try {
-      status = (await this.api.request(origin, "POST", "/api/v1/auth/logout", { refreshToken }, null)).status;
+      status = (await this.broker.logout(origin)).status;
     } catch {
       status = 0;
     }
-    if (status === 0 || status >= 500) return false;
-    // A later sign-in on the same instance may have saved a new token; that one stays.
-    if ((await this.vault.load(origin)) === refreshToken) await this.vault.clear(origin);
-    return true;
+    return status !== 0 && status < 500;
   }
 
   private async run(work: (generation: number) => Promise<void>): Promise<void> {

@@ -271,13 +271,13 @@ struct Slot {
     refresh: String,
 }
 
-trait SlotStore {
+pub(crate) trait SlotStore {
     fn read(&self) -> Result<Option<String>, String>;
     fn write(&self, value: &str) -> Result<(), String>;
     fn erase(&self) -> Result<(), String>;
 }
 
-struct KeyringSlot;
+pub(crate) struct KeyringSlot;
 
 impl KeyringSlot {
     fn entry() -> Result<keyring::Entry, String> {
@@ -307,13 +307,13 @@ impl SlotStore for KeyringSlot {
 }
 
 /// Before S-05 each origin had its own item. They are never read again; saving or clearing an origin removes its old one.
-fn drop_legacy_item(origin: &str) {
+pub(crate) fn drop_legacy_item(origin: &str) {
     if let Ok(entry) = keyring::Entry::new(SERVICE, origin) {
         let _ = entry.delete_credential();
     }
 }
 
-fn load_slot(store: &dyn SlotStore, origin: &str) -> Result<Option<String>, String> {
+pub(crate) fn load_slot(store: &dyn SlotStore, origin: &str) -> Result<Option<String>, String> {
     if !accept_origin(origin) {
         return Err("invalid_origin".to_string());
     }
@@ -331,7 +331,7 @@ fn load_slot(store: &dyn SlotStore, origin: &str) -> Result<Option<String>, Stri
     Ok(Some(slot.refresh))
 }
 
-fn save_slot(store: &dyn SlotStore, origin: &str, refresh_token: &str) -> Result<(), String> {
+pub(crate) fn save_slot(store: &dyn SlotStore, origin: &str, refresh_token: &str) -> Result<(), String> {
     if !accept_origin(origin) {
         return Err("invalid_origin".to_string());
     }
@@ -342,7 +342,7 @@ fn save_slot(store: &dyn SlotStore, origin: &str, refresh_token: &str) -> Result
     store.write(&serde_json::to_string(&slot).map_err(|_| "store_failed".to_string())?)
 }
 
-fn clear_slot(store: &dyn SlotStore, origin: &str) -> Result<(), String> {
+pub(crate) fn clear_slot(store: &dyn SlotStore, origin: &str) -> Result<(), String> {
     if !accept_origin(origin) {
         return Err("invalid_origin".to_string());
     }
@@ -356,7 +356,7 @@ fn clear_slot(store: &dyn SlotStore, origin: &str) -> Result<(), String> {
     }
 }
 
-fn accept_origin(origin: &str) -> bool {
+pub(crate) fn accept_origin(origin: &str) -> bool {
     if origin.len() > 256 {
         return false;
     }
@@ -373,7 +373,7 @@ fn accept_origin(origin: &str) -> bool {
     }
 }
 
-fn accept_token(token: &str) -> bool {
+pub(crate) fn accept_token(token: &str) -> bool {
     (1..=4096).contains(&token.len()) && token.bytes().all(|byte| byte > 32 && byte != 127)
 }
 
@@ -396,25 +396,6 @@ fn track_notice(kind: &str, on: bool) -> Option<&'static str> {
         ("camera", false) => Some("CÃ¢mera desligada"),
         _ => None,
     }
-}
-
-#[tauri::command]
-pub fn session_load(origin: String) -> Result<Option<String>, String> {
-    load_slot(&KeyringSlot, &origin)
-}
-
-#[tauri::command]
-pub fn session_save(origin: String, refresh_token: String) -> Result<(), String> {
-    save_slot(&KeyringSlot, &origin, &refresh_token)?;
-    drop_legacy_item(&origin);
-    Ok(())
-}
-
-#[tauri::command]
-pub fn session_clear(origin: String) -> Result<(), String> {
-    clear_slot(&KeyringSlot, &origin)?;
-    drop_legacy_item(&origin);
-    Ok(())
 }
 
 #[tauri::command]

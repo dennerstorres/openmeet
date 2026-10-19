@@ -1,6 +1,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { SessionVault } from "@openmeet/shared";
+import type { ApiResult, SessionBroker } from "@openmeet/shared";
 
 export { isTauri };
 
@@ -15,22 +15,18 @@ export interface ShellStatus {
   shortcuts: ShortcutView[];
 }
 
-export function createDesktopVault(): SessionVault {
+// S-05: login, refresh and logout run in the native process. The refresh never crosses into the page.
+export function createDesktopBroker(): SessionBroker {
   return {
-    // S-05: the vault holds one instance. Asking for another one is refused in Rust; here it reads as "no session".
-    async load(origin) {
-      try {
-        return await invoke<string | null>("session_load", { origin });
-      } catch (error) {
-        if (error === "invalid_origin") return null;
-        throw error;
-      }
+    start(origin, kind, body) {
+      const command = kind === "login" ? "session_login" : kind === "bootstrap" ? "session_bootstrap" : "session_google";
+      return invoke<ApiResult>(command, { origin, ...body });
     },
-    async save(origin, refreshToken) {
-      await invoke("session_save", { origin, refreshToken });
+    refresh(origin) {
+      return invoke<ApiResult | null>("session_refresh", { origin });
     },
-    async clear(origin) {
-      await invoke("session_clear", { origin });
+    logout(origin) {
+      return invoke<ApiResult>("session_logout", { origin });
     },
   };
 }

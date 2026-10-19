@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { inviteLink, MeetingModel, MemorySessionVault, type InstanceApi, type MeetingMedia } from "../src/index.js";
+import { inviteLink, MeetingModel, MemorySessionVault, vaultSessionBroker, type InstanceApi, type MeetingMedia, type SessionBroker } from "../src/index.js";
 
 const roomId = "11111111-1111-4111-8111-111111111111";
 const otherRoomId = "33333333-3333-4333-8333-333333333333";
@@ -550,4 +550,60 @@ test("a revoked refresh on the next start finishes the pending logout before the
   assert.equal(calls.includes("POST https://meet.example/api/v1/auth/logout"), true);
   assert.equal(await vault.load("https://meet.example"), null);
   assert.equal(model.snapshot().step, "account");
+});
+
+test("with a session broker the page never holds the refresh token (S-05)", async () => {
+  const { api, calls, bodies } = apiFor("admin");
+  const vault = new MemorySessionVault();
+  const inner = vaultSessionBroker(api, vault);
+  const seen: unknown[] = [];
+  const broker: SessionBroker = {
+    async start(origin, kind, body) {
+      const result = await inner.start(origin, kind, body);
+      seen.push(result.body);
+      return result;
+    },
+    refresh: (origin) => inner.refresh(origin),
+    logout: (origin) => inner.logout(origin),
+  };
+  const model = new MeetingModel(api, mediaFor(), broker, async () => {});
+  await model.confirmInstance("https://meet.example");
+  await model.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  assert.equal(model.snapshot().step, "rooms");
+  const stored = await vault.load("https://meet.example");
+  assert.notEqual(stored, null);
+  assert.equal(JSON.stringify(seen).includes(stored ?? "missing"), false);
+  assert.equal(JSON.stringify(seen).includes("refreshToken"), false);
+  assert.equal(JSON.stringify(model.snapshot()).includes(stored ?? "missing"), false);
+
+  // Signing out asks the broker; the page sends no token of its own.
+  await model.signOut();
+  assert.equal(calls.includes("POST https://meet.example/api/v1/auth/logout"), true);
+  assert.equal(await vault.load("https://meet.example"), null);
+  assert.equal(bodies.filter((body) => JSON.stringify(body).includes(stored ?? "missing")).length, 1);
+});
+
+test("a new sign-in stops the logout retries of the session before it", async () => {
+  const { api } = apiFor("admin");
+  let logouts = 0;
+  const inner = vaultSessionBroker(api, new MemorySessionVault());
+  const broker: SessionBroker = {
+    start: (origin, kind, body) => inner.start(origin, kind, body),
+    refresh: (origin) => inner.refresh(origin),
+    async logout() {
+      logouts += 1;
+      return { status: 502, body: { error: "media_disconnect_failed" } };
+    },
+  };
+  let wake: () => void = () => {};
+  const model = new MeetingModel(api, mediaFor(), broker, () => new Promise<void>((resolve) => (wake = resolve)));
+  await model.confirmInstance("https://meet.example");
+  await model.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  await model.signOut();
+  assert.equal(logouts, 1);
+  await model.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  wake();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(logouts, 1);
+  assert.equal(model.snapshot().step, "rooms");
 });

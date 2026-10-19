@@ -1,5 +1,6 @@
 mod google;
 mod invite;
+mod session;
 mod shell;
 
 /// The page shipped inside the installer. No dev port, no https.
@@ -85,9 +86,11 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            shell::session_load,
-            shell::session_save,
-            shell::session_clear,
+            session::session_login,
+            session::session_bootstrap,
+            session::session_google,
+            session::session_refresh,
+            session::session_logout,
             shell::shell_status,
             shell::shell_set_consent,
             shell::shell_tracks,

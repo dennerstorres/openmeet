@@ -96,6 +96,23 @@ export function parseInstanceCard(value: unknown): InstanceCard {
   return { name, apiVersion: "v1", bootstrapOpen: record.bootstrapOpen, googleLogin: record.googleLogin === true };
 }
 
+/** S-05: what the page holds of a session. The refresh stays with the session broker. */
+export interface BrokeredSession {
+  accessToken: string;
+  expiresIn: number;
+  user: AccountUser;
+}
+
+export function parseBrokeredSession(value: unknown): BrokeredSession {
+  const record = objectRecord(value, "invalid_session", "Session response is not an object");
+  const accessToken = secret(record.accessToken);
+  const expiresIn = record.expiresIn;
+  if (accessToken === undefined || typeof expiresIn !== "number" || !Number.isInteger(expiresIn) || expiresIn < 1) {
+    throw new PocInputError("invalid_session", "Session response is incomplete");
+  }
+  return { accessToken, expiresIn, user: parseUser(record.user) };
+}
+
 export function parseAccountSession(value: unknown): AccountSession {
   const record = objectRecord(value, "invalid_session", "Session response is not an object");
   const accessToken = secret(record.accessToken);
