@@ -41,6 +41,7 @@ const idleSnapshot: PocSnapshot = {
   microphone: false,
   camera: false,
   screen: false,
+  audioPlayback: true,
 };
 
 const ERROR_TEXT: Record<string, string> = {
@@ -263,160 +264,181 @@ export function MeetingApp() {
   }
 
   return (
-    <main className="poc">
-      <header>
-        <h1>OpenMeet</h1>
-        <p>{state.instanceName ?? "Instância ainda não confirmada"}</p>
-        {state.origin ? <p>{state.origin}</p> : null}
-        {state.userLabel ? <p>{state.userLabel}</p> : null}
-      </header>
-      {notice ? <p className="error">{notice}</p> : null}
-      {mediaError ? <p className="error">{mediaError}</p> : null}
-      {isTauri() && state.step !== "instance" ? (
-        <ShellConsent
-          status={shell}
-          pending={shellPending}
-          onConsent={(consent) => {
-            setShellPending(true);
-            void setShortcutConsent(consent)
-              .then(setShell)
-              .catch(() => {
-                setMediaError("Não foi possível gravar a preferência de atalhos.");
-              })
-              .finally(() => {
-                setShellPending(false);
+    <main className="app-shell">
+      <aside className="rail">
+        <div className="brand-block">
+          <span className="mark">OM</span>
+          <div>
+            <strong>OpenMeet</strong>
+            <p>{state.instanceName ?? "Sem instância"}</p>
+          </div>
+        </div>
+        {state.userLabel ? <p className="you">{state.userLabel}</p> : null}
+        {state.origin ? <p className="origin">{state.origin}</p> : null}
+      </aside>
+      <section className="workspace">
+        {notice ? <p className="error">{notice}</p> : null}
+        {mediaError ? <p className="error">{mediaError}</p> : null}
+        {isTauri() && state.step !== "instance" ? (
+          <ShellConsent
+            status={shell}
+            pending={shellPending}
+            onConsent={(consent) => {
+              setShellPending(true);
+              void setShortcutConsent(consent)
+                .then(setShell)
+                .catch(() => {
+                  setMediaError("Não foi possível gravar a preferência de atalhos.");
+                })
+                .finally(() => {
+                  setShellPending(false);
+                });
+            }}
+          />
+        ) : null}
+        {state.step === "instance" ? (
+          <InstanceStep address={address} pending={state.pending} onAddress={setAddress} onConfirm={() => void model.confirmInstance(address)} />
+        ) : null}
+        {state.step === "account" ? (
+          <AccountStep
+            bootstrapOpen={state.bootstrapOpen}
+            pending={state.pending}
+            username={username}
+            password={password}
+            displayName={displayName}
+            setupToken={setupToken}
+            onUsername={setUsername}
+            onPassword={setPassword}
+            onDisplayName={setDisplayName}
+            onSetupToken={setSetupToken}
+            onSubmit={(mode) => {
+              void model.submitAccount({ mode, username, password, displayName, token: setupToken }).then(() => {
+                setPassword("");
+                setSetupToken("");
               });
-          }}
-        />
-      ) : null}
-      {state.step === "instance" ? (
-        <InstanceStep address={address} pending={state.pending} onAddress={setAddress} onConfirm={() => void model.confirmInstance(address)} />
-      ) : null}
-      {state.step === "account" ? (
-        <AccountStep
-          bootstrapOpen={state.bootstrapOpen}
-          pending={state.pending}
-          username={username}
-          password={password}
-          displayName={displayName}
-          setupToken={setupToken}
-          onUsername={setUsername}
-          onPassword={setPassword}
-          onDisplayName={setDisplayName}
-          onSetupToken={setSetupToken}
-          onSubmit={(mode) => {
-            void model.submitAccount({ mode, username, password, displayName, token: setupToken }).then(() => {
-              setPassword("");
-              setSetupToken("");
-            });
-          }}
-          onChange={() => void model.changeInstance()}
-        />
-      ) : null}
-      {state.step === "rooms" ? (
-        <RoomsStep
-          state={state}
-          roomName={roomName}
-          roomSlug={roomSlug}
-          roomKind={roomKind}
-          inviteCode={inviteCode}
-          onRoomName={setRoomName}
-          onRoomSlug={setRoomSlug}
-          onRoomKind={setRoomKind}
-          onInviteCode={setInviteCode}
-          onCreate={() => void model.createRoom(roomName, roomSlug, roomKind)}
-          onEnter={(roomId) => void model.enterRoom(roomId, inviteCode)}
-          onReload={() => void model.reloadRooms()}
-          onSignOut={() => void model.signOut()}
-          onChange={() => void model.changeInstance()}
-        />
-      ) : null}
-      {state.step === "meeting" ? (
-        <section className="meeting">
-          <h2>{active?.name ?? "Reunião"}</h2>
-          <p>
-            Estado: <strong>{media.phase}</strong>
-            {media.disconnectReason ? ` · ${media.disconnectReason}` : ""}
-            {elapsedLabel ? ` · ${elapsedLabel}` : ""}
-            {reconnectText ? ` · ${reconnectText}` : ""}
-          </p>
-          <p>{media.participants.length} na sala</p>
-          {media.participants.length === 0 ? (
-            <p>Ninguém na sala.</p>
-          ) : (
-            <ul>
+            }}
+            onChange={() => void model.changeInstance()}
+          />
+        ) : null}
+        {state.step === "rooms" ? (
+          <RoomsStep
+            state={state}
+            roomName={roomName}
+            roomSlug={roomSlug}
+            roomKind={roomKind}
+            inviteCode={inviteCode}
+            onRoomName={setRoomName}
+            onRoomSlug={setRoomSlug}
+            onRoomKind={setRoomKind}
+            onInviteCode={setInviteCode}
+            onCreate={() => void model.createRoom(roomName, roomSlug, roomKind)}
+            onEnter={(roomId) => void model.enterRoom(roomId, inviteCode)}
+            onReload={() => void model.reloadRooms()}
+            onSignOut={() => void model.signOut()}
+            onChange={() => void model.changeInstance()}
+          />
+        ) : null}
+        {state.step === "meeting" ? (
+          <section className="meeting">
+            <header className="call-bar">
+              <h2>{active?.name ?? "Reunião"}</h2>
+              <p>
+                {media.participants.length} na sala
+                {elapsedLabel ? ` · ${elapsedLabel}` : ""}
+                {reconnectText ? ` · ${reconnectText}` : ""}
+                {media.disconnectReason ? ` · ${media.disconnectReason}` : ""}
+              </p>
+            </header>
+            <ul className="people">
               {media.participants.map((person) => (
-                <li key={person}>{person}</li>
+                <li key={person.identity}>{person.label}</li>
               ))}
             </ul>
-          )}
-          <div className="controls">
-            <button
-              type="button"
-              disabled={!controlsEnabled || controlPending}
-              onClick={() => void runControl("microphone", () => session().setMicrophone(!media.microphone))}
-            >
-              Microfone {media.microphone ? "ligado" : "desligado"}
-            </button>
-            <button
-              type="button"
-              disabled={!controlsEnabled || controlPending}
-              onClick={() => void runControl("camera", () => session().setCamera(!media.camera))}
-            >
-              Câmera {media.camera ? "ligada" : "desligada"}
-            </button>
-            <button
-              type="button"
-              aria-pressed={media.screen}
-              disabled={!controlsEnabled || controlPending}
-              onClick={() => void runControl("screen", () => session().setScreenShare(screenShareAction(media.screen) === "start"))}
-            >
-              {media.screen ? "Parar compartilhamento" : "Compartilhar tela"}
-            </button>
-            <button type="button" disabled={!controlsEnabled} onClick={() => void refreshDevices()}>
-              Atualizar dispositivos
-            </button>
-            <DeviceSelect label="Entrada" kind="audioinput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
-            <DeviceSelect label="Saída" kind="audiooutput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
-            <DeviceSelect label="Câmera" kind="videoinput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
-          </div>
-          <MeetingStage tiles={media.tiles} sharing={media.screen} levelFor={levelFor} onChange={changeLevel} />
-          <p>
-            {media.stats.userAgent ?? "user agent indisponível"} · app {media.stats.appVersion ?? "—"}
-          </p>
-          {media.stats.available ? (
-            <p>
-              perda {media.stats.packetsLost ?? "—"} · jitter {media.stats.jitterMs ?? "—"} ms · RTT {media.stats.rttMs ?? "—"} ms · candidato{" "}
-              {media.stats.candidateType ?? "—"} · saída {media.stats.outboundWidth ?? "—"}x{media.stats.outboundHeight ?? "—"} @{" "}
-              {media.stats.outboundFps ?? "—"} fps · superfície {media.stats.displaySurface ?? "—"}
+            <MeetingStage tiles={media.tiles} sharing={media.screen} levelFor={levelFor} onChange={changeLevel} />
+            <p className="metrics">
+              {media.stats.userAgent ?? "user agent indisponível"} · app {media.stats.appVersion ?? "—"}
             </p>
-          ) : (
-            <p>Métricas ainda não disponíveis.</p>
-          )}
-          <label>
-            <input
-              type="checkbox"
-              checked={exportConsent}
-              onChange={(event) => {
-                setExportConsent(event.currentTarget.checked);
-              }}
-            />
-            Autorizar exportação do diagnóstico
-          </label>
-          <button type="button" disabled={!exportConsent} onClick={() => exportDiagnostic()}>
-            Exportar diagnóstico
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMediaError(null);
-              model.leaveRoom();
-            }}
-          >
-            Sair da sala
-          </button>
-        </section>
-      ) : null}
+            {media.stats.available ? (
+              <p className="metrics">
+                perda {media.stats.packetsLost ?? "—"} · jitter {media.stats.jitterMs ?? "—"} ms · RTT {media.stats.rttMs ?? "—"} ms · candidato{" "}
+                {media.stats.candidateType ?? "—"} · saída {media.stats.outboundWidth ?? "—"}x{media.stats.outboundHeight ?? "—"} @{" "}
+                {media.stats.outboundFps ?? "—"} fps · superfície {media.stats.displaySurface ?? "—"}
+              </p>
+            ) : (
+              <p className="metrics">Métricas ainda não disponíveis.</p>
+            )}
+            <label className="export">
+              <input
+                type="checkbox"
+                checked={exportConsent}
+                onChange={(event) => {
+                  setExportConsent(event.currentTarget.checked);
+                }}
+              />
+              Autorizar exportação do diagnóstico
+            </label>
+            <button type="button" disabled={!exportConsent} onClick={() => exportDiagnostic()}>
+              Exportar diagnóstico
+            </button>
+            <div className="dock">
+              {media.audioPlayback ? null : (
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() =>
+                    void session()
+                      .startRemoteAudio()
+                      .catch((caught: unknown) => setMediaError(mediaActionError("audio", caught)))
+                  }
+                >
+                  Ativar som
+                </button>
+              )}
+              <button
+                type="button"
+                className={media.microphone ? "on" : "off"}
+                disabled={!controlsEnabled || controlPending}
+                onClick={() => void runControl("microphone", () => session().setMicrophone(!media.microphone))}
+              >
+                Microfone {media.microphone ? "ligado" : "desligado"}
+              </button>
+              <button
+                type="button"
+                className={media.camera ? "on" : "off"}
+                disabled={!controlsEnabled || controlPending}
+                onClick={() => void runControl("camera", () => session().setCamera(!media.camera))}
+              >
+                Câmera {media.camera ? "ligada" : "desligada"}
+              </button>
+              <button
+                type="button"
+                className={media.screen ? "on" : ""}
+                aria-pressed={media.screen}
+                disabled={!controlsEnabled || controlPending}
+                onClick={() => void runControl("screen", () => session().setScreenShare(screenShareAction(media.screen) === "start"))}
+              >
+                {media.screen ? "Parar compartilhamento" : "Compartilhar tela"}
+              </button>
+              <DeviceSelect label="Entrada" kind="audioinput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
+              <DeviceSelect label="Saída" kind="audiooutput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
+              <DeviceSelect label="Câmera" kind="videoinput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
+              <button type="button" disabled={!controlsEnabled} onClick={() => void refreshDevices()}>
+                Atualizar dispositivos
+              </button>
+              <button
+                type="button"
+                className="danger"
+                onClick={() => {
+                  setMediaError(null);
+                  model.leaveRoom();
+                }}
+              >
+                Sair da sala
+              </button>
+            </div>
+          </section>
+        ) : null}
+      </section>
     </main>
   );
 }
@@ -457,7 +479,7 @@ function MeetingStage({
         </div>
       ) : null}
       {audio.length > 0 ? (
-        <div className="tiles">
+        <div className="voices">
           {audio.map((tile) => (
             <TileFrame key={tile.id} tile={tile} playback={levelFor(tile.id)} onChange={(patch) => onChange(tile.id, patch)} />
           ))}
@@ -470,7 +492,7 @@ function MeetingStage({
 function TileFrame({ tile, playback, onChange }: { tile: TrackTile; playback: PlaybackLevel; onChange: (patch: Partial<PlaybackLevel>) => void }) {
   const remoteAudio = tile.media === "audio" && !tile.local;
   return (
-    <div>
+    <div className={tile.media === "video" ? "tile" : "voice"}>
       <TrackView tile={tile} playback={remoteAudio ? playback : undefined} />
       {remoteAudio ? (
         <div className="controls">
@@ -648,7 +670,7 @@ function RoomsStep(props: {
             <span>
               {room.name} · {room.ended ? "encerrada" : room.kind === "temporary" ? "temporária" : "persistente"}
             </span>
-            <button type="button" disabled={props.state.pending || room.ended} onClick={() => props.onEnter(room.id)}>
+            <button type="button" className="primary" disabled={props.state.pending || room.ended} onClick={() => props.onEnter(room.id)}>
               Entrar
             </button>
           </li>

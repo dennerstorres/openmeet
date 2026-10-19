@@ -147,6 +147,32 @@ test("leaving a persistent room keeps it listed for the same client", async () =
   assert.equal(media.disconnects, 2);
 });
 
+test("an expired session returns to login", async () => {
+  const { api, calls } = apiFor("admin");
+  const wrapped = api.request.bind(api);
+  let expired = false;
+  api.request = (origin, method, path, body, accessToken) => {
+    if (expired && path === "/api/v1/rooms" && method === "GET") return Promise.resolve({ status: 401, body: { error: "unauthorized" } });
+    return wrapped(origin, method, path, body, accessToken);
+  };
+  const vault = new MemorySessionVault();
+  const media = mediaFor();
+  const model = new MeetingModel(api, media, vault);
+  await model.confirmInstance("https://meet.example");
+  await model.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  await model.enterRoom(roomId, "");
+  assert.equal(model.snapshot().step, "meeting");
+  expired = true;
+  await model.reloadRooms();
+  assert.equal(model.snapshot().step, "account");
+  assert.equal(model.snapshot().error, "unauthorized");
+  assert.equal(model.snapshot().userLabel, null);
+  assert.equal(model.snapshot().rooms.length, 0);
+  assert.equal(await vault.load("https://meet.example"), null);
+  assert.equal(calls.includes("POST https://meet.example/api/v1/auth/logout"), true);
+  assert.equal(media.disconnects > 0, true);
+});
+
 test("media failure stays on the room list", async () => {
   const { api } = apiFor("admin");
   const media: MeetingMedia = {

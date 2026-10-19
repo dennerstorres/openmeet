@@ -12,7 +12,7 @@ No Docker local, o `pg_dump` restaurou a linha 7 e a API ficou healthy em `/heal
 ## F07-02
 `IMPLEMENTED` em 2026-10-18 na branch `task/F07-02-installer`.
 
-O bundle Windows é NSIS por usuário, sem assinatura. O build local gerou `OpenMeet_0.1.0_x64-setup.exe`. O workflow `.github/workflows/release.yml` gera o instalador e o `SHA256SUMS`. A publicação só ocorre numa tag `v*`. O GitHub Actions não rodou e o instalador não foi executado numa máquina sem toolchain.
+O bundle Windows é NSIS por usuário, sem assinatura. O build local gerou `OpenMeet_0.1.0_x64-setup.exe`. O workflow `.github/workflows/release.yml` gera o instalador e o `SHA256SUMS`. A publicação só ocorre numa tag `v*`. O GitHub Actions não rodou. Em 2026-10-19 o instalador abriu em dois PCs. Uma máquina limpa, sem toolchain, não foi registrada à parte.
 
 ## Critério de saída
 Restore test e uso VPS externa. Um restore local não fecha a fase.

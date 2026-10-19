@@ -18,4 +18,4 @@ Não concluir fase por implementação superficial ou mocks. Dependências exter
 ## Execução 2026-10-18
 F02-01 IMPLEMENTED: compose em `infra/livekit/docker-compose.yml` subiu `livekit/livekit-server:v1.13.10` em `127.0.0.1:7880` (HTTP 200) e o container foi removido.
 
-F02-02 a F02-05 WAITING_VALIDATION, no fim do plano: token local, conexão LiveKit, controles de mic/câmera/dispositivos, compartilhamento e métricas estão no código. Testes unitários passaram. M01–M12 seguem NOT_RUN. F02-06 BLOCKED. F03–F07 podem seguir. Roteiro em `docs/POC_F02.md`. Sem GO/NO-GO.
+F02-02 a F02-05 WAITING_VALIDATION, no fim do plano: token local, conexão LiveKit, controles de mic/câmera/dispositivos, compartilhamento e métricas estão no código. Testes unitários passaram. Em 2026-10-19 dois PCs com o instalador entraram na mesma sala e microfone, câmera e tela funcionaram. M01–M12 seguem NOT_RUN. F02-06 BLOCKED. F03–F07 podem seguir. Roteiro em `docs/POC_F02.md`. Sem GO/NO-GO.

@@ -1,12 +1,12 @@
 # SPEC — OpenMeet (codinome) v0.1
 
 ## Visão
-Cliente desktop Windows para salas de reunião persistentes ou temporárias, com áudio, vídeo, compartilhamento de janela/monitor e diagnóstico de qualidade; implantação self-hosted, contas independentes por instância, sem dependência de uma conta global.
+Cliente desktop Windows para salas de reunião persistentes ou temporárias, com áudio, vídeo, compartilhamento de janela/monitor e diagnóstico de qualidade; implantação self-hosted, contas independentes por instância, sem dependência de uma conta global. Uma instância pode ter vários servidores, e cada servidor tem suas salas.
 
 ## Personas e jornadas
-- **Operador:** instala a stack numa VPS, configura domínio/TLS/portas, inicializa administrador e controla inscrições.
-- **Moderador:** cria sala, convida usuários, remove participantes, encerra reunião conforme política.
-- **Participante:** configura instância, autentica, escolhe sala, entra rapidamente, ajusta dispositivos, câmera, microfone e compartilha tela.
+- **Operador:** instala a stack numa VPS, configura domínio/TLS/portas, inicializa administrador, cria servidores e controla inscrições.
+- **Dono ou moderador do servidor:** cria salas, convida para o servidor, remove participantes e encerra reunião conforme política.
+- **Participante:** configura instância, autentica, escolhe servidor e sala, entra rapidamente, ajusta dispositivos, câmera, microfone e compartilha tela.
 
 ## In scope — MVP
 1. Configurar múltiplas URLs de instâncias; identidade e sessão locais por instância (sem federação).
@@ -18,9 +18,16 @@ Cliente desktop Windows para salas de reunião persistentes ou temporárias, com
 7. Bandeja do sistema e preferências persistidas localmente; atalhos globais apenas após verificação de conflitos e consentimento.
 8. Deploy Docker Compose de um nó, TLS, LiveKit, banco, TURN/STUN conforme topologia e documentação de firewall.
 9. Instalador Windows e pipelines CI com verificações de segurança, licenses e artefatos.
+10. Vários servidores dentro de uma instância, com salas pertencentes a um servidor. ADR 0007. Não implementado.
+11. Tela em três colunas, card por pessoa, card por compartilhamento, destaque, grade, fixar e tela cheia. ADR 0009. Não implementado.
+12. Presença nas salas e anel de quem fala. ADR 0011. Não implementado.
+13. Convite do servidor por link `openmeet://`. ADR 0012. Não implementado.
+14. Ensurdecer o áudio remoto só neste PC. ADR 0013. Não implementado.
+15. Áudio do PC opcional no compartilhamento, desligado por padrão. ADR 0008. Não implementado.
+16. Login com Google quando o servidor tem as chaves. ADR 0010. Não implementado.
 
 ## Out of scope — MVP
-Mensagens persistentes, federação, apps móveis, macOS/Linux, gravações, transcrição, E2EE, plugins, quadro branco, acesso remoto, múltiplos nós, bots, integrações externas, áudio de sistema durante compartilhamento (investigação separada).
+Mensagens persistentes, federação, apps móveis, macOS/Linux, gravações, transcrição, E2EE, plugins, quadro branco, acesso remoto, múltiplos nós, bots, integrações além do login Google, captura nativa do áudio do Windows, status online fora de uma sala, juntar conta Google a uma conta de senha e link que entra direto numa sala.
 
 ## Requisitos funcionais
 - RF-01: Usuário adiciona instância por HTTPS; cliente verifica metadados e não envia credenciais a host inesperado.
@@ -33,6 +40,14 @@ Mensagens persistentes, federação, apps móveis, macOS/Linux, gravações, tra
 - RF-08: Captura de tela permite selecionar origem e interromper; origem não muda silenciosamente.
 - RF-09: Diagnósticos exportáveis com consentimento, sem tokens, senhas, conteúdo audiovisual ou dados pessoais desnecessários.
 - RF-10: Ao falhar rede, aplicativo informa reconexão e diferencia falha recuperável de fatal.
+- RF-11: Uma conta entra na API e só vê os servidores de que é membro. A sala pertence a um servidor. O administrador da instância cria o servidor e vira dono. ADR 0007.
+- RF-12: A janela tem barra de servidores, sidebar de salas e área de cards. Dá para ver outro servidor sem sair da chamada. ADR 0009.
+- RF-13: Cada pessoa tem um card, com ou sem câmera. Cada compartilhamento tem o seu. Há destaque, grade, fixar e tela cheia. ADR 0009.
+- RF-14: A sidebar mostra quem está em cada sala. O anel verde marca quem fala na sala atual. A ocupação não fica gravada no Postgres. ADR 0011.
+- RF-15: O convite copiado é um link da instância. O código não vai para outra API. Aceitar entra no servidor e não entra sozinho numa sala. ADR 0012.
+- RF-16: Ensurdecer corta o áudio remoto neste PC, guarda o volume de cada card e não mexe no microfone nem avisa o servidor. ADR 0013.
+- RF-17: "Incluir áudio do PC" nasce desligado. Se a origem não entregar a faixa, a imagem continua e a tela avisa. ADR 0008.
+- RF-18: Login Google abre o navegador do sistema. As chaves ficam no servidor. Sem elas, o botão não aparece. Não cria o administrador. ADR 0010.
 
 ## Requisitos não funcionais
 - Segredo jamais incluído no repo, logs ou CI; TLS em produção; Argon2id com parâmetros documentados.

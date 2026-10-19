@@ -166,7 +166,7 @@ export class MeetingModel {
       const origin = this.pinned();
       const accessToken = this.accessToken;
       if (origin === null || accessToken === null) {
-        this.error = "unauthorized";
+        await this.dropExpiredSession(generation);
         return;
       }
       if (this.role !== "admin" && this.role !== "moderator") {
@@ -180,6 +180,7 @@ export class MeetingModel {
       const result = await this.api.request(origin, "POST", "/api/v1/rooms", { name, slug, kind }, accessToken);
       if (generation !== this.generation) return;
       if (result.status !== 201) {
+        if (await this.dropIfUnauthorized(generation, result.body)) return;
         this.error = readErrorCode(result.body);
         return;
       }
@@ -192,7 +193,7 @@ export class MeetingModel {
       const origin = this.pinned();
       const accessToken = this.accessToken;
       if (origin === null || accessToken === null) {
-        this.error = "unauthorized";
+        await this.dropExpiredSession(generation);
         return;
       }
       const invite = code.trim();
@@ -205,6 +206,7 @@ export class MeetingModel {
       const result = await this.api.request(origin, "POST", `/api/v1/rooms/${roomId}/join`, invite.length === 0 ? {} : { code: invite }, accessToken);
       if (generation !== this.generation) return;
       if (result.status !== 200) {
+        if (await this.dropIfUnauthorized(generation, result.body)) return;
         this.error = readErrorCode(result.body);
         return;
       }
@@ -294,12 +296,26 @@ export class MeetingModel {
     const result = await this.api.request(origin, "GET", "/api/v1/rooms", null, accessToken);
     if (generation !== this.generation) return;
     if (result.status !== 200) {
+      if (await this.dropIfUnauthorized(generation, result.body)) return;
       this.error = readErrorCode(result.body);
       return;
     }
     this.rooms = parseRoomList(result.body);
     this.activeRoomId = null;
     this.step = "rooms";
+  }
+
+  private async dropIfUnauthorized(generation: number, body: unknown): Promise<boolean> {
+    if (readErrorCode(body) !== "unauthorized") return false;
+    await this.dropExpiredSession(generation);
+    return true;
+  }
+
+  private async dropExpiredSession(generation: number): Promise<void> {
+    await this.endSession();
+    if (generation !== this.generation) return;
+    this.error = "unauthorized";
+    this.step = this.origin === null ? "instance" : "account";
   }
 
   private async endSession(): Promise<void> {

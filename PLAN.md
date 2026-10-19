@@ -2,7 +2,7 @@
 
 Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, `VERIFIED`, `DONE`, `BLOCKED`.
 
-> A evidência de dois PCs e o GO/NO-GO ficam no fim. Não bloqueiam a implementação de F03–F07. Bloqueiam o aceite final e o F08.
+> A evidência de dois PCs e o GO/NO-GO ficam no fim. Não bloqueiam a implementação de F03–F07 nem de F09. Bloqueiam o aceite final e o F08.
 
 | ID | Fase | Tarefa | Depende de | Estado | Dono inicial | Gate |
 |---|---|---|---|---|---|---|
@@ -29,6 +29,17 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F02-05 | POC | Redes distintas, TURN, reconexão, métricas | F02-03,F02-04 | WAITING_VALIDATION | Grok | G2 |
 | F02-06 | POC | Decisão GO/NO-GO de Tauri/WebView2 | F02-05 | BLOCKED | Claude | G2 |
 | F08-01 | OSS | Segurança/licença/docs/release candidate | F07-02, F02-06 GO | PENDING | Claude+Codex review | G8 |
+| F09-01 | Servidores | Schema, API, migração Geral e token LiveKit pelo id da sala | F03-03 | READY | Claude | G9 |
+| F09-02 | Servidores | Convite do servidor por link openmeet:// | F09-01 | PENDING | Claude | G9 |
+| F09-03 | Sala | Três colunas, cards, destaque, grade, fixar e tela cheia | F09-01 | PENDING | Claude | G9 |
+| F09-04 | Sala | Presença na sidebar e anel de quem fala | F09-03 | PENDING | Claude | G9 |
+| F09-05 | Sala | Ensurdecer o áudio remoto só neste PC | F04-02 | READY | Claude | G9 |
+| F09-06 | Sala | Áudio do PC opcional no compartilhamento | F04-03 | READY | Claude | G9 |
+| F09-07 | Identidade | Login Google pelo navegador, chaves só no servidor | F03-02 | READY | Claude | G9 |
+
+## Estado em 2026-10-19
+
+Nenhuma tarefa está `DONE`. F09-01, F09-05, F09-06 e F09-07 estão `READY`. F09-02, F09-03 e F09-04 estão `PENDING`. Nenhuma tarefa F09 foi implementada. Em 2026-10-19 os dois PCs com o instalador entraram na mesma sala. Microfone, câmera e compartilhamento de tela funcionaram. M01–M12 seguem `NOT_RUN`: faltam duração, resolução, rede distinta, parar e republicar, janela, queda de 5 s, TURN, troca de dispositivo, minimizar e diagnóstico. F02-02–F02-05 seguem `WAITING_VALIDATION`. F02-06 segue `BLOCKED`, sem GO e sem NO-GO.
 
 ## Estado em 2026-10-18
 
@@ -48,6 +59,6 @@ F02-06: A2, A3, A4, M1–M3, M5, M6 e B1–B4 já estavam no histórico. O handl
 - `WAITING_VALIDATION`: teste manual exige humano/equipamento.
 - `VERIFIED`: testes executados com evidências, revisões requeridas concluídas.
 - `DONE`: verificado e aceito pelo gate correspondente.
-- Falha crítica no teste de dois PCs, quando ele rodar → F02-06 `NO-GO`, parar F08 e registrar ADR de alternativa. Até lá a implementação de F03–F07 segue. Não marcar essas tarefas `DONE` nem escrever GO.
+- Falha crítica no teste de dois PCs, quando ele rodar → F02-06 `NO-GO`, parar F08 e registrar ADR de alternativa. Até lá a implementação de F03–F07 e F09 segue. Não marcar essas tarefas `DONE` nem escrever GO.
 
 Leia o plano detalhado correspondente em `plans/phase-XX-*.md`.

@@ -23,6 +23,7 @@ const idleSnapshot: PocSnapshot = {
   stats: emptyStats(),
   reconnect: EMPTY_RECONNECT,
   microphone: false,
+  audioPlayback: true,
   camera: false,
   screen: false,
 };
@@ -164,6 +165,11 @@ export function PocApp() {
 
       <section>
         <h2>Controles</h2>
+        {snapshot.audioPlayback ? null : (
+          <button type="button" onClick={() => void session().startRemoteAudio().catch((caught: unknown) => setError(mediaActionError("audio", caught)))}>
+            Ativar som
+          </button>
+        )}
         <button type="button" disabled={!connected || pending} onClick={() => void runMedia("microphone", () => session().setMicrophone(!snapshot.microphone))}>
           Microfone {snapshot.microphone ? "ligado" : "desligado"}
         </button>
@@ -188,7 +194,7 @@ export function PocApp() {
         ) : (
           <ul>
             {snapshot.participants.map((person) => (
-              <li key={person}>{person}</li>
+              <li key={person.identity}>{person.label}</li>
             ))}
           </ul>
         )}

@@ -6,6 +6,12 @@ if [ "${#AUTH_SECRET}" -lt 32 ]; then
   exit 1
 fi
 
+bootstrap="${BOOTSTRAP_TOKEN:-}"
+if [ "${#bootstrap}" -lt 20 ]; then
+  echo "BOOTSTRAP_TOKEN must be at least 20 characters" >&2
+  exit 1
+fi
+
 if [ -z "${LIVEKIT_API_KEY:-}" ] || [ -z "${LIVEKIT_API_SECRET:-}" ] || [ -z "${LIVEKIT_URL:-}" ]; then
   echo "LIVEKIT_API_KEY, LIVEKIT_API_SECRET and LIVEKIT_URL are required" >&2
   exit 1

@@ -43,9 +43,23 @@ export function shouldShowLiveVideo(tile: Pick<TrackTile, "media" | "muted">): b
   return tile.media === "video" && !tile.muted;
 }
 
+const PARTICIPANT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function participantLabel(name: string, local: boolean): string {
+  const trimmed = name.trim();
+  if (trimmed.length === 0 || PARTICIPANT_UUID.test(trimmed)) return local ? "Você" : "Participante";
+  return trimmed;
+}
+
+export interface RoomPerson {
+  identity: string;
+  label: string;
+}
+
 export interface TrackTile {
   id: string;
   identity: string;
+  label: string;
   source: "microphone" | "camera" | "screen" | "screen-audio" | "unknown";
   media: "audio" | "video";
   local: boolean;
@@ -59,7 +73,7 @@ export interface PocSnapshot {
   phase: ConnectionPhase;
   disconnectReason: string | null;
   tiles: TrackTile[];
-  participants: string[];
+  participants: RoomPerson[];
   diagnostics: DiagnosticEvent[];
   devices: DeviceOption[];
   stats: RtcSnapshot;
@@ -67,6 +81,7 @@ export interface PocSnapshot {
   microphone: boolean;
   camera: boolean;
   screen: boolean;
+  audioPlayback: boolean;
 }
 
 type Listener = (snapshot: PocSnapshot) => void;
@@ -108,6 +123,7 @@ export class LiveKitPocSession {
   private disconnectReason: string | null = null;
   private explicitLeave = false;
   private devices: DeviceOption[] = [];
+  private audioPlayback = true;
   private stats: RtcSnapshot;
   private marks: ReconnectMark[] = [];
 
@@ -145,7 +161,7 @@ export class LiveKitPocSession {
       this.note("error", describeMediaError(error));
     });
     this.room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
-      this.rememberTrack(track, publication.trackSid, participant.identity, false);
+      this.rememberTrack(track, publication.trackSid, participant.identity, participantLabel(participant.name || participant.identity, false), false);
     });
     this.room.on(RoomEvent.TrackUnsubscribed, (_track: RemoteTrack, publication: RemoteTrackPublication) => {
       this.tiles.delete(publication.trackSid);
@@ -159,7 +175,13 @@ export class LiveKitPocSession {
     });
     this.room.on(RoomEvent.LocalTrackPublished, (publication: LocalTrackPublication) => {
       if (publication.track) {
-        this.rememberTrack(publication.track, publication.trackSid, this.room.localParticipant.identity, true);
+        this.rememberTrack(
+          publication.track,
+          publication.trackSid,
+          this.room.localParticipant.identity,
+          participantLabel(this.room.localParticipant.name || this.room.localParticipant.identity, true),
+          true,
+        );
       }
     });
     this.room.on(RoomEvent.LocalTrackUnpublished, (publication: LocalTrackPublication) => {
@@ -170,6 +192,10 @@ export class LiveKitPocSession {
       this.emit();
     });
     this.room.on(RoomEvent.ParticipantDisconnected, () => {
+      this.emit();
+    });
+    this.room.on(RoomEvent.AudioPlaybackStatusChanged, (enabled: boolean) => {
+      this.audioPlayback = enabled;
       this.emit();
     });
     this.room.on(RoomEvent.MediaDevicesChanged, () => {
@@ -193,9 +219,12 @@ export class LiveKitPocSession {
       phase: this.phase,
       disconnectReason: this.disconnectReason,
       tiles: [...this.tiles.values()],
-      participants: [local.identity, ...[...this.room.remoteParticipants.values()].map((participant) => participant.identity)].filter(
-        (identity) => identity.length > 0,
-      ),
+      participants: [local, ...this.room.remoteParticipants.values()]
+        .filter((person) => person.identity.length > 0)
+        .map((person) => ({
+          identity: person.identity,
+          label: participantLabel(person.name || person.identity, person === local),
+        })),
       diagnostics: [...this.diagnostics],
       devices: [...this.devices],
       stats: this.stats,
@@ -203,6 +232,7 @@ export class LiveKitPocSession {
       microphone: local.isMicrophoneEnabled,
       camera: local.isCameraEnabled,
       screen: local.isScreenShareEnabled,
+      audioPlayback: this.audioPlayback,
     };
   }
 
@@ -245,6 +275,12 @@ export class LiveKitPocSession {
   async disconnect(): Promise<void> {
     this.explicitLeave = true;
     await this.room.disconnect(true);
+  }
+
+  async startRemoteAudio(): Promise<void> {
+    await this.room.startAudio();
+    this.audioPlayback = this.room.canPlaybackAudio;
+    this.emit();
   }
 
   async setMicrophone(enabled: boolean): Promise<void> {
@@ -364,7 +400,7 @@ export class LiveKitPocSession {
     this.emit();
   }
 
-  private rememberTrack(track: Track, id: string, identity: string, local: boolean): void {
+  private rememberTrack(track: Track, id: string, identity: string, label: string, local: boolean): void {
     if (track.kind !== Track.Kind.Audio && track.kind !== Track.Kind.Video) {
       return;
     }
@@ -372,6 +408,7 @@ export class LiveKitPocSession {
     this.upsertTile({
       id,
       identity,
+      label,
       source: sourceName(track.source),
       media,
       local,

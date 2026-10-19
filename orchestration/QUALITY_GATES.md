@@ -8,5 +8,6 @@
 - **G6 Observabilidade:** diagnóstico exportável sanitizado, falhas de rede reproduzidas e comportamento de reconexão medido.
 - **G7 Infra/release:** TLS/ICE/TURN em VPS real, teste de restauração, CI de release e instalador Windows.
 - **G8 OSS:** licença de projeto/dependências revisada, SECURITY.md, contribuições e documentação pública verificadas.
+- **G9 Servidores e sala:** os ADR 0007–0013. Servidores isolados na mesma API, convite por link sem vazar o código, cards e layouts, presença sem gravar ocupação no Postgres, ensurdecer local, áudio do PC com falha visível e Google sem segredo no cliente. Prova humana de link, anel e áudio do PC fica `WAITING_VALIDATION`, nunca PASS por inspeção.
 
 Se uma ação exige contexto fora da máquina do agente (2 PCs, rede, VPS) marcar WAITING_VALIDATION e fornecer roteiro ao humano, nunca declarar PASS.

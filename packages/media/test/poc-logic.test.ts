@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { DisconnectReason, Room, RoomEvent } from "livekit-client";
 import { describeMediaError, mediaActionError, sanitizeDiagnostic } from "../src/diagnostics.js";
-import { LiveKitPocSession, shouldAttachPlayback, shouldShowLiveVideo } from "../src/session.js";
+import { LiveKitPocSession, participantLabel, shouldAttachPlayback, shouldShowLiveVideo } from "../src/session.js";
 import { classifyDisconnect, nextPhase, type ConnectionPhase } from "../src/phase.js";
 import { collectTrackReports, readDisplaySurface, summarizeRtcStats, toStatLike } from "../src/stats.js";
 
@@ -134,6 +134,25 @@ test("recoverable, fatal and leave stay distinct from the idle phase", async () 
   await exited.session.disconnect();
   assert.equal(exited.session.snapshot().phase, "disconnected");
   assert.equal(exited.session.snapshot().disconnectReason, "CLIENT_INITIATED");
+});
+
+test("participant labels hide raw ids", () => {
+  assert.equal(participantLabel("Admin", true), "Admin");
+  assert.equal(participantLabel("2ba4e473-a05c-4404-b393-4887ec60fe85", true), "Você");
+  assert.equal(participantLabel("2ba4e473-a05c-4404-b393-4887ec60fe85", false), "Participante");
+});
+
+test("remote audio stays blocked until the listener unlocks it", async () => {
+  const room = new Room();
+  const session = new LiveKitPocSession({ room });
+  assert.equal(session.snapshot().audioPlayback, true);
+  room.emit(RoomEvent.AudioPlaybackStatusChanged, false);
+  assert.equal(session.snapshot().audioPlayback, false);
+  room.startAudio = (async () => {
+    room.emit(RoomEvent.AudioPlaybackStatusChanged, true);
+  }) as Room["startAudio"];
+  await session.startRemoteAudio();
+  assert.equal(session.snapshot().audioPlayback, true);
 });
 
 test("stats summary reads loss, jitter and nominated RTT", () => {

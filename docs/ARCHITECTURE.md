@@ -17,13 +17,13 @@
 6. Ao sair ou ser removido, publicações e tracks param e políticas do servidor são aplicadas.
 
 ## Estado
-- PostgreSQL: usuários, refresh sessions, rooms, memberships, invites, auditoria, configurações.
+- PostgreSQL: usuários, refresh sessions, rooms, memberships, invites, auditoria, configurações. Os ADR 0007 e 0009 propõem servidores, sidebar e cards. Os ADR 0011, 0012 e 0013 propõem presença, convite por link e ensurdecer. O código ainda tem uma lista única de salas.
 - LiveKit: participantes ativos, tracks, qualidade/conexão.
 - Cliente: preferências locais e estado transitório. O diagnóstico exportado leva fase, métricas e tempos de reconexão, e só sai com consentimento. Token, JWT, Bearer e e-mail não entram.
 - Não salvar estado de participante em Postgres como verdade online; não adicionar Socket.IO sem necessidade específica.
 
 ## Segurança
-- Sem master account global; cada instalação é independente.
+- Sem master account global; cada instalação é independente. O ADR 0010 propõe login com Google, com as chaves só no servidor. O código ainda entra por usuário e senha.
 - Proteger bootstrap inicial com token de instalação de uso único ou mecanismo equivalente, não página aberta indefinidamente.
 - Segredos de aplicação em env/secret store, não versionar credenciais.
 - Refresh token rotativo e revogável. O access token aponta para essa sessão e deixa de valer no logout e na rotação. No aplicativo Tauri, o refresh fica no cofre de credenciais do Windows, uma entrada por origem. Fora do Tauri, ele continua só na memória. O access token não é gravado. A preferência de atalho fica num JSON local, sem segredo.
@@ -36,7 +36,7 @@
 - API `getDisplayMedia()` e seleção de origem no WebView2 sob Tauri 2.
 - Permissão de câmera/mic em ambiente empacotado versus `tauri dev`.
 - Troca de áudio de saída, dispositivo Bluetooth e minimização do app.
-- Captura de áudio do sistema está fora do MVP; não misturar com captura visual.
+- O ADR 0008 propõe o áudio do PC junto do compartilhamento, desligado por padrão. A captura atual continua só com imagem. Captura nativa do Windows não faz parte desse desenho.
 
 ## Endpoints v1
 Existem: `GET /health/live`, `GET /health/ready`, `GET /api/v1/instance`,

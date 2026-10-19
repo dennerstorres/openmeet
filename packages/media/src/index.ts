@@ -6,7 +6,7 @@ export { arrangeTiles, localScreenSurface, screenCaption, screenShareAction, scr
 export { formatElapsed, meetingElapsedMs } from "./watch.js";
 export type { LayoutTile, TilePlacement } from "./layout.js";
 export type { PlaybackLevel } from "./playback.js";
-export { LiveKitPocSession, shouldAttachPlayback, shouldShowLiveVideo } from "./session.js";
+export { LiveKitPocSession, participantLabel, shouldAttachPlayback, shouldShowLiveVideo } from "./session.js";
 export { emptyStats, summarizeRtcStats } from "./stats.js";
 export { nextPhase } from "./phase.js";
 export type { DiagnosticEvent } from "./diagnostics.js";

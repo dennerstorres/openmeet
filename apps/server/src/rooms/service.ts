@@ -256,7 +256,7 @@ export async function joinRoom(
     if (!code) throw new RoomError("forbidden");
     await redeemInvite(db, access.room.id, actor.id, code);
   }
-  const token = await issueRoomToken(env, access.room.slug, actor.id);
+  const token = await issueRoomToken(env, access.room.slug, actor.id, actor.displayName);
   await db.query("insert into audit_events (actor_user_id, action, target_type, target_id) values ($1, 'room_join', 'room', $2)", [actor.id, access.room.id]);
   return token;
 }
@@ -287,7 +287,7 @@ async function redeemInvite(db: MigrationClient, id: string, userId: string, cod
   });
 }
 
-async function issueRoomToken(env: AppEnv, slug: string, userId: string): Promise<{ url: string; token: string; expiresIn: number }> {
+async function issueRoomToken(env: AppEnv, slug: string, userId: string, displayName: string): Promise<{ url: string; token: string; expiresIn: number }> {
   const apiKey = env.LIVEKIT_API_KEY;
   const apiSecret = env.LIVEKIT_API_SECRET;
   const signalUrl = env.LIVEKIT_URL;
@@ -298,7 +298,7 @@ async function issueRoomToken(env: AppEnv, slug: string, userId: string): Promis
   } catch {
     throw new RoomError("room_unconfigured");
   }
-  const tokenBuilder = new AccessToken(apiKey, apiSecret, { identity: userId, ttl: "10m" });
+  const tokenBuilder = new AccessToken(apiKey, apiSecret, { identity: userId, name: displayName, ttl: "10m" });
   tokenBuilder.addGrant({ roomJoin: true, room: slug, canPublish: true, canSubscribe: true, canPublishData: false });
   return { url: url.toString(), token: await tokenBuilder.toJwt(), expiresIn: 600 };
 }
