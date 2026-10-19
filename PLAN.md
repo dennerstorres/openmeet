@@ -34,7 +34,7 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F09-03 | Sala | Três colunas, cards, destaque, grade, fixar e tela cheia | F09-01 | IMPLEMENTED | Claude | G9 |
 | F09-04 | Sala | Presença na sidebar e anel de quem fala | F09-03 | WAITING_VALIDATION | Claude | G9 |
 | F09-05 | Sala | Ensurdecer o áudio remoto só neste PC | F04-02 | IMPLEMENTED | Claude | G9 |
-| F09-06 | Sala | Áudio do PC opcional no compartilhamento | F04-03 | READY | Claude | G9 |
+| F09-06 | Sala | Áudio do PC opcional no compartilhamento | F04-03 | WAITING_VALIDATION | Claude | G9 |
 | F09-07 | Identidade | Login Google pelo navegador, chaves só no servidor | F03-02 | READY | Claude | G9 |
 | F10-01 | Segurança | Recusar controle e bidi nos nomes (S-21) | F03-03 | READY | Grok | G10 |
 | F10-02 | Segurança | Sala só para membro, sem username (S-01, S-10) | F03-03 | READY | Grok | G10 |
@@ -56,6 +56,8 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F10-18 | Segurança | Salas e join no processo nativo (S-06) | F10-17 | PENDING | Grok | G10 |
 
 ## Estado em 2026-10-19
+
+F09-06 ficou `WAITING_VALIDATION` na branch `task/F09-06-audio-pc`, sobre a F09-05: marca "Incluir áudio do PC" e aviso quando a origem não traz o som. Falta a prova do ADR 0008 em dois PCs. A F10-06 precisa liberar `screen_share_audio` no grant.
 
 F09-05 ficou `IMPLEMENTED` na branch `task/F09-05-ensurdecer`, sobre a F09-04: botão Ensurdecer na barra, só neste PC. Não foi ouvido em chamada real.
 

@@ -57,6 +57,7 @@ const idleSnapshot: PocSnapshot = {
   screen: false,
   audioPlayback: true,
   speakers: [],
+  screenAudio: "off",
 };
 
 const ERROR_TEXT: Record<string, string> = {
@@ -89,6 +90,17 @@ function errorText(code: string | null): string | null {
   return ERROR_TEXT[code] ?? "A instância recusou o pedido.";
 }
 
+const SHARE_AUDIO_KEY = "openmeet.shareAudio";
+
+// ADR 0008: the choice may stay on this PC, and it is always visible next to the share button.
+function storedShareAudio(): boolean {
+  try {
+    return localStorage.getItem(SHARE_AUDIO_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 function storedAddress(): string {
   try {
     return localStorage.getItem("openmeet.instance") ?? "http://127.0.0.1:3000";
@@ -118,6 +130,7 @@ export function MeetingApp() {
   const [fullscreen, setFullscreen] = useState(false);
   // ADR 0013: only this PC, only during the call, never saved.
   const [deafened, setDeafened] = useState(false);
+  const [shareAudio, setShareAudio] = useState(storedShareAudio);
   const [levels, setLevels] = useState<Record<string, PlaybackLevel>>({});
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [controlPending, setControlPending] = useState(false);
@@ -686,7 +699,18 @@ export function MeetingApp() {
                 </button>
               ) : null}
             </header>
-            {caption ? <p className="sharing">{caption}. Para trocar a origem, pare e escolha de novo.</p> : null}
+            {caption ? (
+              <p className="sharing">
+                {caption}
+                {media.screenAudio === "on" ? " com o áudio do PC" : ""}. Para trocar a origem, pare e escolha de novo.
+              </p>
+            ) : null}
+            {media.screenAudio === "missing" ? (
+              <p className="error" role="status">
+                Esta origem não trouxe o áudio do PC. Só a imagem está sendo compartilhada. No Windows, o som costuma vir ao escolher a tela inteira com a opção
+                de áudio marcada no seletor.
+              </p>
+            ) : null}
             <CardStage
               cards={cards}
               tiles={media.tiles}
@@ -745,10 +769,27 @@ export function MeetingApp() {
                 className={media.screen ? "on" : ""}
                 aria-pressed={media.screen}
                 disabled={!controlsEnabled || controlPending}
-                onClick={() => void runControl("screen", () => session().setScreenShare(screenShareAction(media.screen) === "start"))}
+                onClick={() => void runControl("screen", () => session().setScreenShare(screenShareAction(media.screen) === "start", shareAudio))}
               >
                 {media.screen ? "Parar compartilhamento" : "Compartilhar tela"}
               </button>
+              <label className="share-audio" title="Pede o som do PC junto com a imagem. Muda na próxima vez que compartilhar.">
+                <input
+                  type="checkbox"
+                  checked={shareAudio}
+                  disabled={media.screen}
+                  onChange={(event) => {
+                    const next = event.currentTarget.checked;
+                    setShareAudio(next);
+                    try {
+                      localStorage.setItem(SHARE_AUDIO_KEY, next ? "1" : "0");
+                    } catch {
+                      // The choice still holds for this window.
+                    }
+                  }}
+                />
+                Incluir áudio do PC
+              </label>
               {isFullscreen ? (
                 <button type="button" className="ghost" onClick={() => setFullscreen(false)}>
                   Sair da tela cheia

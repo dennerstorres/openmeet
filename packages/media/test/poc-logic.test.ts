@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DisconnectReason, Room, RoomEvent } from "livekit-client";
+import { DisconnectReason, Room, RoomEvent, Track } from "livekit-client";
+import { screenAudioState } from "../src/layout.js";
 import { describeMediaError, mediaActionError, sanitizeDiagnostic } from "../src/diagnostics.js";
 import { LiveKitPocSession, participantLabel, shouldAttachPlayback, shouldShowLiveVideo } from "../src/session.js";
 import { classifyDisconnect, nextPhase, type ConnectionPhase } from "../src/phase.js";
@@ -284,4 +285,45 @@ test("the active speakers come from the SFU and clear when the call drops", () =
   assert.deepEqual(session.snapshot().speakers, ["ana", "bia"]);
   room.emit(RoomEvent.Disconnected, DisconnectReason.SERVER_SHUTDOWN);
   assert.deepEqual(session.snapshot().speakers, []);
+});
+
+test("PC audio is asked only when marked, and a share without it is reported as missing", async () => {
+  assert.equal(screenAudioState(false, true, false), "off");
+  assert.equal(screenAudioState(true, false, true), "off");
+  assert.equal(screenAudioState(true, true, true), "on");
+  assert.equal(screenAudioState(true, true, false), "missing");
+
+  const room = new Room();
+  const asked: unknown[] = [];
+  let sharing = false;
+  let audioPublished = false;
+  const local = room.localParticipant as unknown as Record<string, unknown>;
+  local.setScreenShareEnabled = async (enabled: boolean, options: unknown) => {
+    asked.push(options);
+    sharing = enabled;
+    return undefined;
+  };
+  local.getTrackPublication = (source: Track.Source) => (source === Track.Source.ScreenShareAudio && audioPublished && sharing ? {} : undefined);
+  Object.defineProperty(room.localParticipant, "isScreenShareEnabled", { get: () => sharing });
+  const session = new LiveKitPocSession({ room });
+
+  await session.setScreenShare(true);
+  assert.deepEqual(asked.at(-1), { audio: false });
+  assert.equal(session.snapshot().screenAudio, "off");
+
+  await session.setScreenShare(true, true);
+  assert.deepEqual(asked.at(-1), { audio: true, systemAudio: "include" });
+  assert.equal(session.snapshot().screenAudio, "missing");
+  assert.equal(
+    session.snapshot().diagnostics.some((event) => event.message.includes("screen audio missing")),
+    true,
+  );
+
+  audioPublished = true;
+  await session.setScreenShare(true, true);
+  assert.equal(session.snapshot().screenAudio, "on");
+
+  await session.setScreenShare(false, true);
+  assert.deepEqual(asked.at(-1), { audio: false });
+  assert.equal(session.snapshot().screenAudio, "off");
 });

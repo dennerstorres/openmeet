@@ -24,7 +24,7 @@ PR 4 do desenho. Corte no SFU repetível e join na mesma trava (S-04). Depende d
 PR 5 do desenho. Desativar conta, senha, recuperação e corte no logout (S-02, S-18). Depende de F10-03 e F10-04.
 
 ## F10-06
-PR 6 do desenho. Grant só com as fontes autorizadas (S-09). Depende de F10-04.
+PR 6 do desenho. Grant só com as fontes autorizadas (S-09). Depende de F10-04. A F09-06 implementou o ADR 0008: o grant precisa listar também `screen_share_audio`, senão a marca "Incluir áudio do PC" deixa de funcionar. O desenho original dizia "sem áudio do PC" porque o ADR 0008 ainda não estava no código.
 
 ## F10-07
 PR 7 do desenho. Limite só atrás do segredo do proxy (S-11).

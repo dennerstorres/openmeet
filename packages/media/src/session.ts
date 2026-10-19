@@ -11,6 +11,7 @@ import {
 } from "livekit-client";
 import { describeMediaError, mediaActionError, sanitizeDiagnostic, type DiagnosticEvent } from "./diagnostics.js";
 import { buildDiagnosticExport, dropOpenReconnect, pushReconnect, summarizeReconnect, type ReconnectMark, type ReconnectSummary } from "./report.js";
+import { screenAudioState, type ScreenAudioState } from "./layout.js";
 import { classifyDisconnect, nextPhase, type ConnectionPhase } from "./phase.js";
 import { collectTrackReports, emptyStats, readDisplaySurface, readUserAgent, summarizeRtcStats, type RtcSnapshot } from "./stats.js";
 
@@ -82,6 +83,8 @@ export interface PocSnapshot {
   microphone: boolean;
   camera: boolean;
   screen: boolean;
+  /** PC audio of the local share: not asked, published, or asked and absent. */
+  screenAudio: ScreenAudioState;
   audioPlayback: boolean;
   /** Identities the SFU reports as speaking now, loudest first. */
   speakers: string[];
@@ -128,6 +131,7 @@ export class LiveKitPocSession {
   private devices: DeviceOption[] = [];
   private audioPlayback = true;
   private speakers: string[] = [];
+  private screenAudioRequested = false;
   private stats: RtcSnapshot;
   private marks: ReconnectMark[] = [];
 
@@ -242,6 +246,11 @@ export class LiveKitPocSession {
       microphone: local.isMicrophoneEnabled,
       camera: local.isCameraEnabled,
       screen: local.isScreenShareEnabled,
+      screenAudio: screenAudioState(
+        local.isScreenShareEnabled,
+        this.screenAudioRequested,
+        local.getTrackPublication(Track.Source.ScreenShareAudio) !== undefined,
+      ),
       audioPlayback: this.audioPlayback,
       speakers: [...this.speakers],
     };
@@ -304,8 +313,14 @@ export class LiveKitPocSession {
     await this.refreshDevices();
   }
 
-  async setScreenShare(enabled: boolean): Promise<void> {
-    await this.toggle(() => this.room.localParticipant.setScreenShareEnabled(enabled, { audio: false }), "screen");
+  /** The image and, only when asked, the PC audio in the same picker. Stopping ends both. */
+  async setScreenShare(enabled: boolean, withAudio = false): Promise<void> {
+    this.screenAudioRequested = enabled && withAudio;
+    const options = enabled && withAudio ? { audio: true, systemAudio: "include" as const } : { audio: false };
+    await this.toggle(() => this.room.localParticipant.setScreenShareEnabled(enabled, options), "screen");
+    if (enabled && withAudio && this.room.localParticipant.getTrackPublication(Track.Source.ScreenShareAudio) === undefined) {
+      this.note("error", "screen audio missing: the source gave no PC audio");
+    }
   }
 
   applyDeviceList(

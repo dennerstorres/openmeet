@@ -21,6 +21,14 @@ export function arrangeTiles(tiles: readonly LayoutTile[]): TilePlacement {
   };
 }
 
+export type ScreenAudioState = "off" | "on" | "missing";
+
+/** ADR 0008. Asked for the PC audio and the source gave none: the image goes on, and that is not a success. */
+export function screenAudioState(sharing: boolean, requested: boolean, published: boolean): ScreenAudioState {
+  if (!sharing || !requested) return "off";
+  return published ? "on" : "missing";
+}
+
 export function screenShareAction(sharing: boolean): "start" | "stop" {
   return sharing ? "stop" : "start";
 }

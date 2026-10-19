@@ -10,11 +10,13 @@ export {
   keepPin,
   localScreenSurface,
   placeCards,
+  screenAudioState,
   screenCaption,
   screenShareAction,
   screenSourceLabel,
 } from "./layout.js";
 export { formatElapsed, meetingElapsedMs } from "./watch.js";
+export type { ScreenAudioState } from "./layout.js";
 export type { CardLayout, CardPerson, CardPlacement, CardTile, LayoutTile, MeetingCard, TilePlacement } from "./layout.js";
 export type { PlaybackLevel } from "./playback.js";
 export { LiveKitPocSession, participantLabel, shouldAttachPlayback, shouldShowLiveVideo } from "./session.js";

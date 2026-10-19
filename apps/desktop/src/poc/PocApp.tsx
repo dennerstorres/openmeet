@@ -25,6 +25,7 @@ const idleSnapshot: PocSnapshot = {
   microphone: false,
   audioPlayback: true,
   speakers: [],
+  screenAudio: "off",
   camera: false,
   screen: false,
 };

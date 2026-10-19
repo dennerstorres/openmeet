@@ -1,5 +1,9 @@
 # HISTORY — registro cronológico
 
+### 2026-10-19 — F09-06 áudio do PC no compartilhamento — Claude
+Branch `task/F09-06-audio-pc`, sobre `task/F09-05-ensurdecer`. Ao lado de Compartilhar tela há a marca "Incluir áudio do PC", desligada por padrão e lembrada neste PC. Sem a marca o pedido continua `audio: false`. Com ela, o mesmo seletor pede imagem e som (`audio: true`, `systemAudio: include`); parar encerra os dois. Se a origem não entregar a faixa, a imagem continua, a tela avisa e o diagnóstico registra `screen audio missing`. Quem compartilha não ouve a própria faixa; os outros ouvem pelo card do compartilhamento, sob o mesmo Ativar som e o Ensurdecer. Não há captura nativa do Windows.
+Comandos, Windows 11: `pnpm typecheck`, `pnpm lint` e `pnpm --filter @openmeet/desktop build` ok. `pnpm -r test`: shared 32, media 44, server 34, desktop 2, todos pass. Não feito: os quatro passos de prova do ADR 0008 com build instalado e dois PCs. Risco: a F10-06 (S-09) precisa incluir `screen_share_audio` no grant. Sem GO/NO-GO.
+
 ### 2026-10-19 — F09-05 ensurdecer — Claude
 Branch `task/F09-05-ensurdecer`, sobre `task/F09-04-presenca`. A barra da chamada ganhou Ensurdecer. Ligado, todo áudio remoto deste PC fica mudo, inclusive o de compartilhamento, sem mexer no microfone e sem avisar o servidor. O volume e o silêncio de cada card ficam guardados e voltam ao desligar. Nasce desligado, zera ao sair da sala e não grava em disco. Se o som ainda estiver bloqueado, o corte já vale quando a pessoa clicar em Ativar som, porque o elemento de áudio nasce mudo.
 Comandos, Windows 11: `pnpm typecheck`, `pnpm lint` e `pnpm --filter @openmeet/desktop build` ok. `pnpm -r test`: shared 32, media 43, server 34, desktop 2, todos pass. Não ouvido em chamada real. Sem GO/NO-GO.

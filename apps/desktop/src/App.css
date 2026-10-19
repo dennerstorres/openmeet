@@ -891,3 +891,13 @@ button.ghost:hover:not(:disabled) {
     transition: none;
   }
 }
+
+/* ADR 0008 */
+
+.share-audio {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  color: #b5c7bb;
+  font-size: 13px;
+}
