@@ -65,6 +65,8 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 
 ## Estado em 2026-10-19
 
+O `.exe` passou a renovar o access token de 15 min durante o uso (complemento da F10-18): um 401 faz um refresh só e repete a chamada. Falta ver no instalador uma sessão passar de 15 min.
+
 F12-02 ficou `IMPLEMENTED` na branch `task/F12-02-cookie`: login, bootstrap, Google, refresh e senha gravam `om_access` e `om_refresh` quando o pedido traz `X-OpenMeet-Web: 1` e a origem da página; o corpo não leva token. O `.exe` segue com `Bearer`. Falta o navegador real (F12-07).
 
 F12-01 está `DONE`: o ADR 0014 foi aceito em 2026-10-19 e a SPEC tem o item 17, o RF-19 e o RF-02 com cookie na web. F12-02 e F12-03 passaram a `READY`.

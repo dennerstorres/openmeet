@@ -1,6 +1,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { ApiResult, InstanceApi, SessionBroker } from "@openmeet/shared";
+import { createRenewal } from "./renew";
 
 export { isTauri };
 
@@ -15,6 +16,9 @@ export interface ShellStatus {
   shortcuts: ShortcutView[];
 }
 
+// The broker's refresh and the 401 renewal of instance calls share one flight.
+const renewal = createRenewal((origin) => invoke<ApiResult | null>("session_refresh", { origin }));
+
 // S-05: login, refresh and logout run in the native process. The refresh never crosses into the page.
 export function createDesktopBroker(): SessionBroker {
   return {
@@ -23,7 +27,7 @@ export function createDesktopBroker(): SessionBroker {
       return invoke<ApiResult>(command, { origin, ...body });
     },
     refresh(origin) {
-      return invoke<ApiResult | null>("session_refresh", { origin });
+      return renewal.renew(origin);
     },
     logout(origin) {
       return invoke<ApiResult>("session_logout", { origin });
@@ -40,7 +44,8 @@ export function createDesktopApi(open: InstanceApi): InstanceApi {
   return {
     request(origin, method, path, body, accessToken) {
       if (accessToken === null) return open.request(origin, method, path, body, null);
-      return invoke<ApiResult>("instance_call", { origin, method, path, body: method === "GET" ? null : (body ?? {}) });
+      const args = { origin, method, path, body: method === "GET" ? null : (body ?? {}) };
+      return renewal.call(origin, () => invoke<ApiResult>("instance_call", args));
     },
   };
 }
