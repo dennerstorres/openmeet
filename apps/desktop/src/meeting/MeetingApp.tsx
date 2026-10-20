@@ -88,6 +88,7 @@ const ERROR_TEXT: Record<string, string> = {
   room_unconfigured: "A instância ainda não emite mídia.",
   connect_failed: "Não foi possível entrar na sala.",
   request_failed: "A instância não respondeu.",
+  instance_outdated: "A instância está desatualizada para este app. Peça ao operador para atualizar a API.",
   instance_unavailable: "A instância não confirmou os metadados.",
 };
 

@@ -197,6 +197,10 @@ export function readErrorCode(value: unknown): string {
   if (typeof value === "object" && value !== null && "error" in value) {
     const code = value.error;
     if (typeof code === "string" && ERROR_CODE.test(code)) return code;
+    // The API answers an unknown route this way. The instance is older than this app, not offline.
+    if ("statusCode" in value && value.statusCode === 404 && "message" in value && typeof value.message === "string" && value.message.startsWith("Route ")) {
+      return "instance_outdated";
+    }
   }
   return "request_failed";
 }

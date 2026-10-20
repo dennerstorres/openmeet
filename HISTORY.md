@@ -1,5 +1,9 @@
 # HISTORY — registro cronológico
 
+### 2026-10-19 — "A instância não respondeu" depois do login — Claude
+`main`. Relato: instalador novo, login de admin em `https://openmeet-api.dennerstorres.dev`, erro "A instância não respondeu". Causa: a API dessa instância é anterior à F09. O cartão não traz `googleLogin`, `GET /api/v1/servers` responde 404 de rota inexistente do Fastify e `GET /api/v1/rooms` responde 401. O app chama `/servers` logo depois do login, e esse 404 caía em `request_failed`. O cliente nativo não é a causa: uma sonda Rust temporária (removida) recebeu 401 `invalid_credentials` da mesma instância. Correção no app: rota inexistente vira `instance_outdated`, com a mensagem de pedir ao operador para atualizar a API. A correção de fato é atualizar a VPS para o `main`. A instância está atrás do Cloudflare e a raiz do domínio responde nginx; se o proxy da VPS não for o Caddy deste repositório, a API nova com `TRUST_PROXY=1` responde 503 `proxy_rejected` no login até o proxy mandar `X-OpenMeet-Proxy` e um `X-Forwarded-For` de um hop só, com o IP real (`CF-Connecting-IP`).
+Comandos, Windows 11: `pnpm typecheck`, `pnpm lint`, `prettier --check` e `pnpm test` ok (shared 41). Instalador não regerado.
+
 ### 2026-10-19 — F12-01 ADR 0014 aceito — Claude
 `main`. Aceite humano no chat. ADR 0014 em `Accepted`. SPEC: visão com cliente web, item 17 do escopo, RF-02 com cofre no `.exe` e cookie `HttpOnly` na web, RF-19 do cliente web e navegadores suportados. Sem código. F12-01 `DONE`; F12-02 e F12-03 `READY`.
 

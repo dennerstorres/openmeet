@@ -132,3 +132,10 @@ test("parseLabel refuses C0, DEL, C1, separators and bidi without cleaning them 
   assert.equal(parseLabel("   "), undefined);
   assert.throws(() => parseInstanceCard({ name: "Sala‮", apiVersion: "v1", bootstrapOpen: false }), PocInputError);
 });
+
+test("an unknown route reads as an outdated instance, not as a network failure", () => {
+  assert.equal(readErrorCode({ message: "Route GET:/api/v1/servers not found", error: "Not Found", statusCode: 404 }), "instance_outdated");
+  assert.equal(readErrorCode({ error: "room_not_found" }), "room_not_found");
+  assert.equal(readErrorCode({ error: "Not Found", statusCode: 404, message: "something else" }), "request_failed");
+  assert.equal(readErrorCode(null), "request_failed");
+});
