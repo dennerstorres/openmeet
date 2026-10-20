@@ -1,4 +1,5 @@
 import {
+  browserLabel,
   buildCards,
   cardInitial,
   DEFAULT_PLAYBACK,
@@ -161,7 +162,7 @@ export function MeetingApp() {
   mediaRef.current = media;
 
   function session(): LiveKitPocSession {
-    sessionRef.current ??= new LiveKitPocSession({ appVersion: desktopPackage.version });
+    sessionRef.current ??= new LiveKitPocSession({ appVersion: desktopPackage.version, client: __WEB__ ? "web" : "desktop" });
     return sessionRef.current;
   }
 
@@ -909,23 +910,25 @@ export function MeetingApp() {
               >
                 <IconHeadphones size={22} off={deafened} />
               </button>
-              <label className="share-audio" title="Pede o som do PC junto com a imagem. Muda na próxima vez que compartilhar.">
-                <input
-                  type="checkbox"
-                  checked={shareAudio}
-                  disabled={media.screen}
-                  onChange={(event) => {
-                    const next = event.currentTarget.checked;
-                    setShareAudio(next);
-                    try {
-                      localStorage.setItem(SHARE_AUDIO_KEY, next ? "1" : "0");
-                    } catch {
-                      // The choice still holds for this window.
-                    }
-                  }}
-                />
-                Incluir áudio do PC
-              </label>
+              {session().browser.screenAudio ? (
+                <label className="share-audio" title="Pede o som do PC junto com a imagem. Muda na próxima vez que compartilhar.">
+                  <input
+                    type="checkbox"
+                    checked={shareAudio}
+                    disabled={media.screen}
+                    onChange={(event) => {
+                      const next = event.currentTarget.checked;
+                      setShareAudio(next);
+                      try {
+                        localStorage.setItem(SHARE_AUDIO_KEY, next ? "1" : "0");
+                      } catch {
+                        // The choice still holds for this window.
+                      }
+                    }}
+                  />
+                  Incluir áudio do PC
+                </label>
+              ) : null}
               {isFullscreen ? (
                 <button type="button" className="ghost" onClick={() => setFullscreen(false)}>
                   Sair da tela cheia
@@ -937,13 +940,21 @@ export function MeetingApp() {
                   </summary>
                   <div className="more-body">
                     <DeviceSelect label="Entrada" kind="audioinput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
-                    <DeviceSelect label="Saída" kind="audiooutput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
+                    {session().browser.outputSelection ? (
+                      <DeviceSelect
+                        label="Saída"
+                        kind="audiooutput"
+                        devices={media.devices}
+                        disabled={!controlsEnabled || controlPending}
+                        onChange={onDevice}
+                      />
+                    ) : null}
                     <DeviceSelect label="Câmera" kind="videoinput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
                     <button type="button" disabled={!controlsEnabled} onClick={() => void refreshDevices()}>
                       Atualizar dispositivos
                     </button>
                     <p className="metrics">
-                      {media.stats.userAgent ?? "user agent indisponível"} · app {media.stats.appVersion ?? "—"}
+                      {browserLabel(session().browser)} · {media.stats.userAgent ?? "user agent indisponível"} · app {media.stats.appVersion ?? "—"}
                     </p>
                     {media.stats.available ? (
                       <p className="metrics">

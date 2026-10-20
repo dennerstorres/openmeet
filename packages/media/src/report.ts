@@ -72,6 +72,9 @@ export interface DiagnosticExportInput {
   disconnectReason: string | null;
   appVersion: string | null;
   userAgent: string | null;
+  /** ADR 0014: which client and which browser, so a report says where it came from. */
+  client?: "desktop" | "web" | null;
+  browser?: string | null;
   stats: RtcSnapshot;
   events: readonly DiagnosticEvent[];
   reconnect: ReconnectSummary;
@@ -90,6 +93,8 @@ export function buildDiagnosticExport(input: DiagnosticExportInput, consent: boo
     disconnectReason: text(input.disconnectReason),
     appVersion: text(input.appVersion),
     userAgent: text(input.userAgent),
+    client: input.client ?? null,
+    browser: text(input.browser ?? null),
     reconnect: input.reconnect,
     stats: {
       packetsLost: input.stats.packetsLost,

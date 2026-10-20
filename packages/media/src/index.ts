@@ -1,3 +1,5 @@
+export { browserLabel, detectBrowserMedia, readBrowserMedia } from "./browser.js";
+export type { BrowserFeatures, BrowserMedia, BrowserName } from "./browser.js";
 export { describeMediaError, mediaActionError, redactText, sanitizeDiagnostic } from "./diagnostics.js";
 export { buildDiagnosticExport, dropOpenReconnect, EMPTY_RECONNECT, pushReconnect, reconnectLabel, summarizeReconnect } from "./report.js";
 export type { DiagnosticExportInput, ReconnectMark, ReconnectSummary } from "./report.js";

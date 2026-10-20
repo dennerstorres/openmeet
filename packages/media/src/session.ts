@@ -10,6 +10,7 @@ import {
   type TrackPublication,
 } from "livekit-client";
 import { describeMediaError, mediaActionError, sanitizeDiagnostic, type DiagnosticEvent } from "./diagnostics.js";
+import { browserLabel, readBrowserMedia, type BrowserMedia } from "./browser.js";
 import { buildDiagnosticExport, dropOpenReconnect, pushReconnect, summarizeReconnect, type ReconnectMark, type ReconnectSummary } from "./report.js";
 import { screenAudioState, type ScreenAudioState } from "./layout.js";
 import { classifyDisconnect, nextPhase, type ConnectionPhase } from "./phase.js";
@@ -125,6 +126,9 @@ export class LiveKitPocSession {
   private readonly diagnostics: DiagnosticEvent[] = [];
   private readonly secrets: string[] = [];
   private readonly appVersion: string | null;
+  private readonly client: "desktop" | "web" | null;
+  /** ADR 0014: what this browser gives; the screen hides what is missing. */
+  readonly browser: BrowserMedia;
   private phase: ConnectionPhase = "idle";
   private disconnectReason: string | null = null;
   private explicitLeave = false;
@@ -135,9 +139,11 @@ export class LiveKitPocSession {
   private stats: RtcSnapshot;
   private marks: ReconnectMark[] = [];
 
-  constructor(options?: { appVersion?: string; room?: Room }) {
+  constructor(options?: { appVersion?: string; room?: Room; client?: "desktop" | "web"; browser?: BrowserMedia }) {
     this.room = options?.room ?? new Room();
     this.appVersion = options?.appVersion ?? null;
+    this.client = options?.client ?? null;
+    this.browser = options?.browser ?? readBrowserMedia();
     this.stats = { ...emptyStats(), userAgent: readUserAgent(), appVersion: this.appVersion };
     this.room.on(RoomEvent.Reconnecting, () => {
       this.phase = nextPhase(this.phase, "reconnecting");
@@ -265,6 +271,8 @@ export class LiveKitPocSession {
         disconnectReason: snapshot.disconnectReason,
         appVersion: snapshot.stats.appVersion,
         userAgent: snapshot.stats.userAgent,
+        client: this.client,
+        browser: browserLabel(this.browser),
         stats: snapshot.stats,
         events: snapshot.diagnostics,
         reconnect: snapshot.reconnect,
@@ -314,7 +322,9 @@ export class LiveKitPocSession {
   }
 
   /** The image and, only when asked, the PC audio in the same picker. Stopping ends both. */
-  async setScreenShare(enabled: boolean, withAudio = false): Promise<void> {
+  async setScreenShare(enabled: boolean, requestAudio = false): Promise<void> {
+    // A browser without screen audio is never asked for it (ADR 0014).
+    const withAudio = requestAudio && this.browser.screenAudio;
     this.screenAudioRequested = enabled && withAudio;
     const options = enabled && withAudio ? { audio: true, systemAudio: "include" as const } : { audio: false };
     await this.toggle(() => this.room.localParticipant.setScreenShareEnabled(enabled, options), "screen");

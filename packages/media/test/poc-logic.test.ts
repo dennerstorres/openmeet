@@ -305,7 +305,7 @@ test("PC audio is asked only when marked, and a share without it is reported as 
   };
   local.getTrackPublication = (source: Track.Source) => (source === Track.Source.ScreenShareAudio && audioPublished && sharing ? {} : undefined);
   Object.defineProperty(room.localParticipant, "isScreenShareEnabled", { get: () => sharing });
-  const session = new LiveKitPocSession({ room });
+  const session = new LiveKitPocSession({ room, browser: { name: "edge", version: "141", outputSelection: true, screenAudio: true } });
 
   await session.setScreenShare(true);
   assert.deepEqual(asked.at(-1), { audio: false });
