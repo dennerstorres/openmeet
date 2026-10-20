@@ -55,8 +55,17 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F10-17 | Segurança | Login, refresh e logout no processo nativo (S-05, S-18) | F10-05,F10-07,F10-15 | WAITING_VALIDATION | Claude | G10 |
 | F10-18 | Segurança | Salas e join no processo nativo (S-06) | F10-17 | WAITING_VALIDATION | Claude | G10 |
 | F11-01 | Marca | Novo ícone do app e variantes | F07-02 | WAITING_VALIDATION | Claude | G7 |
+| F12-01 | Web | Aceitar ADR 0014 e atualizar a SPEC | — | READY | Humano | G12 |
+| F12-02 | Web | Sessão por cookie HttpOnly na API | F12-01 | PENDING | Grok | G12 |
+| F12-03 | Web | Alvo web do frontend, instância na origem | F12-01 | PENDING | Grok | G12 |
+| F12-04 | Web | API serve o bundle web com CSP própria | F12-03 | PENDING | Grok | G12 |
+| F12-05 | Web | Convite e Google no navegador | F12-02,F12-03 | PENDING | Grok | G12 |
+| F12-06 | Web | Mídia conforme o navegador | F12-03 | PENDING | Grok | G12 |
+| F12-07 | Web | Prova em Chrome, Edge e Firefox em dois PCs | F12-04,F12-05,F12-06 | PENDING | Humano | G12 |
 
 ## Estado em 2026-10-19
+
+F12 entrou com o desenho do cliente web (ADR 0014, `plans/phase-12-web.md`): a instância serve o mesmo frontend em `https://{API_DOMAIN}/`, com sessão em cookie `HttpOnly`. Bandeja, atalhos e cofre não existem na web; áudio do PC depende do navegador. F12-01 espera o aceite do ADR. Nada implementado.
 
 F10-18 ficou `WAITING_VALIDATION` na branch `task/F10-18-salas-nativas`: o access token sai da página; salas, servidores, convites, presença e join passam pelo Rust com lista fechada de rotas. Falta o instalador contra uma instância real. Com isso as 18 tarefas da F10 têm código; nenhuma está `DONE`.
 

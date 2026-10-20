@@ -11,4 +11,6 @@
 - **G9 Servidores e sala:** os ADR 0007–0013. Servidores isolados na mesma API, convite por link sem vazar o código, cards e layouts, presença sem gravar ocupação no Postgres, ensurdecer local, áudio do PC com falha visível e Google sem segredo no cliente. Prova humana de link, anel e áudio do PC fica `WAITING_VALIDATION`, nunca PASS por inspeção.
 - **G10 Segurança:** cada achado S-01 a S-21 fechado com o teste que o desenho pede, sem afrouxar auth, TLS ou autorização e com `POC_JOIN` em 0. Itens que só um build instalado ou a stack real provam (WebView2, SFU, Caddy) ficam `WAITING_VALIDATION`.
 
+- **G12 Web:** ADR 0014. Cliente web na mesma origem da API, sem token legível por JavaScript, cookie `HttpOnly; Secure; SameSite=Strict`, CSRF recusado sem `Origin` e cabeçalho web, CSP sem `unsafe-inline` e com só o domínio do LiveKit, e o `.exe` sem regressão. Chrome, Edge e Firefox reais ficam `WAITING_VALIDATION` até prova humana.
+
 Se uma ação exige contexto fora da máquina do agente (2 PCs, rede, VPS) marcar WAITING_VALIDATION e fornecer roteiro ao humano, nunca declarar PASS.
