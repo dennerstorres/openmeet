@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-19 — F12-01 ADR 0014 aceito — Claude
+`main`. Aceite humano no chat. ADR 0014 em `Accepted`. SPEC: visão com cliente web, item 17 do escopo, RF-02 com cofre no `.exe` e cookie `HttpOnly` na web, RF-19 do cliente web e navegadores suportados. Sem código. F12-01 `DONE`; F12-02 e F12-03 `READY`.
+
 ### 2026-10-19 — instalador com a F10 — Claude
 `main` (ba5a36b, código; o commit seguinte só tem o desenho da F12). `pnpm --filter @openmeet/desktop exec tauri build --bundles nsis` gerou `OpenMeet_0.1.0_x64-setup.exe`, 2,20 MiB, SHA256 `39a5d6df7cbfbb1ec0e9df4024f791497b9d51b640fe3a722c61705299be69fd`, copiado para a Área de Trabalho. Antes do build o disco tinha 0,5 GB livres; apaguei `src-tauri/target/debug` (cache). O app agora fala com a instância pelo processo nativo (F10-17 e F10-18): a API do teste precisa estar no `main` com as migrations até `0006` e, atrás do Caddy, com `PROXY_AUTH`. O instalador não foi aberto.
 

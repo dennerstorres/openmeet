@@ -1,7 +1,7 @@
 # SPEC — OpenMeet (codinome) v0.1
 
 ## Visão
-Cliente desktop Windows para salas de reunião persistentes ou temporárias, com áudio, vídeo, compartilhamento de janela/monitor e diagnóstico de qualidade; implantação self-hosted, contas independentes por instância, sem dependência de uma conta global. Uma instância pode ter vários servidores, e cada servidor tem suas salas.
+Cliente desktop Windows e cliente web, servido pela própria instância, para salas de reunião persistentes ou temporárias, com áudio, vídeo, compartilhamento de janela/monitor e diagnóstico de qualidade; implantação self-hosted, contas independentes por instância, sem dependência de uma conta global. Uma instância pode ter vários servidores, e cada servidor tem suas salas.
 
 ## Personas e jornadas
 - **Operador:** instala a stack numa VPS, configura domínio/TLS/portas, inicializa administrador, cria servidores e controla inscrições.
@@ -25,13 +25,14 @@ Cliente desktop Windows para salas de reunião persistentes ou temporárias, com
 14. Ensurdecer o áudio remoto só neste PC. ADR 0013. Não implementado.
 15. Áudio do PC opcional no compartilhamento, desligado por padrão. ADR 0008. Não implementado.
 16. Login com Google quando o servidor tem as chaves. ADR 0010. Não implementado.
+17. Cliente web em `https://{API_DOMAIN}/`, mesmo frontend do `.exe`, sessão em cookie `HttpOnly`, para Chrome, Edge e Firefox atuais em computador. Sem bandeja, atalhos globais, notificação do sistema nem cofre do Windows. ADR 0014. Não implementado.
 
 ## Out of scope — MVP
 Mensagens persistentes, federação, apps móveis, macOS/Linux, gravações, transcrição, E2EE, plugins, quadro branco, acesso remoto, múltiplos nós, bots, integrações além do login Google, captura nativa do áudio do Windows, status online fora de uma sala, juntar conta Google a uma conta de senha e link que entra direto numa sala.
 
 ## Requisitos funcionais
 - RF-01: Usuário adiciona instância por HTTPS; cliente verifica metadados e não envia credenciais a host inesperado.
-- RF-02: Login por instância e persistência de sessão em armazenamento seguro nativo.
+- RF-02: Login por instância e persistência de sessão em armazenamento seguro: cofre do Windows no `.exe`, cookie `HttpOnly; Secure; SameSite=Strict` na web. Nenhum dos dois expõe token ao JavaScript.
 - RF-03: Tokens LiveKit são emitidos pelo backend somente após autorização explícita; escopo de sala e TTL reduzido.
 - RF-04: Usuário escolhe sala autorizada e entra/sai sem recriar o cliente.
 - RF-05: Cada track de microfone/câmera/tela apresenta estado local, remoto e erros visíveis.
@@ -48,11 +49,12 @@ Mensagens persistentes, federação, apps móveis, macOS/Linux, gravações, tra
 - RF-16: Ensurdecer corta o áudio remoto neste PC, guarda o volume de cada card e não mexe no microfone nem avisa o servidor. ADR 0013.
 - RF-17: "Incluir áudio do PC" nasce desligado. Se a origem não entregar a faixa, a imagem continua e a tela avisa. ADR 0008.
 - RF-18: Login Google abre o navegador do sistema. As chaves ficam no servidor. Sem elas, o botão não aparece. Não cria o administrador. ADR 0010.
+- RF-19: A instância serve o cliente web na mesma origem da API, sem escolher outra instância. Cookie só autentica com `Origin` da instância e `X-OpenMeet-Web: 1`. O que o navegador não suporta (áudio do PC, saída de som) some da tela em vez de falhar. ADR 0014.
 
 ## Requisitos não funcionais
 - Segredo jamais incluído no repo, logs ou CI; TLS em produção; Argon2id com parâmetros documentados.
 - Sem pré-requisito de Node/Rust para o usuário final (runtime WebView2 considerado pela instalação).
-- Suporte inicial Windows 10/11 em versões suportadas pelo Tauri/WebView2; matriz de versões testadas explicitamente.
+- Suporte inicial Windows 10/11 em versões suportadas pelo Tauri/WebView2; matriz de versões testadas explicitamente. Web: Chrome, Edge e Firefox atuais em computador; celular não testado.
 - Teste funcional de cinco participantes simultâneos e reunião contínua de 60 min em ambiente homologado.
 - Meta de p95 de entrada <= 5s em rede estável e sessão pronta; reconexão <=15s após queda de 5s, mediante servidor alcançável. São metas, não garantias.
 - Monitoramento: logs JSON no backend, requestId/roomId pseudonimizados e healthchecks; retenção configurável.

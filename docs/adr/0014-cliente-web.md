@@ -1,5 +1,5 @@
 # ADR 0014 — Cliente web
-Status: Proposed. Data: 2026-10-19. Espera aceite humano antes da F12.
+Status: Accepted. Data: 2026-10-19. Aceito para a F12. O cliente web ainda não está no código.
 
 ## Contexto
 O cliente hoje é o `.exe` do Windows (Tauri). Quem não pode instalar nada, ou usa outro sistema, não entra. A interface já roda no navegador no `tauri dev`: é React com o mesmo `MeetingModel`, e a mídia é LiveKit no navegador. O que prende ao Windows é pouco: bandeja, atalhos globais, notificação nativa, cofre do Windows, link `openmeet://` e o processo nativo que guarda os tokens (F10-15, F10-17 e F10-18).
