@@ -13,7 +13,7 @@ export {
   prepareInstanceRequest,
   readErrorCode,
 } from "./instance.js";
-export { inviteLink, isInviteCode, parseInvite } from "./invite.js";
+export { inviteFromFragment, inviteLink, invitePageLink, isInviteCode, parseInvite } from "./invite.js";
 export type { InviteLink } from "./invite.js";
 export { MeetingModel, MemorySessionVault, vaultSessionBroker } from "./meeting.js";
 export { PocInputError, parseApiBase, parseIdentity, parseJoinResponse, parsePastedJoin, parseRoomName, parseSignalUrl } from "./poc.js";

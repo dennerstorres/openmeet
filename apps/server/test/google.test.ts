@@ -232,6 +232,47 @@ test("a second Google account with the same e-mail name gets its own username", 
   }
 });
 
+test("in the browser the poll answers with cookies and a body without tokens", async () => {
+  const pg = new PGlite();
+  const db = pgliteClient(pg);
+  await applyMigrations(db);
+  let nonce = "";
+  const app = await buildApp({ logger: false, env, db, googleTokens: { exchange: async () => ({ idToken: idToken(claimsFor(nonce)) }) } });
+  const web = { "x-openmeet-web": "1", origin: "https://api.example.com" };
+  try {
+    const started = (await app.inject({ method: "POST", url: "/api/v1/auth/google/start", headers: web })).json() as { authUrl: string; poll: string };
+    const url = new URL(started.authUrl);
+    nonce = url.searchParams.get("nonce") ?? "";
+    const pending = await app.inject({ method: "POST", url: "/api/v1/auth/google/poll", headers: web, payload: { poll: started.poll } });
+    assert.equal(pending.statusCode, 202);
+    assert.equal(pending.headers["set-cookie"], undefined);
+    await app.inject({ method: "GET", url: `/api/v1/auth/google/callback?state=${url.searchParams.get("state")}&code=c` });
+
+    const foreign = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/google/poll",
+      headers: { ...web, origin: "https://evil.example" },
+      payload: { poll: started.poll },
+    });
+    assert.equal(foreign.statusCode, 403);
+    assert.equal(foreign.headers["set-cookie"], undefined);
+
+    const done = await app.inject({ method: "POST", url: "/api/v1/auth/google/poll", headers: web, payload: { poll: started.poll } });
+    assert.equal(done.statusCode, 200);
+    assert.deepEqual(Object.keys(done.json() as object).sort(), ["expiresIn", "user"]);
+    const cookies = done.headers["set-cookie"];
+    assert.ok(Array.isArray(cookies));
+    assert.match(cookies[0] ?? "", /^om_access=[^;]+; Path=\/api; Max-Age=900; HttpOnly; Secure; SameSite=Strict$/);
+    assert.match(cookies[1] ?? "", /^om_refresh=[^;]+; Path=\/api\/v1\/auth; Max-Age=2592000; HttpOnly; Secure; SameSite=Strict$/);
+    const access = (cookies[0] ?? "").slice("om_access=".length, (cookies[0] ?? "").indexOf(";"));
+    const me = await app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { "x-openmeet-web": "1", cookie: `om_access=${access}` } });
+    assert.equal(me.statusCode, 200);
+  } finally {
+    await app.close();
+    await pg.close();
+  }
+});
+
 test("claims are checked one by one and the callback query is not logged", () => {
   const config = { clientId, clientSecret, redirectUri: "https://api.example.com/api/v1/auth/google/callback" };
   assert.equal(readIdToken(idToken(claimsFor("n")), config, "n", Math.floor(Date.now() / 1000)).subject, "google-sub-1");

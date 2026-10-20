@@ -91,11 +91,35 @@ test("an unknown page path opens the client, but /api and missing files stay 404
   }
 });
 
+test("with the web client the invite page hands the code over in the fragment, never in the log", async () => {
+  const root = await webRoot();
+  const lines: string[] = [];
+  const app = await buildApp({ env, webRoot: root, logStream: { write: (line: string) => lines.push(line) } });
+  const code = "A".repeat(20) + "b_-" + "9".repeat(20);
+  try {
+    const page = await app.inject({ method: "GET", url: `/convite/${code}`, headers: { host: "meet.example" } });
+    assert.equal(page.statusCode, 200);
+    assert.equal(page.body.includes(`<a href="/#convite=${code}">Abrir no navegador</a>`), true);
+    assert.equal(page.body.includes("openmeet://convite?host=meet.example"), true);
+    // The client opens at / with the code after #, which the browser does not send.
+    const opened = await app.inject({ method: "GET", url: "/" });
+    assert.equal(opened.statusCode, 200);
+    assert.ok(lines.length > 0);
+    assert.equal(lines.join("").includes(code), false);
+  } finally {
+    await app.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("without a built client the instance serves only the API", async () => {
   const app = await buildApp({ logger: false, env, webRoot: path.join(tmpdir(), "openmeet-no-web-here") });
+  const code = "A".repeat(20) + "b_-" + "9".repeat(20);
   try {
     const root = await app.inject({ method: "GET", url: "/" });
     assert.equal(root.statusCode, 404);
+    const invite = await app.inject({ method: "GET", url: `/convite/${code}`, headers: { host: "meet.example" } });
+    assert.equal(invite.body.includes("Abrir no navegador"), false);
   } finally {
     await app.close();
   }

@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { inviteLink, MeetingModel, MemorySessionVault, vaultSessionBroker, type InstanceApi, type MeetingMedia, type SessionBroker } from "../src/index.js";
+import {
+  inviteLink,
+  invitePageLink,
+  MeetingModel,
+  MemorySessionVault,
+  vaultSessionBroker,
+  type InstanceApi,
+  type MeetingMedia,
+  type SessionBroker,
+} from "../src/index.js";
 
 const roomId = "11111111-1111-4111-8111-111111111111";
 const otherRoomId = "33333333-3333-4333-8333-333333333333";
@@ -401,6 +410,15 @@ test("owners copy a link for the selected server and participants cannot", async
   assert.equal(model.snapshot().createdInvite, `openmeet://convite?host=meet.example&code=${inviteCode}`);
   await model.signOut();
   assert.equal(model.snapshot().createdInvite, null);
+});
+
+test("the web client shares the https invite page instead of openmeet://", async () => {
+  const { api } = apiFor("admin");
+  const model = new MeetingModel(api, mediaFor(), undefined, undefined, invitePageLink);
+  await model.confirmInstance("https://meet.example");
+  await model.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  await model.createInvite();
+  assert.equal(model.snapshot().createdInvite, `https://meet.example/convite/${inviteCode}`);
 });
 
 test("presence fills the room list, never blocks other work, and hides on failure", async () => {

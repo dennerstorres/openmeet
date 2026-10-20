@@ -190,6 +190,8 @@ export class MeetingModel {
     private readonly media: MeetingMedia = idleMedia,
     store: SessionVault | SessionBroker = new MemorySessionVault(),
     private readonly wait: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    /** The link a created invite is shared as: openmeet:// in the .exe, the https page on the web (ADR 0014). */
+    private readonly shareLink: (origin: string, code: string) => string = inviteLink,
   ) {
     this.broker = isBroker(store) ? store : vaultSessionBroker(api, store);
   }
@@ -479,7 +481,7 @@ export class MeetingModel {
         return;
       }
       try {
-        this.createdInvite = inviteLink(origin, code);
+        this.createdInvite = this.shareLink(origin, code);
       } catch {
         this.error = "invalid_instance";
       }

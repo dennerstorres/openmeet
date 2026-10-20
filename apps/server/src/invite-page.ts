@@ -34,6 +34,7 @@ function page(body: string): string {
 body{margin:0;min-height:100vh;display:grid;place-items:center;background:#111613;color:#e7f2ea;font-family:"Segoe UI",system-ui,sans-serif}
 main{max-width:420px;padding:24px;text-align:center}
 a{display:inline-block;margin-top:16px;padding:10px 16px;border-radius:8px;background:#23a559;color:#06210f;font-weight:700;text-decoration:none}
+a+a{margin-left:8px}
 p{color:#9bb0a2;line-height:1.5}
 </style>
 </head>
@@ -41,7 +42,11 @@ p{color:#9bb0a2;line-height:1.5}
 </html>`;
 }
 
-export function registerInvitePage(app: FastifyInstance): void {
+/**
+ * ADR 0014: with the web client installed, the page also offers it. The code goes in the fragment,
+ * which the browser never sends, so it reaches no request log on the way to the client.
+ */
+export function registerInvitePage(app: FastifyInstance, webClient = false): void {
   app.get("/convite/:code", async (request, reply) => {
     const params = request.params as Record<string, unknown>;
     const code = typeof params.code === "string" ? params.code : "";
@@ -52,12 +57,9 @@ export function registerInvitePage(app: FastifyInstance): void {
     }
     // Both values passed the strict patterns above, so they carry no HTML or URL syntax.
     const link = `openmeet://convite?host=${encodeURIComponent(host)}&amp;code=${code}`;
-    return reply
-      .code(200)
-      .send(
-        page(
-          `<h1>Convite do OpenMeet</h1><p>Este convite abre no aplicativo OpenMeet. Se ele não abriu sozinho, use o botão abaixo.</p><a href="${link}">Abrir no OpenMeet</a><p>Sem o aplicativo? Instale o OpenMeet e abra este link de novo.</p>`,
-        ),
-      );
+    const body = webClient
+      ? `<h1>Convite do OpenMeet</h1><p>Abra o convite no aplicativo OpenMeet ou direto no navegador.</p><a href="${link}">Abrir no OpenMeet</a> <a href="/#convite=${code}">Abrir no navegador</a>`
+      : `<h1>Convite do OpenMeet</h1><p>Este convite abre no aplicativo OpenMeet. Se ele não abriu sozinho, use o botão abaixo.</p><a href="${link}">Abrir no OpenMeet</a><p>Sem o aplicativo? Instale o OpenMeet e abra este link de novo.</p>`;
+    return reply.code(200).send(page(body));
   });
 }

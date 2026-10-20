@@ -27,6 +27,18 @@ export function inviteLink(origin: string, code: string): string {
   return `openmeet://convite?host=${encodeURIComponent(inviteHost(origin))}&code=${code}`;
 }
 
+/** ADR 0014: the browser page of the invite. It opens the app or, where the instance serves it, the web client. */
+export function invitePageLink(origin: string, code: string): string {
+  if (!isInviteCode(code)) throw new Error("invalid invite code");
+  return `${canonicalInstanceUrl(origin)}/convite/${code}`;
+}
+
+/** ADR 0014: the code the invite page hands to the web client in the fragment, `#convite=<code>`. */
+export function inviteFromFragment(hash: string): string | null {
+  const match = /^#convite=([A-Za-z0-9_-]{43})$/.exec(hash);
+  return match?.[1] ?? null;
+}
+
 export function hostOrigin(host: string): string {
   const lower = host.toLowerCase();
   if (!HOST.test(lower)) throw new Error("invalid host");

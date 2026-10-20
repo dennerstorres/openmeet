@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { inviteLink, parseInvite } from "../src/invite.js";
+import { inviteFromFragment, inviteLink, invitePageLink, parseInvite } from "../src/invite.js";
 
 const code = "A".repeat(20) + "b_-" + "9".repeat(20);
 
@@ -42,4 +42,15 @@ test("anything else is refused without throwing", () => {
     "x".repeat(600),
   ];
   for (const raw of refused) assert.equal(parseInvite(raw), null, raw);
+});
+
+test("the web client takes the code only from an exact #convite fragment", () => {
+  assert.equal(invitePageLink("https://meet.example/", code), `https://meet.example/convite/${code}`);
+  assert.deepEqual(parseInvite(invitePageLink("https://meet.example", code)), { origin: "https://meet.example", code });
+  assert.throws(() => invitePageLink("https://meet.example", "short"));
+  assert.equal(inviteFromFragment(`#convite=${code}`), code);
+  assert.equal(inviteFromFragment(`#convite=${code}&x=1`), null);
+  assert.equal(inviteFromFragment("#convite=short"), null);
+  assert.equal(inviteFromFragment(`?convite=${code}`), null);
+  assert.equal(inviteFromFragment(""), null);
 });

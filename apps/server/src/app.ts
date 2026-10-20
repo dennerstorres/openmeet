@@ -23,11 +23,14 @@ export async function buildApp(options?: {
   googleTokens?: GoogleTokens;
   /** ADR 0014: the built web client (`dist-web`). Absent, the instance serves only the API. */
   webRoot?: string;
+  /** Tests read the production log lines through this stream. */
+  logStream?: { write: (line: string) => void };
 }): Promise<FastifyInstance> {
   const env = options?.env ?? process.env;
   const app = Fastify({
     logger: options?.logger ?? {
       level: env.LOG_LEVEL ?? "info",
+      ...(options?.logStream ? { stream: options.logStream } : {}),
       serializers: {
         req: (request: { method: string; url: string }) => ({ method: request.method, url: redactInviteUrl(request.url) }),
       },
@@ -61,7 +64,6 @@ export async function buildApp(options?: {
   registerGoogle(app, env, options?.db, attempts, options?.googleTokens);
   registerRooms(app, env, options?.db, options?.media);
   registerPocJoin(app, env);
-  registerInvitePage(app);
-  registerWebClient(app, env, options?.webRoot);
+  registerInvitePage(app, registerWebClient(app, env, options?.webRoot));
   return app;
 }

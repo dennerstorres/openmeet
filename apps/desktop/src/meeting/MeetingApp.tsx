@@ -23,7 +23,7 @@ import {
   type PlaybackLevel,
   type PocSnapshot,
 } from "@openmeet/media";
-import { MeetingModel, type InstanceApi, type SessionBroker, type ShellSnapshot } from "@openmeet/shared";
+import { inviteFromFragment, invitePageLink, MeetingModel, type InstanceApi, type SessionBroker, type ShellSnapshot } from "@openmeet/shared";
 import desktopPackage from "../../package.json";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { holdMeetingLock } from "../shell/background";
@@ -45,6 +45,7 @@ import {
   type ShellStatus,
 } from "../shell/native";
 import { createFetchApi, createLiveKitMedia } from "./api";
+import { prepareGoogleWindow } from "../web/google";
 import { createWebSession } from "../web/session";
 
 const idleSnapshot: PocSnapshot = {
@@ -166,7 +167,7 @@ export function MeetingApp() {
 
   if (modelRef.current === null) {
     const { api, broker } = platform();
-    modelRef.current = new MeetingModel(api, createLiveKitMedia(session), broker);
+    modelRef.current = new MeetingModel(api, createLiveKitMedia(session), broker, undefined, __WEB__ ? invitePageLink : undefined);
   }
   const model = modelRef.current;
   const [state, setState] = useState<ShellSnapshot>(model.snapshot());
@@ -202,7 +203,13 @@ export function MeetingApp() {
 
   useEffect(() => model.subscribe(setState), [model]);
   useEffect(() => {
-    if (__WEB__) void model.confirmInstance(window.location.origin);
+    if (!__WEB__) return;
+    // ADR 0014: the invite page hands the code over in the fragment. It leaves the address bar at once.
+    const code = inviteFromFragment(window.location.hash);
+    if (code !== null) window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    void model.confirmInstance(window.location.origin).then(() => {
+      if (code !== null) model.offerInvite(invitePageLink(window.location.origin, code));
+    });
   }, [model]);
   const presenceKey = state.step === "rooms" || state.step === "meeting" ? `${state.selectedServerId ?? ""}:${state.activeRoomId ?? ""}` : null;
   useEffect(() => {
@@ -416,6 +423,7 @@ export function MeetingApp() {
       offer={state.inviteOffer}
       waiting={state.step === "account" || state.step === "instance" ? state.inviteWaiting : null}
       pending={state.pending}
+      web={__WEB__}
       onAccept={() => void model.acceptInvite()}
       onDecline={() => model.declineInvite()}
     />
@@ -464,7 +472,14 @@ export function MeetingApp() {
                 onChange={__WEB__ ? null : () => void model.changeInstance()}
                 googleLogin={state.googleLogin}
                 googleWaiting={state.googleWaiting}
-                onGoogle={() => void model.loginWithGoogle(openGoogleLogin)}
+                onGoogle={() => {
+                  if (!__WEB__) {
+                    void model.loginWithGoogle(openGoogleLogin);
+                    return;
+                  }
+                  const google = prepareGoogleWindow();
+                  void model.loginWithGoogle(google.open).finally(google.dispose);
+                }}
                 onCancelGoogle={() => model.cancelGoogle()}
               />
             )}
@@ -1132,7 +1147,30 @@ function AccountStep(props: {
   );
 }
 
-function InvitePanel(props: { offer: ShellSnapshot["inviteOffer"]; waiting: string | null; pending: boolean; onAccept: () => void; onDecline: () => void }) {
+function InvitePanel(props: {
+  offer: ShellSnapshot["inviteOffer"];
+  waiting: string | null;
+  pending: boolean;
+  web: boolean;
+  onAccept: () => void;
+  onDecline: () => void;
+}) {
+  // ADR 0014: this page talks only to its own instance. An invite from another one opens at that address.
+  if (props.offer && props.web && !props.offer.sameInstance) {
+    return (
+      <section className="invite-offer" role="alertdialog" aria-labelledby="invite-title">
+        <h2 id="invite-title">Convite de outra instância</h2>
+        <p>
+          O convite é de <strong>{props.offer.host}</strong>. Abra o link do convite no navegador para entrar por esse endereço.
+        </p>
+        <div className="row">
+          <button type="button" className="ghost" onClick={props.onDecline}>
+            Fechar
+          </button>
+        </div>
+      </section>
+    );
+  }
   if (props.offer) {
     return (
       <section className="invite-offer" role="alertdialog" aria-labelledby="invite-title">
