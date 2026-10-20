@@ -1,6 +1,7 @@
 *.md
 node_modules
 dist
+dist-web
 coverage
 pnpm-lock.yaml
 apps/desktop/src-tauri/target

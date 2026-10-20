@@ -23,7 +23,7 @@ import {
   type PlaybackLevel,
   type PocSnapshot,
 } from "@openmeet/media";
-import { MeetingModel, type ShellSnapshot } from "@openmeet/shared";
+import { MeetingModel, type InstanceApi, type SessionBroker, type ShellSnapshot } from "@openmeet/shared";
 import desktopPackage from "../../package.json";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { holdMeetingLock } from "../shell/background";
@@ -45,6 +45,7 @@ import {
   type ShellStatus,
 } from "../shell/native";
 import { createFetchApi, createLiveKitMedia } from "./api";
+import { createWebSession } from "../web/session";
 
 const idleSnapshot: PocSnapshot = {
   phase: "idle",
@@ -110,6 +111,13 @@ function storedShareAudio(): boolean {
   }
 }
 
+// ADR 0014: the web build has one instance, the origin that served the page. `__WEB__` is replaced at
+// build time (vite.config.ts), so the branches of the other target leave the bundle.
+function platform(): { api: InstanceApi; broker: SessionBroker | undefined } {
+  if (__WEB__) return createWebSession();
+  return { api: isTauri() ? createDesktopApi(createFetchApi()) : createFetchApi(), broker: isTauri() ? createDesktopBroker() : undefined };
+}
+
 function storedAddress(): string {
   try {
     return localStorage.getItem("openmeet.instance") ?? "http://127.0.0.1:3000";
@@ -122,7 +130,7 @@ export function MeetingApp() {
   const sessionRef = useRef<LiveKitPocSession | null>(null);
   const modelRef = useRef<MeetingModel | null>(null);
   const [media, setMedia] = useState<PocSnapshot>(idleSnapshot);
-  const [address, setAddress] = useState(storedAddress);
+  const [address, setAddress] = useState(() => (__WEB__ ? "" : storedAddress()));
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -157,11 +165,8 @@ export function MeetingApp() {
   }
 
   if (modelRef.current === null) {
-    modelRef.current = new MeetingModel(
-      isTauri() ? createDesktopApi(createFetchApi()) : createFetchApi(),
-      createLiveKitMedia(session),
-      isTauri() ? createDesktopBroker() : undefined,
-    );
+    const { api, broker } = platform();
+    modelRef.current = new MeetingModel(api, createLiveKitMedia(session), broker);
   }
   const model = modelRef.current;
   const [state, setState] = useState<ShellSnapshot>(model.snapshot());
@@ -196,6 +201,9 @@ export function MeetingApp() {
   };
 
   useEffect(() => model.subscribe(setState), [model]);
+  useEffect(() => {
+    if (__WEB__) void model.confirmInstance(window.location.origin);
+  }, [model]);
   const presenceKey = state.step === "rooms" || state.step === "meeting" ? `${state.selectedServerId ?? ""}:${state.activeRoomId ?? ""}` : null;
   useEffect(() => {
     if (presenceKey === null) return;
@@ -289,7 +297,7 @@ export function MeetingApp() {
     };
   }, [state.step, media.phase]);
   useEffect(() => {
-    if (state.origin === null) return;
+    if (state.origin === null || __WEB__) return;
     try {
       localStorage.setItem("openmeet.instance", state.origin);
     } catch {
@@ -385,7 +393,7 @@ export function MeetingApp() {
   }
 
   const consent =
-    isTauri() && state.step !== "instance" ? (
+    !__WEB__ && isTauri() && state.step !== "instance" ? (
       <ShellConsent
         status={shell}
         pending={shellPending}
@@ -420,12 +428,20 @@ export function MeetingApp() {
           <section className="auth-form">
             <header className="auth-head">
               <h1>{state.step === "instance" ? "Boas-vindas!" : state.bootstrapOpen ? "Criar administrador" : "Boas-vindas de volta!"}</h1>
-              <p>{state.step === "instance" ? "Informe o endereço da sua instância." : "Entre na instância para ver seus servidores."}</p>
+              <p>
+                {state.step !== "instance"
+                  ? "Entre na instância para ver seus servidores."
+                  : __WEB__
+                    ? "Conectando a esta instância."
+                    : "Informe o endereço da sua instância."}
+              </p>
             </header>
             {notice ? <p className="error">{notice}</p> : null}
             {invitePanel}
             {consent}
-            {state.step === "instance" ? (
+            {state.step === "instance" && __WEB__ ? (
+              <WebInstanceStep pending={state.pending} onRetry={() => void model.confirmInstance(window.location.origin)} />
+            ) : state.step === "instance" ? (
               <InstanceStep address={address} pending={state.pending} onAddress={setAddress} onConfirm={() => void model.confirmInstance(address)} />
             ) : (
               <AccountStep
@@ -445,7 +461,7 @@ export function MeetingApp() {
                     setSetupToken("");
                   });
                 }}
-                onChange={() => void model.changeInstance()}
+                onChange={__WEB__ ? null : () => void model.changeInstance()}
                 googleLogin={state.googleLogin}
                 googleWaiting={state.googleWaiting}
                 onGoogle={() => void model.loginWithGoogle(openGoogleLogin)}
@@ -738,9 +754,11 @@ export function MeetingApp() {
               <button type="button" className="ghost" onClick={() => void model.reloadRooms()} disabled={state.pending}>
                 Atualizar
               </button>
-              <button type="button" className="ghost" onClick={() => void model.changeInstance()}>
-                Trocar instância
-              </button>
+              {__WEB__ ? null : (
+                <button type="button" className="ghost" onClick={() => void model.changeInstance()}>
+                  Trocar instância
+                </button>
+              )}
               <button type="button" className="ghost danger-text" onClick={() => void model.signOut()} disabled={state.pending}>
                 Sair da conta
               </button>
@@ -995,6 +1013,16 @@ function DeviceSelect({
   );
 }
 
+function WebInstanceStep({ pending, onRetry }: { pending: boolean; onRetry: () => void }) {
+  return (
+    <div className="stack">
+      <button type="button" disabled={pending} onClick={onRetry}>
+        Tentar de novo
+      </button>
+    </div>
+  );
+}
+
 function InstanceStep({
   address,
   pending,
@@ -1039,7 +1067,7 @@ function AccountStep(props: {
   onDisplayName: (value: string) => void;
   onSetupToken: (value: string) => void;
   onSubmit: (mode: "login" | "bootstrap") => void;
-  onChange: () => void;
+  onChange: (() => void) | null;
   googleLogin: boolean;
   googleWaiting: boolean;
   onGoogle: () => void;
@@ -1095,9 +1123,11 @@ function AccountStep(props: {
           </button>
         )
       ) : null}
-      <button type="button" onClick={props.onChange}>
-        Trocar instância
-      </button>
+      {props.onChange ? (
+        <button type="button" onClick={props.onChange}>
+          Trocar instância
+        </button>
+      ) : null}
     </form>
   );
 }
