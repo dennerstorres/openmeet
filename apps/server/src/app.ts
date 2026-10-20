@@ -10,6 +10,7 @@ import { redactInviteUrl, registerInvitePage } from "./invite-page.js";
 import { registerPocJoin, type AppEnv } from "./poc-join.js";
 import type { RoomMedia } from "./rooms/media.js";
 import { registerRooms } from "./rooms/routes.js";
+import { registerWebClient } from "./web-client.js";
 
 const DEV_ORIGINS = ["http://localhost:1420", "http://127.0.0.1:1420", "http://tauri.localhost", "tauri://localhost"];
 
@@ -20,6 +21,8 @@ export async function buildApp(options?: {
   media?: RoomMedia;
   attempts?: AttemptOptions;
   googleTokens?: GoogleTokens;
+  /** ADR 0014: the built web client (`dist-web`). Absent, the instance serves only the API. */
+  webRoot?: string;
 }): Promise<FastifyInstance> {
   const env = options?.env ?? process.env;
   const app = Fastify({
@@ -59,5 +62,6 @@ export async function buildApp(options?: {
   registerRooms(app, env, options?.db, options?.media);
   registerPocJoin(app, env);
   registerInvitePage(app);
+  registerWebClient(app, env, options?.webRoot);
   return app;
 }

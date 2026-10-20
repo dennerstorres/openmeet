@@ -5,7 +5,9 @@ RUN corepack enable && corepack prepare pnpm@10.30.2 --activate
 COPY . .
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @openmeet/shared build && pnpm --filter @openmeet/server build
-RUN pnpm --filter @openmeet/server deploy --legacy --prod /out
+# ADR 0014: the web client is the desktop frontend built with the web target, served by the API.
+RUN pnpm --filter @openmeet/media build && pnpm --filter @openmeet/desktop build:web
+RUN pnpm --filter @openmeet/server deploy --legacy --prod /out && cp -r apps/desktop/dist-web /out/web
 
 FROM node:24.18.0-bookworm-slim
 WORKDIR /app

@@ -58,7 +58,7 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 | F12-01 | Web | Aceitar ADR 0014 e atualizar a SPEC | — | DONE | Humano | G12 |
 | F12-02 | Web | Sessão por cookie HttpOnly na API | F12-01 | IMPLEMENTED | Grok | G12 |
 | F12-03 | Web | Alvo web do frontend, instância na origem | F12-01 | IMPLEMENTED | Grok | G12 |
-| F12-04 | Web | API serve o bundle web com CSP própria | F12-03 | READY | Grok | G12 |
+| F12-04 | Web | API serve o bundle web com CSP própria | F12-03 | IMPLEMENTED | Grok | G12 |
 | F12-05 | Web | Convite e Google no navegador | F12-02,F12-03 | READY | Grok | G12 |
 | F12-06 | Web | Mídia conforme o navegador | F12-03 | READY | Grok | G12 |
 | F12-07 | Web | Prova em Chrome, Edge e Firefox em dois PCs | F12-04,F12-05,F12-06 | PENDING | Humano | G12 |

@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { buildApp } from "./app.js";
 import { openPostgres, redact } from "./db/postgres.js";
 import { assertPocBind } from "./poc-join.js";
@@ -14,7 +15,10 @@ assertPocBind(process.env);
 const databaseUrl = process.env.DATABASE_URL?.trim() ?? "";
 const database = databaseUrl.length > 0 ? openPostgres(databaseUrl) : undefined;
 const media = liveKitRoomMedia(process.env);
+// ADR 0014: the image puts the web client next to dist/. WEB_ROOT points elsewhere for development.
+const webRoot = process.env.WEB_ROOT?.trim() || fileURLToPath(new URL("../web", import.meta.url));
 const app = await buildApp({
+  webRoot,
   ...(database ? { db: database.client } : {}),
   ...(media ? { media } : {}),
 });
