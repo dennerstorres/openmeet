@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-19 — instalador com a F10 — Claude
+`main` (ba5a36b, código; o commit seguinte só tem o desenho da F12). `pnpm --filter @openmeet/desktop exec tauri build --bundles nsis` gerou `OpenMeet_0.1.0_x64-setup.exe`, 2,20 MiB, SHA256 `39a5d6df7cbfbb1ec0e9df4024f791497b9d51b640fe3a722c61705299be69fd`, copiado para a Área de Trabalho. Antes do build o disco tinha 0,5 GB livres; apaguei `src-tauri/target/debug` (cache). O app agora fala com a instância pelo processo nativo (F10-17 e F10-18): a API do teste precisa estar no `main` com as migrations até `0006` e, atrás do Caddy, com `PROXY_AUTH`. O instalador não foi aberto.
+
 ### 2026-10-19 — desenho do cliente web (F12) — Claude
 `main`. ADR 0014 em `Proposed`: a instância serve o mesmo frontend em `https://{API_DOMAIN}/`, mesma origem da API; sessão em cookies `HttpOnly` (`om_access` e `om_refresh`) com `SameSite=Strict`, `Origin` e `X-OpenMeet-Web` contra CSRF; CSP própria só com o domínio do LiveKit. Fica igual: salas, servidores, convite, presença, cards, ensurdecer, mídia e diagnóstico. Muda: áudio do PC só em Chrome e Edge, saída de som só com `setSinkId`, Google em janela nova. Não existe na web: bandeja, atalhos globais, notificação nativa e cofre. Plano em `plans/phase-12-web.md`, sete tarefas F12, gate G12. Sem código, sem teste.
 
