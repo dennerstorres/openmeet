@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { AuthError, type AuthErrorCode, currentUser, type PublicUser } from "../auth/service.js";
 import { readAccessToken } from "../auth/tokens.js";
+import { requireAccessToken } from "../auth/web-session.js";
 import type { MigrationClient } from "../db/migrate.js";
 import type { AppEnv } from "../poc-join.js";
 import {
@@ -46,6 +47,7 @@ const AUTH_STATUS: Record<AuthErrorCode, number> = {
   rate_limited: 429,
   media_disconnect_failed: 502,
   proxy_rejected: 503,
+  origin_rejected: 403,
 };
 
 const ROOM_STATUS: Record<RoomErrorCode, number> = {
@@ -68,13 +70,6 @@ const ROOM_STATUS: Record<RoomErrorCode, number> = {
 function configuredSecret(env: AppEnv): string | undefined {
   const secret = env.AUTH_SECRET ?? "";
   return secret.length >= 32 ? secret : undefined;
-}
-
-function bearer(header: string | string[] | undefined): string | undefined {
-  const value = Array.isArray(header) ? undefined : header;
-  if (!value?.startsWith("Bearer ")) return undefined;
-  const token = value.slice("Bearer ".length).trim();
-  return token.length > 0 ? token : undefined;
 }
 
 function textField(body: unknown, key: string): string | undefined {
@@ -109,9 +104,7 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
   async function caller(request: FastifyRequest): Promise<PublicUser> {
     const secret = configuredSecret(env);
     if (!db || !secret) throw new AuthError("auth_unconfigured");
-    const token = bearer(request.headers.authorization);
-    if (!token) throw new AuthError("unauthorized");
-    return currentUser(db, secret, token);
+    return currentUser(db, secret, requireAccessToken(request, env));
   }
 
   app.post("/api/v1/admin/users", async (request, reply) => {
@@ -411,8 +404,7 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
       if (!db) throw new AuthError("auth_unconfigured");
       const code = textField(request.body, "code");
       const secret = configuredSecret(env);
-      const token = bearer(request.headers.authorization);
-      const sessionId = secret && token ? readAccessToken(secret, token)?.sessionId : undefined;
+      const sessionId = secret ? readAccessToken(secret, requireAccessToken(request, env))?.sessionId : undefined;
       const joined = await joinRoom(db, env, actor, param(request, "id"), code, sessionId);
       return reply.code(200).header("cache-control", "no-store").send(joined);
     } catch (error) {

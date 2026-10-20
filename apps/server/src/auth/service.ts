@@ -19,7 +19,8 @@ export type AuthErrorCode =
   | "unauthorized"
   | "rate_limited"
   | "media_disconnect_failed"
-  | "proxy_rejected";
+  | "proxy_rejected"
+  | "origin_rejected";
 
 export class AuthError extends Error {
   readonly code: AuthErrorCode;

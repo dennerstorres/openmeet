@@ -4,6 +4,7 @@ import type { MigrationClient } from "../db/migrate.js";
 import { clientAddress, headerValue, ProxyRejected, type AttemptPolicy } from "./limit.js";
 import type { RoomMedia } from "../rooms/media.js";
 import { AuthError, type AuthErrorCode, bootstrapAdmin, bootstrapClosed, changePassword, currentUser, login, logout, refreshSession } from "./service.js";
+import { clearSessionCookies, readCookie, REFRESH_COOKIE, rejectForeignWeb, requireAccessToken, sendSession, webMode } from "./web-session.js";
 
 const STATUS: Record<AuthErrorCode, number> = {
   auth_unconfigured: 503,
@@ -19,6 +20,7 @@ const STATUS: Record<AuthErrorCode, number> = {
   rate_limited: 429,
   media_disconnect_failed: 502,
   proxy_rejected: 503,
+  origin_rejected: 403,
 };
 
 function configuredSecret(env: AppEnv): string | undefined {
@@ -41,13 +43,6 @@ function requireField(body: unknown, key: string): string {
   const value = field(body, key);
   if (value === undefined) throw new AuthError("invalid_body");
   return value;
-}
-
-function bearer(header: string | string[] | undefined): string | undefined {
-  const value = Array.isArray(header) ? undefined : header;
-  if (!value?.startsWith("Bearer ")) return undefined;
-  const token = value.slice("Bearer ".length).trim();
-  return token.length > 0 ? token : undefined;
 }
 
 export function registerAuth(
@@ -80,6 +75,7 @@ export function registerAuth(
       if (await bootstrapClosed(database)) throw new AuthError("bootstrap_closed");
       const expected = configuredBootstrap(env);
       if (!expected) throw new AuthError("auth_unconfigured");
+      rejectForeignWeb(request, env);
       const ip = address(request);
       const session = await bootstrapAdmin(
         database,
@@ -93,7 +89,7 @@ export function registerAuth(
         },
         () => attempts.bootstrap.allow(`bootstrap:${ip}`, attempts.now()),
       );
-      return reply.code(201).header("cache-control", "no-store").send(session);
+      return sendSession(request, reply, env, 201, session);
     } catch (error) {
       return sendAuthError(request, reply, error);
     }
@@ -104,6 +100,7 @@ export function registerAuth(
       const database = db;
       const secret = configuredSecret(env);
       if (!database || !secret) throw new AuthError("auth_unconfigured");
+      rejectForeignWeb(request, env);
       const ip = address(request);
       const username = requireField(request.body, "username");
       const session = await login(database, secret, username, requireField(request.body, "password"), () => {
@@ -111,25 +108,31 @@ export function registerAuth(
         const ipOk = attempts.loginIp.allow(`ip:${ip}`, attempts.now());
         return userOk && ipOk;
       });
-      return reply.code(200).header("cache-control", "no-store").send(session);
+      return sendSession(request, reply, env, 200, session);
     } catch (error) {
       return sendAuthError(request, reply, error);
     }
   });
 
   app.post("/api/v1/auth/refresh", async (request, reply) => {
+    const web = webMode(request, env) === "web";
     try {
       const database = db;
       const secret = configuredSecret(env);
       if (!database || !secret) throw new AuthError("auth_unconfigured");
+      rejectForeignWeb(request, env);
       const ip = address(request);
-      const session = await refreshSession(database, secret, requireField(request.body, "refreshToken"), (tokenKey) => {
+      // The web client never sees its refresh token: it comes from the cookie, not the body.
+      const refreshToken = web ? (readCookie(request.headers, REFRESH_COOKIE) ?? "") : requireField(request.body, "refreshToken");
+      const session = await refreshSession(database, secret, refreshToken, (tokenKey) => {
         const ipOk = attempts.refreshIp.allow(`refresh:${ip}`, attempts.now());
         const tokenOk = attempts.refreshToken.allow(`refresh-token:${tokenKey}`, attempts.now());
         return ipOk && tokenOk;
       });
-      return reply.code(200).header("cache-control", "no-store").send(session);
+      return sendSession(request, reply, env, 200, session);
     } catch (error) {
+      // A reused or unknown refresh ends the web session: the cookies go with it.
+      if (web && error instanceof AuthError && error.code === "invalid_session") clearSessionCookies(reply);
       return sendAuthError(request, reply, error);
     }
   });
@@ -137,6 +140,14 @@ export function registerAuth(
   app.post("/api/v1/auth/logout", async (request, reply) => {
     try {
       if (!db) throw new AuthError("auth_unconfigured");
+      rejectForeignWeb(request, env);
+      if (webMode(request, env) === "web") {
+        const refreshToken = readCookie(request.headers, REFRESH_COOKIE);
+        // 502 keeps the cookies, so the page can repeat the logout until the cut confirms.
+        if (refreshToken !== undefined) await logout(db, refreshToken, media);
+        clearSessionCookies(reply);
+        return reply.code(204).header("cache-control", "no-store").send();
+      }
       await logout(db, requireField(request.body, "refreshToken"), media);
       return reply.code(204).header("cache-control", "no-store").send();
     } catch (error) {
@@ -149,8 +160,7 @@ export function registerAuth(
       const database = db;
       const secret = configuredSecret(env);
       if (!database || !secret) throw new AuthError("auth_unconfigured");
-      const token = bearer(request.headers.authorization);
-      if (!token) throw new AuthError("unauthorized");
+      const token = requireAccessToken(request, env);
       const ip = address(request);
       const session = await changePassword(
         database,
@@ -159,7 +169,7 @@ export function registerAuth(
         { currentPassword: requireField(request.body, "currentPassword"), newPassword: requireField(request.body, "newPassword") },
         () => attempts.loginIp.allow(`password:${ip}`, attempts.now()),
       );
-      return reply.code(200).header("cache-control", "no-store").send(session);
+      return sendSession(request, reply, env, 200, session);
     } catch (error) {
       return sendAuthError(request, reply, error);
     }
@@ -170,8 +180,7 @@ export function registerAuth(
       const database = db;
       const secret = configuredSecret(env);
       if (!database || !secret) throw new AuthError("auth_unconfigured");
-      const token = bearer(request.headers.authorization);
-      if (!token) throw new AuthError("unauthorized");
+      const token = requireAccessToken(request, env);
       const user = await currentUser(database, secret, token);
       return reply.code(200).header("cache-control", "no-store").send(user);
     } catch (error) {

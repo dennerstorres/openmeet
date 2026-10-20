@@ -4,6 +4,7 @@ import type { AppEnv } from "../poc-join.js";
 import { finishGoogleLogin, googleConfig, liveGoogleTokens, pollGoogleLogin, startGoogleLogin, type GoogleTokens } from "./google.js";
 import { clientAddress, headerValue, ProxyRejected, type AttemptPolicy } from "./limit.js";
 import { AuthError } from "./service.js";
+import { sendSession, webMode } from "./web-session.js";
 
 const PAGE_HEADERS = {
   "cache-control": "no-store",
@@ -99,12 +100,13 @@ export function registerGoogle(
 
   app.post("/api/v1/auth/google/poll", async (request, reply) => {
     if (!config || !db || !secret) return reply.code(404).send({ error: "google_unconfigured" });
+    if (webMode(request, env) === "rejected") return reply.code(403).send({ error: "origin_rejected" });
     const poll = typeof request.body === "object" && request.body !== null ? query(request.body, "poll") : undefined;
     try {
       const result = await pollGoogleLogin(db, secret, poll ?? "");
       if (result.status === "pending") return reply.code(202).header("cache-control", "no-store").send({ status: "pending" });
       if (result.status === "failed") return reply.code(403).header("cache-control", "no-store").send({ error: result.failure });
-      return reply.code(200).header("cache-control", "no-store").send(result.session);
+      return sendSession(request, reply, env, 200, result.session);
     } catch (error) {
       if (error instanceof AuthError) return reply.code(401).send({ error: "invalid_session" });
       request.log.error({ code: "google_poll_failed" }, "google poll failed");
