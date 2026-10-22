@@ -65,7 +65,7 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 
 ## Estado em 2026-10-19
 
-O `.exe` passou a renovar o access token de 15 min durante o uso (complemento da F10-18): um 401 faz um refresh só e repete a chamada. Falta ver no instalador uma sessão passar de 15 min.
+O `.exe` passou a renovar o access token de 15 min durante o uso (complemento da F10-18): um 401 faz um refresh só e repete a chamada. Em 2026-10-22 uma chamada de quase 1 hora entre duas cidades passou dos 15 min sem cair (ver `HISTORY.md`).
 
 F12-02 ficou `IMPLEMENTED` na branch `task/F12-02-cookie`: login, bootstrap, Google, refresh e senha gravam `om_access` e `om_refresh` quando o pedido traz `X-OpenMeet-Web: 1` e a origem da página; o corpo não leva token. O `.exe` segue com `Bearer`. Falta o navegador real (F12-07).
 
