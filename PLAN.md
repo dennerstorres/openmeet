@@ -10,6 +10,8 @@ F04-05 — Ajustes, kick da sala e volume de entrada: WAITING_VALIDATION. Seleci
 
 F04-06 — Blur de fundo da câmera: WAITING_VALIDATION. Selecionada READY em 2026-10-23 por pedido explícito, depende de F04-02. Pipeline local com `@livekit/track-processors`, assets MediaPipe no bundle, fallback visível e CSP limitada a `wasm-unsafe-eval`, autorizada pelo usuário. Faltam câmera real no WebView2/web, qualidade do recorte e desempenho em celular. Escopo e validação em `plans/phase-04-meeting-ui.md` e ADR 0016.
 
+F09-08 — Presença dos membros do servidor: WAITING_VALIDATION. Implementada em 2026-10-23 na branch `codex/F09-08-server-presence`. Lista todos os membros, heartbeat efêmero online/ausente/desconectado e invisibilidade governada pelo dono. Migration 0007 guarda apenas política e preferência. Testes automatizados, typecheck, lint e bundles desktop/web passaram; falta inspeção visual e prova com dois clientes, incluindo minimizar e fechar. ADR 0017.
+
 > A evidência de dois PCs e o GO/NO-GO ficam no fim. Não bloqueiam a implementação de F03–F07, F09 nem F10. Bloqueiam o aceite final e o F08.
 
 | ID | Fase | Tarefa | Depende de | Estado | Dono inicial | Gate |
@@ -45,6 +47,7 @@ F04-06 — Blur de fundo da câmera: WAITING_VALIDATION. Selecionada READY em 20
 | F09-05 | Sala | Ensurdecer o áudio remoto só neste PC | F04-02 | IMPLEMENTED | Claude | G9 |
 | F09-06 | Sala | Áudio do PC opcional no compartilhamento | F04-03 | WAITING_VALIDATION | Claude | G9 |
 | F09-07 | Identidade | Login Google pelo navegador, chaves só no servidor | F03-02 | WAITING_VALIDATION | Claude | G9 |
+| F09-08 | Servidores | Lista de membros e presença com invisibilidade governada | F09-01 | WAITING_VALIDATION | Codex | G9,G10,G12 |
 | F10-01 | Segurança | Recusar controle e bidi nos nomes (S-21) | F03-03 | IMPLEMENTED | Claude | G10 |
 | F10-02 | Segurança | Sala só para membro, sem username (S-01, S-10) | F03-03 | IMPLEMENTED | Claude | G10 |
 | F10-03 | Segurança | Reuso de refresh revoga a família (S-03) | F03-02 | IMPLEMENTED | Claude | G10 |

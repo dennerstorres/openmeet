@@ -26,9 +26,10 @@ Cliente desktop Windows e cliente web, servido pela própria instância, para sa
 15. Áudio do PC opcional no compartilhamento, desligado por padrão. ADR 0008. Não implementado.
 16. Login com Google quando o servidor tem as chaves. ADR 0010. Não implementado.
 17. Cliente web em `https://{API_DOMAIN}/`, mesmo frontend do `.exe`, sessão em cookie `HttpOnly`, para Chrome, Edge e Firefox atuais em computador. Sem bandeja, atalhos globais, notificação do sistema nem cofre do Windows. ADR 0014. Não implementado.
+18. Lista dos membros de cada servidor com presença online, ausente e desconectada; invisibilidade opcional conforme política do dono. ADR 0017.
 
 ## Out of scope — MVP
-Mensagens persistentes, federação, apps móveis, macOS/Linux, gravações, transcrição, E2EE, plugins, quadro branco, acesso remoto, múltiplos nós, bots, integrações além do login Google, captura nativa do áudio do Windows, status online fora de uma sala, juntar conta Google a uma conta de senha e link que entra direto numa sala.
+Mensagens persistentes, federação, apps móveis, macOS/Linux, gravações, transcrição, E2EE, plugins, quadro branco, acesso remoto, múltiplos nós, bots, integrações além do login Google, captura nativa do áudio do Windows, juntar conta Google a uma conta de senha e link que entra direto numa sala.
 
 ## Requisitos funcionais
 - RF-01: Usuário adiciona instância por HTTPS; cliente verifica metadados e não envia credenciais a host inesperado.
@@ -51,6 +52,7 @@ Mensagens persistentes, federação, apps móveis, macOS/Linux, gravações, tra
 - RF-18: Login Google abre o navegador do sistema. As chaves ficam no servidor. Sem elas, o botão não aparece. Não cria o administrador. ADR 0010.
 - RF-19: A instância serve o cliente web na mesma origem da API, sem escolher outra instância. Cookie só autentica com `Origin` da instância e `X-OpenMeet-Web: 1`. O que o navegador não suporta (áudio do PC, saída de som) some da tela em vez de falhar. ADR 0014.
 - RF-20: O usuário pode desfocar o fundo da câmera localmente. Modelo e runtime ficam no bundle da aplicação; clientes incompatíveis mostram a indisponibilidade e continuam enviando câmera sem efeito. ADR 0016.
+- RF-21: Cada servidor lista seus membros com presença efêmera. Atividade recente fica online, ausência fica ausente e heartbeat expirado fica desconectado. O dono decide se aceita invisibilidade e se dono/moderadores identificam invisíveis; para os demais, invisível aparece desconectado. ADR 0017.
 
 ## Requisitos não funcionais
 - Segredo jamais incluído no repo, logs ou CI; TLS em produção; Argon2id com parâmetros documentados.

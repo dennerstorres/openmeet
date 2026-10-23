@@ -446,6 +446,16 @@ Próxima tarefa: revisão da fundação; depois F02-02 só com dois Windows reai
 - Bloqueio principal: compatibilidade real de captura monitor/janela com WebView2; POC exige dois Windows em redes diferentes.
 - Próxima tarefa: F01-01.
 
+### 2026-10-23 — F09-08 — Codex
+Branch / commit: `codex/F09-08-server-presence` / commit que contém este registro.
+Arquivos alterados: migration `0007_server_presence.sql`; schema, rotas, serviço e registro efêmero da API; modelo compartilhado; UI desktop/web; allowlist nativa; testes; SPEC, PLAN, arquitetura e ADR 0017.
+Decisão tomada: todos os membros ativos do servidor aparecem na lista mesmo fora de salas. Heartbeat autenticado fica somente na memória da API: atividade recente é online, cinco minutos inativo ou página oculta é ausente e 75 segundos sem heartbeat é desconectado. O dono governa a invisibilidade e decide se dono/moderadores podem identificá-la; membros comuns veem invisíveis como desconectados. O banco persiste somente a política e a preferência.
+Comandos executados: `pnpm test`; `pnpm typecheck`; `pnpm lint`; `pnpm format:check`; `pnpm --filter @openmeet/desktop build`; `pnpm --filter @openmeet/desktop build:web`; `cargo test session::tests --lib` com o Cargo do usuário; `git diff --check`.
+Resultados/artefatos: 210 testes TypeScript passaram (scripts 24, shared 45, media 52, server 73, desktop 16); typecheck, lint, formatação e `git diff --check` passaram; bundles desktop e web passaram. Seis testes Rust da sessão passaram. O primeiro format check encontrou o teste da migration sem formatação e dois JavaScripts vendorizados do MediaPipe; o teste foi formatado e os artefatos externos foram excluídos do Prettier antes da repetição final.
+Testes manuais (máquina/rede): não executados; nenhum segundo cliente nem janela do produto foi aberto nesta tarefa.
+Pendências e riscos: reiniciar a API apaga a presença até o próximo heartbeat; fechar abruptamente pode levar até 75 segundos para aparecer desconectado. A UI, minimizar/ausência, fechar e a privacidade entre duas contas exigem validação real. F09-08 fica `WAITING_VALIDATION`, nunca `DONE`.
+Próxima tarefa: abrir dois clientes com contas no mesmo servidor e validar verde, âmbar, vermelho, invisível comum e invisível visível ao dono/moderador conforme política.
+
 ## Template de registro
 ```
 ### YYYY-MM-DD HH:mm — TASK-ID — Agente

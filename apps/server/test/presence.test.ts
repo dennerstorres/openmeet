@@ -5,6 +5,8 @@ import { ServerError } from "livekit-server-sdk";
 import { buildApp } from "../src/app.js";
 import { applyMigrations, type MigrationClient } from "../src/db/migrate.js";
 import { roomMedia, type RoomMedia } from "../src/rooms/media.js";
+import { PlatformPresence } from "../src/rooms/platform-presence.js";
+import { listServerPresence, setServerPresenceMode, setServerPresencePolicy } from "../src/rooms/service.js";
 
 const bootstrapToken = "unit-test-bootstrap-token";
 const authSecret = "unit-test-auth-secret-do-not-leak";
@@ -115,7 +117,7 @@ test("presence lists who is in each open room, once, with the name from the data
     const unconfigured = await blind.inject({ method: "GET", url: `/api/v1/servers/${serverId}/presence`, headers: auth(adminToken) });
     assert.equal(unconfigured.statusCode, 503);
 
-    const stored = await db.query("select count(*)::int as n from information_schema.columns where column_name ~ 'presence|occupant'");
+    const stored = await db.query("select count(*)::int as n from information_schema.columns where column_name ~ 'online|away|last_seen|occupant'");
     assert.equal(stored.rows[0]?.n, 0);
   } finally {
     await app.close();
@@ -137,4 +139,63 @@ test("the SFU adapter treats a room that does not exist as empty", async () => {
   assert.deepEqual(await media.occupants?.("missing"), []);
   assert.deepEqual(await media.occupants?.("live"), ["a"]);
   await assert.rejects(() => media.occupants?.("broken") ?? Promise.resolve([]));
+});
+
+test("server presence expires, honors invisible policy and reveals it only to managers when allowed", async () => {
+  const pg = new PGlite();
+  const db = pgliteClient(pg);
+  await applyMigrations(db);
+  try {
+    const users = await db.query(
+      `insert into users (username, password_hash, display_name, role) values
+       ('owner', 'hash', 'Dona', 'participant'),
+       ('mod', 'hash', 'Mod', 'participant'),
+       ('member', 'hash', 'Membro', 'participant')
+       returning id, username, display_name, role`,
+    );
+    const [ownerRow, modRow, memberRow] = users.rows;
+    assert.ok(ownerRow && modRow && memberRow);
+    const owner = { id: String(ownerRow.id), username: "owner", displayName: "Dona", role: "participant" };
+    const mod = { id: String(modRow.id), username: "mod", displayName: "Mod", role: "participant" };
+    const member = { id: String(memberRow.id), username: "member", displayName: "Membro", role: "participant" };
+    const server = await db.query("insert into servers (name, created_by) values ('Equipe', $1) returning id", [owner.id]);
+    const serverId = String(server.rows[0]?.id);
+    await db.query(
+      `insert into server_members (server_id, user_id, role) values
+       ($1, $2, 'owner'), ($1, $3, 'moderator'), ($1, $4, 'participant')`,
+      [serverId, owner.id, mod.id, member.id],
+    );
+    let now = 1_000;
+    const live = new PlatformPresence(75_000, () => now);
+    live.touch(serverId, owner.id, "online");
+    live.touch(serverId, mod.id, "away");
+    live.touch(serverId, member.id, "online");
+
+    await assert.rejects(() => setServerPresenceMode(db, member, serverId, "invisible"), /forbidden/);
+    await setServerPresencePolicy(db, owner, serverId, { allowInvisible: true, managersSeeInvisible: false });
+    await setServerPresenceMode(db, member, serverId, "invisible");
+    const hidden = await listServerPresence(db, mod, serverId, live);
+    assert.deepEqual(
+      hidden.members.map(({ displayName: label, status }) => ({ label, status })),
+      [
+        { label: "Dona", status: "online" },
+        { label: "Membro", status: "offline" },
+        { label: "Mod", status: "away" },
+      ],
+    );
+
+    await setServerPresencePolicy(db, owner, serverId, { allowInvisible: true, managersSeeInvisible: true });
+    const revealed = await listServerPresence(db, mod, serverId, live);
+    const invisible = revealed.members.find((item) => item.id === member.id);
+    assert.deepEqual(invisible, { id: member.id, displayName: "Membro", role: "participant", status: "invisible", activity: "online", self: false });
+
+    now += 75_001;
+    const expired = await listServerPresence(db, owner, serverId, live);
+    assert.equal(expired.members.find((item) => item.id === owner.id)?.status, "offline");
+    await setServerPresencePolicy(db, owner, serverId, { allowInvisible: false, managersSeeInvisible: true });
+    const stored = await db.query("select presence_mode from server_members where server_id = $1 and user_id = $2", [serverId, member.id]);
+    assert.equal(stored.rows[0]?.presence_mode, "visible");
+  } finally {
+    await pg.close();
+  }
 });

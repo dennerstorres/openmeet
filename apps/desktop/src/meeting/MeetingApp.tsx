@@ -98,6 +98,8 @@ const ERROR_TEXT: Record<string, string> = {
 };
 
 const PRESENCE_MS = 5000;
+const PLATFORM_PRESENCE_MS = 20_000;
+const AWAY_MS = 5 * 60_000;
 
 function errorText(code: string | null): string | null {
   if (code === null) return null;
@@ -164,6 +166,7 @@ export function MeetingApp() {
   const [shellPending, setShellPending] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportConsent, setExportConsent] = useState(false);
+  const [activity, setActivity] = useState<"online" | "away">("online");
   const mediaRef = useRef(media);
   mediaRef.current = media;
 
@@ -225,6 +228,43 @@ export function MeetingApp() {
     const timer = window.setInterval(() => void model.refreshPresence(), PRESENCE_MS);
     return () => window.clearInterval(timer);
   }, [model, presenceKey]);
+  useEffect(() => {
+    if (state.step !== "rooms" && state.step !== "meeting") return;
+    let awayTimer: number | undefined;
+    let lastReset = 0;
+    const markAway = () => setActivity("away");
+    const markActive = () => {
+      if (document.hidden) return;
+      const now = Date.now();
+      if (now - lastReset < 15_000) return;
+      lastReset = now;
+      setActivity("online");
+      if (awayTimer !== undefined) window.clearTimeout(awayTimer);
+      awayTimer = window.setTimeout(markAway, AWAY_MS);
+    };
+    const visibility = () => {
+      if (document.hidden) markAway();
+      else {
+        lastReset = 0;
+        markActive();
+      }
+    };
+    const events: Array<keyof WindowEventMap> = ["pointerdown", "keydown", "mousemove", "touchstart"];
+    events.forEach((event) => window.addEventListener(event, markActive, { passive: true }));
+    document.addEventListener("visibilitychange", visibility);
+    markActive();
+    return () => {
+      if (awayTimer !== undefined) window.clearTimeout(awayTimer);
+      events.forEach((event) => window.removeEventListener(event, markActive));
+      document.removeEventListener("visibilitychange", visibility);
+    };
+  }, [state.step]);
+  useEffect(() => {
+    if ((state.step !== "rooms" && state.step !== "meeting") || state.selectedServerId === null) return;
+    void model.refreshServerPresence(activity);
+    const timer = window.setInterval(() => void model.refreshServerPresence(activity), PLATFORM_PRESENCE_MS);
+    return () => window.clearInterval(timer);
+  }, [model, state.step, state.selectedServerId, state.servers.length, activity]);
   useEffect(() => {
     if (!isTauri()) return;
     let stop: (() => void) | undefined;
@@ -651,6 +691,54 @@ export function MeetingApp() {
             </li>
           ))}
         </ul>
+        {selectedServer && state.serverPresence ? (
+          <section className="server-members" aria-label={`Membros de ${selectedServer.name}`}>
+            <details open>
+              <summary>Membros — {state.serverPresence.members.length}</summary>
+              <ul>
+                {state.serverPresence.members.map((member) => (
+                  <li key={member.id}>
+                    <span className={`presence-dot ${member.status}`} aria-hidden="true" />
+                    <span className="member-name">{member.label}</span>
+                    <span className="member-status">{presenceLabel(member.status, member.activity)}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+            {state.serverPresence.allowInvisible ? (
+              <label className="presence-option">
+                <input
+                  type="checkbox"
+                  checked={state.serverPresence.selfMode === "invisible"}
+                  onChange={(event) => void model.setPresenceMode(event.currentTarget.checked ? "invisible" : "visible")}
+                />
+                Aparecer como invisível
+              </label>
+            ) : null}
+            {selectedServer.role === "owner" ? (
+              <details className="presence-policy">
+                <summary>Privacidade de presença</summary>
+                <label className="presence-option">
+                  <input
+                    type="checkbox"
+                    checked={state.serverPresence.allowInvisible}
+                    onChange={(event) => void model.setPresencePolicy(event.currentTarget.checked, state.serverPresence?.managersSeeInvisible ?? false)}
+                  />
+                  Permitir modo invisível
+                </label>
+                <label className="presence-option">
+                  <input
+                    type="checkbox"
+                    checked={state.serverPresence.managersSeeInvisible}
+                    disabled={!state.serverPresence.allowInvisible}
+                    onChange={(event) => void model.setPresencePolicy(true, event.currentTarget.checked)}
+                  />
+                  Dono e moderadores veem invisíveis
+                </label>
+              </details>
+            ) : null}
+          </section>
+        ) : null}
         {selectedServer && state.rooms.length === 0 ? <p className="hint">Nenhuma sala neste servidor.</p> : null}
         {state.canCreate ? (
           state.createdInvite ? (
@@ -1160,6 +1248,13 @@ function roleLabel(role: string): string {
   if (role === "owner") return "dono";
   if (role === "moderator") return "moderador";
   return "participante";
+}
+
+function presenceLabel(status: "online" | "away" | "offline" | "invisible", activity: "online" | "away" | null): string {
+  if (status === "online") return "online";
+  if (status === "away") return "ausente";
+  if (status === "invisible") return activity === "away" ? "invisível · ausente" : "invisível";
+  return "desconectado";
 }
 
 function DeviceSelect({

@@ -59,6 +59,8 @@ export const servers = pgTable(
     createdBy: uuid("created_by")
       .notNull()
       .references(() => users.id),
+    allowInvisible: boolean("allow_invisible").notNull().default(false),
+    managersSeeInvisible: boolean("managers_see_invisible").notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -78,6 +80,7 @@ export const serverMembers = pgTable(
     removedAt: timestamp("removed_at", { withTimezone: true, mode: "date" }),
     mediaCutAt: timestamp("media_cut_at", { withTimezone: true, mode: "date" }),
     lastJoinNbf: bigint("last_join_nbf", { mode: "bigint" }),
+    presenceMode: text("presence_mode").notNull().default("visible"),
     createdAt: createdAt(),
   },
   (table) => [
@@ -85,6 +88,7 @@ export const serverMembers = pgTable(
     uniqueIndex("server_members_single_owner")
       .on(table.serverId)
       .where(sql`${table.role} = 'owner'`),
+    check("server_members_presence_mode", sql`${table.presenceMode} in ('visible', 'invisible')`),
   ],
 );
 

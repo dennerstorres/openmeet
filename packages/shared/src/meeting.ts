@@ -12,11 +12,13 @@ import {
   parseRoomList,
   parseServer,
   parseServerList,
+  parseServerPresence,
   readErrorCode,
   type BrokeredSession,
   type RoomOccupant,
   type RoomSummary,
   type ServerSummary,
+  type ServerPresenceView,
 } from "./instance.js";
 
 export interface ApiResult {
@@ -88,6 +90,8 @@ export interface ShellSnapshot {
   createdInvite: string | null;
   /** People in each room of the selected server, or null when the SFU could not be asked. */
   presence: Readonly<Record<string, readonly RoomOccupant[]>> | null;
+  /** Every member of the selected server and their platform presence. */
+  serverPresence: ServerPresenceView | null;
   error: string | null;
   pending: boolean;
 }
@@ -181,6 +185,8 @@ export class MeetingModel {
   private createdInvite: string | null = null;
   private presence: Record<string, RoomOccupant[]> | null = null;
   private presenceAsk = 0;
+  private serverPresence: ServerPresenceView | null = null;
+  private serverPresenceAsk = 0;
   private error: string | null = null;
   private pending = false;
   private readonly listeners = new Set<(snapshot: ShellSnapshot) => void>();
@@ -223,6 +229,7 @@ export class MeetingModel {
         this.presence === null
           ? null
           : Object.fromEntries(Object.entries(this.presence).map(([room, people]) => [room, people.map((person) => ({ ...person }))])),
+      serverPresence: this.serverPresence === null ? null : { ...this.serverPresence, members: this.serverPresence.members.map((member) => ({ ...member })) },
       error: this.error,
       pending: this.pending,
     };
@@ -393,6 +400,8 @@ export class MeetingModel {
       this.rooms = [];
       this.presence = null;
       this.presenceAsk += 1;
+      this.serverPresence = null;
+      this.serverPresenceAsk += 1;
       await this.loadRooms(generation);
     });
   }
@@ -513,6 +522,54 @@ export class MeetingModel {
     if (ask !== this.presenceAsk || serverId !== this.selectedServerId || accessToken !== this.accessToken) return;
     this.presence = next;
     this.publish();
+  }
+
+  async refreshServerPresence(activity: "online" | "away"): Promise<void> {
+    const origin = this.origin;
+    const accessToken = this.accessToken;
+    const selectedServerId = this.selectedServerId;
+    if (origin === null || accessToken === null || selectedServerId === null) return;
+    const ask = ++this.serverPresenceAsk;
+    try {
+      await Promise.all(
+        this.servers.map((server) => this.api.request(origin, "POST", `/api/v1/servers/${server.id}/presence/heartbeat`, { state: activity }, accessToken)),
+      );
+      const result = await this.api.request(origin, "GET", `/api/v1/servers/${selectedServerId}/members`, null, accessToken);
+      if (ask !== this.serverPresenceAsk || selectedServerId !== this.selectedServerId || accessToken !== this.accessToken) return;
+      this.serverPresence = result.status === 200 ? parseServerPresence(result.body) : null;
+    } catch {
+      if (ask !== this.serverPresenceAsk) return;
+      this.serverPresence = null;
+    }
+    this.publish();
+  }
+
+  async setPresenceMode(mode: "visible" | "invisible"): Promise<void> {
+    const origin = this.origin;
+    const accessToken = this.accessToken;
+    const serverId = this.selectedServerId;
+    if (origin === null || accessToken === null || serverId === null) return;
+    const result = await this.api.request(origin, "POST", `/api/v1/servers/${serverId}/presence/mode`, { mode }, accessToken);
+    if (result.status !== 204) {
+      this.error = readErrorCode(result.body);
+      this.publish();
+      return;
+    }
+    await this.refreshServerPresence("online");
+  }
+
+  async setPresencePolicy(allowInvisible: boolean, managersSeeInvisible: boolean): Promise<void> {
+    const origin = this.origin;
+    const accessToken = this.accessToken;
+    const serverId = this.selectedServerId;
+    if (origin === null || accessToken === null || serverId === null) return;
+    const result = await this.api.request(origin, "POST", `/api/v1/servers/${serverId}/presence/policy`, { allowInvisible, managersSeeInvisible }, accessToken);
+    if (result.status !== 204) {
+      this.error = readErrorCode(result.body);
+      this.publish();
+      return;
+    }
+    await this.refreshServerPresence("online");
   }
 
   async enterRoom(roomId: string, code: string): Promise<void> {
@@ -722,6 +779,12 @@ export class MeetingModel {
     await this.media.disconnect();
     const origin = this.origin;
     const signedIn = this.accessToken !== null;
+    const accessToken = this.accessToken;
+    if (origin !== null && accessToken !== null) {
+      await Promise.allSettled(
+        this.servers.map((server) => this.api.request(origin, "POST", `/api/v1/servers/${server.id}/presence/heartbeat`, { state: "offline" }, accessToken)),
+      );
+    }
     this.accessToken = null;
     this.userLabel = null;
     this.role = null;
@@ -732,6 +795,8 @@ export class MeetingModel {
     this.createdInvite = null;
     this.presence = null;
     this.presenceAsk += 1;
+    this.serverPresence = null;
+    this.serverPresenceAsk += 1;
     if (origin === null || !signedIn) return;
     await this.finishLogout(origin);
   }

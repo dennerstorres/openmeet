@@ -45,6 +45,61 @@ export interface RoomOccupant {
   label: string;
 }
 
+export type PlatformPresenceStatus = "online" | "away" | "offline" | "invisible";
+
+export interface ServerPresenceMember {
+  id: string;
+  label: string;
+  role: "owner" | "moderator" | "participant";
+  status: PlatformPresenceStatus;
+  activity: "online" | "away" | null;
+  self: boolean;
+}
+
+export interface ServerPresenceView {
+  allowInvisible: boolean;
+  managersSeeInvisible: boolean;
+  selfMode: "visible" | "invisible";
+  members: ServerPresenceMember[];
+}
+
+export function parseServerPresence(value: unknown): ServerPresenceView {
+  const record = objectRecord(value, "invalid_instance", "Server presence is not an object");
+  const policy = objectRecord(record.policy, "invalid_instance", "Presence policy is not an object");
+  if (typeof policy.allowInvisible !== "boolean" || typeof policy.managersSeeInvisible !== "boolean") {
+    throw new PocInputError("invalid_instance", "Presence policy is incomplete");
+  }
+  if (record.selfMode !== "visible" && record.selfMode !== "invisible") throw new PocInputError("invalid_instance", "Presence mode is invalid");
+  if (!Array.isArray(record.members)) throw new PocInputError("invalid_instance", "Server members are not an array");
+  const members = record.members.map((item): ServerPresenceMember => {
+    const member = objectRecord(item, "invalid_instance", "Server member is not an object");
+    const id = text(member.id);
+    const label = text(member.displayName);
+    const role = member.role;
+    const status = member.status;
+    const activity = member.activity === "online" || member.activity === "away" ? member.activity : null;
+    if (
+      id === undefined ||
+      !UUID.test(id) ||
+      label === undefined ||
+      label.length > 80 ||
+      hasControlCharacter(label) ||
+      (role !== "owner" && role !== "moderator" && role !== "participant") ||
+      (status !== "online" && status !== "away" && status !== "offline" && status !== "invisible") ||
+      typeof member.self !== "boolean"
+    ) {
+      throw new PocInputError("invalid_instance", "Server member is incomplete");
+    }
+    return { id, label, role, status, activity, self: member.self };
+  });
+  return {
+    allowInvisible: policy.allowInvisible,
+    managersSeeInvisible: policy.managersSeeInvisible,
+    selfMode: record.selfMode,
+    members,
+  };
+}
+
 /** Room id to the people in it. Unknown shapes are dropped; a bad name becomes "Participante". */
 export function parsePresence(value: unknown): Record<string, RoomOccupant[]> {
   const record = objectRecord(value, "invalid_instance", "Presence is not an object");
@@ -250,8 +305,10 @@ function instancePath(path: string): string {
   if (join?.[1] !== undefined && UUID.test(join[1])) return path;
   const kick = /^\/api\/v1\/rooms\/([0-9a-f-]{36})\/participants\/([0-9a-f-]{36})\/kick$/i.exec(path);
   if (kick?.[1] !== undefined && kick[2] !== undefined && UUID.test(kick[1]) && UUID.test(kick[2])) return path;
-  const serverRooms = /^\/api\/v1\/servers\/([0-9a-f-]{36})\/(?:rooms|invites|presence)$/i.exec(path);
+  const serverRooms = /^\/api\/v1\/servers\/([0-9a-f-]{36})\/(?:rooms|invites|presence|members)$/i.exec(path);
   if (serverRooms?.[1] !== undefined && UUID.test(serverRooms[1])) return path;
+  const serverPresenceAction = /^\/api\/v1\/servers\/([0-9a-f-]{36})\/presence\/(?:heartbeat|mode|policy)$/i.exec(path);
+  if (serverPresenceAction?.[1] !== undefined && UUID.test(serverPresenceAction[1])) return path;
   throw new PocInputError("invalid_api_base", "Request path is not part of the instance API");
 }
 

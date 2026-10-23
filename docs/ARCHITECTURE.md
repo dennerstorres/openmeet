@@ -17,9 +17,10 @@
 6. Ao sair ou ser removido, publicações e tracks param e políticas do servidor são aplicadas.
 
 ## Estado
-- PostgreSQL: usuários, refresh sessions, rooms, memberships, invites, auditoria, configurações. Os ADR 0007 e 0009 propõem servidores, sidebar e cards. Os ADR 0011, 0012 e 0013 propõem presença, convite por link e ensurdecer. O código ainda tem uma lista única de salas.
+- PostgreSQL: usuários, refresh sessions, salas, servidores, memberships, convites, auditoria, configurações de presença e preferência visível/invisível. O estado online continua efêmero.
 - LiveKit: participantes ativos, tracks, qualidade/conexão.
 - Cliente: preferências locais e estado transitório. O diagnóstico exportado leva fase, métricas e tempos de reconexão, e só sai com consentimento. Token, JWT, Bearer e e-mail não entram.
+- Presença da plataforma: heartbeat efêmero em memória na API de um nó, separado da ocupação de sala do LiveKit. O banco guarda somente política do servidor e preferência visível/invisível; nunca grava online/ausente como verdade durável. ADR 0017.
 - Não salvar estado de participante em Postgres como verdade online; não adicionar Socket.IO sem necessidade específica.
 
 ## Segurança

@@ -9,6 +9,7 @@ import { hashSecret } from "../auth/tokens.js";
 import { heldRooms, releaseHold, revokeAfter } from "../auth/media-hold.js";
 import { roomGrant } from "./grant.js";
 import type { RoomMedia } from "./media.js";
+import { PlatformPresence, type ActivityState } from "./platform-presence.js";
 
 export type RoomErrorCode =
   | "invalid_body"
@@ -70,6 +71,18 @@ export interface ServerMember {
   id: string;
   displayName: string;
   role: string;
+}
+
+export interface ServerPresenceMember extends ServerMember {
+  status: "online" | "away" | "offline" | "invisible";
+  activity?: ActivityState;
+  self: boolean;
+}
+
+export interface ServerPresenceView {
+  policy: { allowInvisible: boolean; managersSeeInvisible: boolean };
+  selfMode: "visible" | "invisible";
+  members: ServerPresenceMember[];
 }
 
 function isTrue(value: unknown): boolean {
@@ -252,6 +265,87 @@ export async function getServer(
   const role = activeRole(access.membership);
   if (!role) throw new RoomError("server_not_found");
   return { server: { ...access.server, role }, members: await serverMembers(db, access.server.id) };
+}
+
+export async function heartbeatServerPresence(db: MigrationClient, actor: PublicUser, id: string, state: string, presence: PlatformPresence): Promise<void> {
+  if (state !== "online" && state !== "away" && state !== "offline") throw new RoomError("invalid_body");
+  const access = await loadServerAccess(db, actor, serverId(id));
+  requireMember(access);
+  if (state === "offline") presence.drop(access.server.id, actor.id);
+  else presence.touch(access.server.id, actor.id, state);
+}
+
+export async function listServerPresence(db: MigrationClient, actor: PublicUser, id: string, presence: PlatformPresence): Promise<ServerPresenceView> {
+  const access = await loadServerAccess(db, actor, serverId(id));
+  requireMember(access);
+  const policyRow = await db.query("select allow_invisible, managers_see_invisible from servers where id = $1", [access.server.id]);
+  const allowInvisible = isTrue(policyRow.rows[0]?.allow_invisible);
+  const managersSeeInvisible = isTrue(policyRow.rows[0]?.managers_see_invisible);
+  const manager = canManage(access.membership);
+  const listed = await db.query(
+    `select u.id, u.display_name, m.role, m.presence_mode
+     from server_members m
+     join users u on u.id = m.user_id
+     where m.server_id = $1 and m.removed_at is null and u.disabled_at is null
+     order by u.display_name, u.id`,
+    [access.server.id],
+  );
+  let selfMode: "visible" | "invisible" = "visible";
+  const members = listed.rows.flatMap((row): ServerPresenceMember[] => {
+    const userId = text(row.id);
+    const displayName = text(row.display_name);
+    const role = text(row.role);
+    if (!userId || !displayName || !role) return [];
+    const invisible = allowInvisible && row.presence_mode === "invisible";
+    const activity = presence.read(access.server.id, userId);
+    const self = userId === actor.id;
+    if (self) selfMode = invisible ? "invisible" : "visible";
+    if (!invisible) return [{ id: userId, displayName, role, status: activity, self }];
+    if (self || (manager && managersSeeInvisible)) {
+      return [
+        activity === "offline"
+          ? { id: userId, displayName, role, status: "invisible", self }
+          : { id: userId, displayName, role, status: "invisible", activity, self },
+      ];
+    }
+    return [{ id: userId, displayName, role, status: "offline", self }];
+  });
+  return { policy: { allowInvisible, managersSeeInvisible }, selfMode, members };
+}
+
+export async function setServerPresenceMode(db: MigrationClient, actor: PublicUser, id: string, mode: string): Promise<void> {
+  if (mode !== "visible" && mode !== "invisible") throw new RoomError("invalid_body");
+  const access = await loadServerAccess(db, actor, serverId(id));
+  requireMember(access);
+  if (mode === "invisible") {
+    const policy = await db.query("select allow_invisible from servers where id = $1", [access.server.id]);
+    if (!isTrue(policy.rows[0]?.allow_invisible)) throw new RoomError("forbidden");
+  }
+  await db.query("update server_members set presence_mode = $3 where server_id = $1 and user_id = $2 and removed_at is null", [
+    access.server.id,
+    actor.id,
+    mode,
+  ]);
+}
+
+export async function setServerPresencePolicy(
+  db: MigrationClient,
+  actor: PublicUser,
+  id: string,
+  policy: { allowInvisible: boolean; managersSeeInvisible: boolean },
+): Promise<void> {
+  const access = await loadServerAccess(db, actor, serverId(id));
+  requireMember(access);
+  if (activeRole(access.membership) !== "owner") throw new RoomError("forbidden");
+  await db.transaction(async (tx) => {
+    await tx.query("update servers set allow_invisible = $2, managers_see_invisible = $3, updated_at = now() where id = $1", [
+      access.server.id,
+      policy.allowInvisible,
+      policy.allowInvisible && policy.managersSeeInvisible,
+    ]);
+    if (!policy.allowInvisible) await tx.query("update server_members set presence_mode = 'visible' where server_id = $1", [access.server.id]);
+    await audit(tx, actor.id, "server_presence_policy", "server", access.server.id);
+  });
 }
 
 export async function listServerRooms(db: MigrationClient, actor: PublicUser, id: string): Promise<RoomRecord[]> {

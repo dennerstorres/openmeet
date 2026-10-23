@@ -7,6 +7,7 @@ import {
   hasControlCharacter,
   parseInstanceCard,
   parseLabel,
+  parseServerPresence,
   prepareInstanceRequest,
   readErrorCode,
 } from "../src/index.js";
@@ -92,6 +93,17 @@ test("the server list and the rooms of one server are the only server paths acce
     prepareInstanceRequest("https://meet.example", "https://meet.example", "GET", "/api/v1/servers", null, "t").url,
     "https://meet.example/api/v1/servers",
   );
+  for (const [method, suffix] of [
+    ["GET", "members"],
+    ["POST", "presence/heartbeat"],
+    ["POST", "presence/mode"],
+    ["POST", "presence/policy"],
+  ] as const) {
+    assert.equal(
+      prepareInstanceRequest("https://meet.example", "https://meet.example", method, `/api/v1/servers/${serverId}/${suffix}`, {}, "t").url,
+      `https://meet.example/api/v1/servers/${serverId}/${suffix}`,
+    );
+  }
   assert.equal(
     prepareInstanceRequest("https://meet.example", "https://meet.example", "POST", `/api/v1/servers/${serverId}/rooms`, {}, "t").url,
     `https://meet.example/api/v1/servers/${serverId}/rooms`,
@@ -99,6 +111,31 @@ test("the server list and the rooms of one server are the only server paths acce
   for (const path of [`/api/v1/servers/${serverId}`, `/api/v1/servers/${serverId}/members/${serverId}`, "/api/v1/servers/../admin/users"]) {
     assert.throws(() => prepareInstanceRequest("https://meet.example", "https://meet.example", "GET", path, null, "t"), PocInputError, path);
   }
+});
+
+test("server presence validates policy, status and safe member labels", () => {
+  assert.deepEqual(
+    parseServerPresence({
+      policy: { allowInvisible: true, managersSeeInvisible: true },
+      selfMode: "invisible",
+      members: [{ id: roomId, displayName: "Ada", role: "owner", status: "invisible", activity: "online", self: true }],
+    }),
+    {
+      allowInvisible: true,
+      managersSeeInvisible: true,
+      selfMode: "invisible",
+      members: [{ id: roomId, label: "Ada", role: "owner", status: "invisible", activity: "online", self: true }],
+    },
+  );
+  assert.throws(
+    () =>
+      parseServerPresence({
+        policy: { allowInvisible: true, managersSeeInvisible: false },
+        selfMode: "visible",
+        members: [{ id: roomId, displayName: "Ada", role: "owner", status: "hidden", self: true }],
+      }),
+    PocInputError,
+  );
 });
 
 test("error codes stay inside a short token", () => {

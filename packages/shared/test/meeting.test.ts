@@ -96,6 +96,21 @@ function apiFor(role: string): { api: InstanceApi; calls: string[]; bodies: unkn
           },
         };
       }
+      if (path.endsWith("/presence/heartbeat")) return { status: 204, body: null };
+      if (path === `/api/v1/servers/${serverId}/members`) {
+        return {
+          status: 200,
+          body: {
+            policy: { allowInvisible: true, managersSeeInvisible: true },
+            selfMode: "visible",
+            members: [
+              { id: userId, displayName: "Ada", role: serverRole, status: "online", self: true },
+              { id: otherRoomId, displayName: "Grace", role: "participant", status: "away", self: false },
+            ],
+          },
+        };
+      }
+      if (path.endsWith("/presence/mode") || path.endsWith("/presence/policy")) return { status: 204, body: null };
       if (path.endsWith("/join")) return { status: 200, body: { url: "wss://sfu.example", token: joinToken } };
       if (path === "/api/v1/auth/logout") return { status: 204, body: null };
       return { status: 404, body: { error: "room_not_found" } };
@@ -447,6 +462,35 @@ test("presence fills the room list, never blocks other work, and hides on failur
   await model.refreshPresence();
   await model.selectServer(otherServerId);
   assert.equal(model.snapshot().presence, null);
+});
+
+test("platform presence heartbeats every server and exposes member privacy controls", async () => {
+  const { api, calls, bodies } = apiFor("admin");
+  const model = new MeetingModel(api, mediaFor());
+  await model.confirmInstance("https://meet.example");
+  await model.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  await model.refreshServerPresence("away");
+  assert.equal(calls.includes(`POST https://meet.example/api/v1/servers/${serverId}/presence/heartbeat`), true);
+  assert.equal(calls.includes(`POST https://meet.example/api/v1/servers/${otherServerId}/presence/heartbeat`), true);
+  assert.deepEqual(
+    model.snapshot().serverPresence?.members.map(({ label, status }) => ({ label, status })),
+    [
+      { label: "Ada", status: "online" },
+      { label: "Grace", status: "away" },
+    ],
+  );
+  await model.setPresenceMode("invisible");
+  await model.setPresencePolicy(true, false);
+  assert.equal(
+    bodies.some((body) => JSON.stringify(body) === JSON.stringify({ mode: "invisible" })),
+    true,
+  );
+  assert.equal(
+    bodies.some((body) => JSON.stringify(body) === JSON.stringify({ allowInvisible: true, managersSeeInvisible: false })),
+    true,
+  );
+  await model.selectServer(otherServerId);
+  assert.equal(model.snapshot().serverPresence, null);
 });
 
 test("Google opens only the system browser, polls with its own secret, and lands like a password login", async () => {

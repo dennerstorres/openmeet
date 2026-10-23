@@ -183,6 +183,8 @@ fn allowed_call(method: &str, path: &str) -> bool {
         ("GET" | "POST", ["", "api", "v1", "servers", id, "rooms"]) => is_id(id),
         ("POST", ["", "api", "v1", "servers", id, "invites"]) => is_id(id),
         ("GET", ["", "api", "v1", "servers", id, "presence"]) => is_id(id),
+        ("GET", ["", "api", "v1", "servers", id, "members"]) => is_id(id),
+        ("POST", ["", "api", "v1", "servers", id, "presence", "heartbeat" | "mode" | "policy"]) => is_id(id),
         _ => false,
     }
 }
@@ -291,6 +293,10 @@ mod tests {
             ("GET", format!("/api/v1/servers/{id}/rooms")),
             ("POST", format!("/api/v1/servers/{id}/invites")),
             ("GET", format!("/api/v1/servers/{id}/presence")),
+            ("GET", format!("/api/v1/servers/{id}/members")),
+            ("POST", format!("/api/v1/servers/{id}/presence/heartbeat")),
+            ("POST", format!("/api/v1/servers/{id}/presence/mode")),
+            ("POST", format!("/api/v1/servers/{id}/presence/policy")),
         ] {
             assert!(allowed_call(method, &path), "{method} {path}");
         }

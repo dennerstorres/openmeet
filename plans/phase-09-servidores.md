@@ -29,5 +29,8 @@ ADR 0008. A marca "Incluir áudio do PC" nasce desligada. Sem a marca, o pedido 
 ## F09-07
 ADR 0010. `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` só no ambiente do servidor. Sem as duas, o botão não aparece. O navegador é o do sistema. A página de volta não mostra token. O primeiro administrador continua no token de instalação. Conta Google nova não vira admin e não entra sozinha num servidor.
 
+## F09-08
+ADR 0017. READY → WAITING_VALIDATION em 2026-10-23. Lista todos os membros do servidor separadamente da ocupação de salas. Heartbeat autenticado: atividade recente online, cinco minutos sem interação ou janela oculta ausente, 75 segundos sem heartbeat desconectado. O dono permite ou proíbe invisibilidade e decide se dono/moderadores identificam invisíveis; os demais recebem desconectado. Banco guarda política e preferência, nunca o estado online. Testes automatizados e bundles desktop/web passaram. Exige dois clientes reais e teste de fechar/minimizar antes de `DONE`.
+
 ## Observação
 Não concluir fase por implementação superficial ou mocks. Dependências externas e validações reais precisam de evidência ou status WAITING_VALIDATION.

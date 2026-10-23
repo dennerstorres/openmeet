@@ -479,6 +479,95 @@ a {
   text-align: left;
 }
 
+.server-members {
+  padding: 10px 8px;
+  border-top: 1px solid var(--line);
+}
+
+.server-members summary {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.server-members ul {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.server-members li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  font-size: 13px;
+}
+
+.presence-dot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border: 2px solid var(--bg-side);
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.12);
+}
+
+.presence-dot.online {
+  background: var(--glow);
+}
+
+.presence-dot.away {
+  background: var(--warn);
+}
+
+.presence-dot.invisible {
+  background: var(--text-faint);
+}
+
+.member-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--text-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-status {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.presence-option {
+  flex-direction: row;
+  align-items: center;
+  gap: 7px;
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.presence-option input {
+  accent-color: var(--accent);
+}
+
+.presence-policy {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
 .inline-form {
   display: flex;
   flex-direction: column;
