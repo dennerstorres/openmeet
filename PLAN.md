@@ -2,6 +2,8 @@
 
 Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, `VERIFIED`, `DONE`, `BLOCKED`.
 
+F07-04 — Entrega 0.2.1: WAITING_VALIDATION. Versão e instalador NSIS gerados em 2026-10-23 com atalhos/configurações, blur local e presença global do servidor. Testes automatizados e checksum passaram; falta instalar o `.exe`, validar câmera/presença com dois clientes e aplicar a migration 0007 em implantação real. Sem tag, GitHub Release ou deploy nesta tarefa.
+
 F07-03 — Entrega 0.2.0: WAITING_VALIDATION. GitHub Release `v0.2.0`, instalador NSIS e checksum publicados; `openmeet-api` implantado pelo Coolify no commit `96d206e` e produção respondeu 200 em `/` e `/health/ready`. A execução automática da release não iniciou por limite de Actions, então os artefatos locais foram publicados manualmente e baixados novamente com hash idêntico. Faltam instalar a 0.2.0 e executar as provas físicas de mídia/mobile; sem declarar esses gates concluídos.
 
 F12-08 — Responsividade mínima da web: WAITING_VALIDATION. Selecionada READY em 2026-10-23 por solicitação explícita; depende de F12-03/F12-06 implementadas. Branch `codex/F12-08-web-mobile`. Layout verificado em Edge emulado, falta aparelho físico e revisão independente. Escopo/testes em plans/phase-12-web.md. Alterações locais anteriores de F04-05 preservadas, sem escrita concorrente.

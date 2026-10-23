@@ -2,6 +2,9 @@
 
 Objetivo: Infra Docker + instalador.
 
+## F07-04 — 0.2.1
+READY → WAITING_VALIDATION em 2026-10-23. Pedido explícito de novo `.exe`, commit e push na `main`. O NSIS 0.2.1 local reúne atalhos/configurações, blur e presença de servidor; checksum, suíte TypeScript e testes Rust passaram. Faltam instalar o bundle, validar câmera e presença com dois clientes e aplicar a migration 0007 em implantação real. Sem tag, GitHub Release ou deploy público nesta tarefa.
+
 ## F07-03 — 0.2.0
 READY → IN_PROGRESS → WAITING_VALIDATION em 2026-10-23. Pedido explícito de deploy e exe versionado inclui F04-05/F12-08. `v0.2.0` foi publicada com NSIS e `SHA256SUMS`; download repetido confirmou o hash. Coolify implantou `96d206e` e produção respondeu 200 em `/` e `/health/ready`. O job do GitHub Actions não iniciou por limite da conta, por isso a publicação dos artefatos locais foi manual. Preservadas as pendências de instalação, mídia e aparelho físico; nenhuma migration nova nesta entrega.
 

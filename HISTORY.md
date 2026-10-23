@@ -1,5 +1,12 @@
 # HISTORY — registro cronológico
 
+### 2026-10-23 — F07-04, instalador 0.2.1 — Codex
+Branch `main`. Integração por fast-forward dos commits `3944cc2`, `e8ef5ce` e `8d464de`; versão atualizada de 0.2.0 para 0.2.1 em `apps/desktop/package.json`, `src-tauri/Cargo.toml`, `Cargo.lock` e `tauri.conf.json`. A entrega reúne configurações de atalhos, fechamento externo dos menus, blur local da câmera e presença dos membros do servidor com a migration 0007. Autorização explícita do usuário para gerar o `.exe`, commitar e enviar a `main`.
+
+Windows/PowerShell, 2026-10-23: `pnpm test` PASS (24 scripts + 45 shared + 52 media + 73 server + 16 desktop = 210 testes); `cargo test` PASS (18); `pnpm typecheck`, `pnpm lint`, `pnpm format:check` e `git diff --check` PASS. `pnpm --filter @openmeet/desktop exec tauri build --bundles nsis` gerou `OpenMeet_0.2.1_x64-setup.exe`, 7.335.407 bytes. SHA-256: `c2d811d2f2423869f5aea472d6cdba1f36082db359238b4a028d7f15b6ec0b0c`. O instalador 0.2.0 foi movido para `bundle/nsis/archive` antes de regenerar o `SHA256SUMS`; bundles não são versionados.
+
+O instalador continua sem assinatura e sem instalação manual nesta execução. Blur com câmera real, estados de presença entre dois clientes e migration na implantação real continuam `WAITING_VALIDATION`. Nenhuma tag, GitHub Release ou deploy público faz parte desta entrega.
+
 ### 2026-10-23 — F04-06, blur de fundo — Codex
 Branch `codex/F04-05-settings-menu`, continuação isolada após `3944cc2`. Blur moderado opcional usa `@livekit/track-processors` 0.8.2 e MediaPipe no cliente antes da publicação; runtime Wasm, modelo e aviso Apache-2.0 entram no bundle, sem CDN em execução. A opção fica nos ajustes de câmera, detecta incompatibilidade, mantém a preferência com câmera desligada e reaplica numa nova track. O usuário autorizou `script-src 'self' 'wasm-unsafe-eval'` para desktop/web; `unsafe-eval` de JavaScript segue proibido.
 
