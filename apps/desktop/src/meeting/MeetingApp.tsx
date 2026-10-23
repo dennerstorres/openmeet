@@ -145,11 +145,14 @@ export function MeetingApp() {
   const [copied, setCopied] = useState(false);
   const [creating, setCreating] = useState<"server" | "room" | null>(null);
   const [layout, setLayout] = useState<CardLayout>("spotlight");
+  const [mobileRooms, setMobileRooms] = useState(true);
   const [pinnedId, setPinnedId] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
   // ADR 0013: only this PC, only during the call, never saved.
   const [deafened, setDeafened] = useState(false);
   const [shareAudio, setShareAudio] = useState(storedShareAudio);
+  const [microphoneVolume, setMicrophoneVolume] = useState(100);
+  const [kickTarget, setKickTarget] = useState<{ roomId: string; userId: string; label: string } | null>(null);
   const [levels, setLevels] = useState<Record<string, PlaybackLevel>>({});
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [controlPending, setControlPending] = useState(false);
@@ -332,6 +335,7 @@ export function MeetingApp() {
   const toggleScreen = () => void runControl("screen", () => session().setScreenShare(screenShareAction(media.screen) === "start", shareAudio));
   const toggleDeafen = () => setDeafened((current) => !current);
   const leaveCall = () => {
+    setMobileRooms(true);
     setMediaError(null);
     model.leaveRoom();
   };
@@ -432,7 +436,7 @@ export function MeetingApp() {
 
   if (state.step === "instance" || state.step === "account") {
     return (
-      <main className="auth-shell">
+      <main className={`auth-shell${__WEB__ ? " web-auth" : ""}`}>
         <div className="auth-card">
           <section className="auth-form">
             <header className="auth-head">
@@ -499,7 +503,32 @@ export function MeetingApp() {
   }
 
   return (
-    <main className={`server-shell${isFullscreen ? " is-fullscreen" : ""}`}>
+    <main className={`server-shell${__WEB__ ? " web-shell" : ""}${mobileRooms ? " mobile-rooms" : " mobile-call"}${isFullscreen ? " is-fullscreen" : ""}`}>
+      {__WEB__ ? (
+        <header className="mobile-navigation">
+          <nav aria-label="Navegação da reunião">
+            <button
+              type="button"
+              aria-pressed={mobileRooms}
+              onClick={() => {
+                setMobileRooms(true);
+                setFullscreen(false);
+              }}
+            >
+              Salas
+            </button>
+            <button type="button" aria-pressed={!mobileRooms} disabled={!inCall && !kickTarget} onClick={() => setMobileRooms(false)}>
+              {inCall ? "Voltar à chamada" : "Chamada"}
+            </button>
+          </nav>
+          {mobileRooms && notice ? (
+            <p className="error" role="status">
+              {notice}
+            </p>
+          ) : null}
+          {mobileRooms ? invitePanel : null}
+        </header>
+      ) : null}
       <nav className="server-bar" aria-label="Servidores">
         {state.servers.map((server) => (
           <button
@@ -564,7 +593,11 @@ export function MeetingApp() {
                 type="button"
                 className={`room-item${room.id === state.activeRoomId ? " active" : ""}`}
                 disabled={state.pending || room.ended || room.id === state.activeRoomId}
-                onClick={() => void model.enterRoom(room.id, "")}
+                onClick={() =>
+                  void model.enterRoom(room.id, "").then(() => {
+                    if (model.snapshot().activeRoomId === room.id) setMobileRooms(false);
+                  })
+                }
               >
                 {room.kind === "temporary" ? <IconClock /> : <IconSpeaker />}
                 <span className="room-name">{room.name}</span>
@@ -580,6 +613,21 @@ export function MeetingApp() {
                           <span>{cardInitial(person.label)}</span>
                         </span>
                         <span className="room-name">{person.label}</span>
+                        {(state.canCreate || state.role === "admin") && !media.participants.some((p) => p.local && p.identity === person.id) ? (
+                          <button
+                            type="button"
+                            className="icon-btn danger-text"
+                            disabled={state.pending}
+                            aria-label={`Desconectar ${person.label} da sala`}
+                            title={`Desconectar ${person.label} da sala`}
+                            onClick={() => {
+                              setKickTarget({ roomId: room.id, userId: person.id, label: person.label });
+                              setMobileRooms(false);
+                            }}
+                          >
+                            <IconHangUp size={16} />
+                          </button>
+                        ) : null}
                         {speaking ? <span className="sr"> falando</span> : null}
                       </li>
                     );
@@ -784,6 +832,24 @@ export function MeetingApp() {
       </aside>
 
       <section className="call-area">
+        {kickTarget ? (
+          <section className="inline-form" role="alertdialog" aria-label="Desconectar participante">
+            <p>Desconectar {kickTarget.label} desta sala? A pessoa continua no servidor e pode entrar novamente.</p>
+            <div className="row">
+              <button
+                type="button"
+                className="danger-text"
+                disabled={state.pending}
+                onClick={() => void model.kickParticipant(kickTarget.roomId, kickTarget.userId).then(() => setKickTarget(null))}
+              >
+                Desconectar da sala
+              </button>
+              <button type="button" className="ghost" disabled={state.pending} onClick={() => setKickTarget(null)}>
+                Cancelar
+              </button>
+            </div>
+          </section>
+        ) : null}
         {notice ? <p className="error">{notice}</p> : null}
         {invitePanel}
         {mediaError ? <p className="error">{mediaError}</p> : null}
@@ -939,7 +1005,38 @@ export function MeetingApp() {
                     <IconGear size={22} />
                   </summary>
                   <div className="more-body">
+                    <button
+                      type="button"
+                      className="mobile-close ghost"
+                      onClick={(event) => {
+                        const menu = event.currentTarget.closest("details");
+                        if (menu) {
+                          menu.open = false;
+                          menu.querySelector("summary")?.focus();
+                        }
+                      }}
+                    >
+                      Fechar ajustes
+                    </button>
                     <DeviceSelect label="Entrada" kind="audioinput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
+                    <label>
+                      Volume de entrada do microfone: {microphoneVolume}%
+                      <input
+                        type="range"
+                        min={0}
+                        max={200}
+                        step={1}
+                        value={microphoneVolume}
+                        disabled={!controlsEnabled || controlPending}
+                        aria-valuetext={`${microphoneVolume}%`}
+                        onChange={(event) => {
+                          const value = Number(event.currentTarget.value);
+                          session().setMicrophoneVolume(value / 100);
+                          setMicrophoneVolume(value);
+                        }}
+                      />
+                    </label>
+                    <p className="hint">100% mantém o nível original. Acima disso, o som pode distorcer. 0% corta sua voz.</p>
                     {session().browser.outputSelection ? (
                       <DeviceSelect
                         label="Saída"

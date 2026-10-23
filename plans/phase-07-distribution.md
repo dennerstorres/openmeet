@@ -2,6 +2,9 @@
 
 Objetivo: Infra Docker + instalador.
 
+## F07-03 — 0.2.0
+READY → IN_PROGRESS em 2026-10-23. Pedido explícito de deploy e exe versionado inclui F04-05/F12-08. Arquivos: versões em package.json/Tauri/Cargo.lock, documentação de entrega. Testes: pnpm test/typecheck/lint, build NSIS, SHA256SUMS, resposta HTTPS/health e assets após deploy. Preservar pendências de mídia/aparelho físico; nenhuma migration nova nesta entrega.
+
 ## F07-01
 `IMPLEMENTED` em 2026-10-18 na branch `task/F07-01-compose`.
 

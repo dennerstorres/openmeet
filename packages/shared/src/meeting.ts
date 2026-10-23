@@ -560,6 +560,22 @@ export class MeetingModel {
     });
   }
 
+  async kickParticipant(roomId: string, userId: string): Promise<void> {
+    await this.run(async (generation) => {
+      const origin = this.pinned();
+      const accessToken = this.accessToken;
+      if (origin === null || accessToken === null) return;
+      const result = await this.api.request(origin, "POST", `/api/v1/rooms/${roomId}/participants/${userId}/kick`, {}, accessToken);
+      if (generation !== this.generation) return;
+      if (result.status !== 204) {
+        if (await this.dropIfUnauthorized(generation, result.body)) return;
+        this.error = readErrorCode(result.body);
+        return;
+      }
+      await this.refreshPresence();
+    });
+  }
+
   leaveRoom(): void {
     this.generation += 1;
     this.pending = false;

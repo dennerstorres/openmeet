@@ -47,7 +47,7 @@ Bootstrap, login, servidores, salas, convites, presença, anel de quem fala, car
 Bandeja, atalhos globais, notificação do sistema, cofre do Windows e o aviso de "Fechar o OpenMeet". Fechar a aba sai da chamada; a sessão fica no cookie até expirar ou sair da conta.
 
 ### Navegadores
-Chrome, Edge e Firefox atuais, em computador. Celular não está no escopo: a lista de fora do MVP já exclui apps móveis, e o navegador do celular não foi testado.
+Chrome, Edge e Firefox atuais, em computador. Em 2026-10-23 o usuário ampliou o escopo para responsividade mínima do cliente web em celular (F12-08), mantendo o mesmo frontend e capacidades detectadas. Isso não inclui app móvel nativo nem certifica mídia em navegadores móveis: testes físicos continuam pendentes.
 
 ## Alternativas
 - **Segundo app em `apps/web`:** duplicaria a tela. Recusada.

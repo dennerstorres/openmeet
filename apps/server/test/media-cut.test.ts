@@ -113,6 +113,40 @@ function assertNoCredential(body: string): void {
   assert.equal(body.includes('"token"'), false);
 }
 
+test("room kick checks permissions, preserves membership and reports SFU failure", async () => {
+  const pg = new PGlite();
+  const db = pgliteClient(pg);
+  await applyMigrations(db);
+  const sfu = fakeMedia();
+  const app = await buildApp({ logger: false, env, db, media: sfu.media });
+  try {
+    const { adminToken, memberToken, memberId, roomId, serverId } = await setup(app);
+    const url = `/api/v1/rooms/${roomId}/participants/${memberId}/kick`;
+    assert.equal((await app.inject({ method: "POST", url })).statusCode, 401);
+    assert.equal((await app.inject({ method: "POST", url, headers: auth(memberToken) })).statusCode, 403);
+    const owner = await db.query("select user_id from server_members where server_id = $1 and role = 'owner'", [serverId]);
+    const ownerId = String(owner.rows[0]?.user_id);
+    assert.equal(
+      (await app.inject({ method: "POST", url: `/api/v1/rooms/${roomId}/participants/${ownerId}/kick`, headers: auth(adminToken) })).statusCode,
+      403,
+    );
+    assert.equal(sfu.calls.length, 0);
+    sfu.fail.on = true;
+    assert.equal((await app.inject({ method: "POST", url, headers: auth(adminToken) })).statusCode, 502);
+    sfu.fail.on = false;
+    assert.equal((await app.inject({ method: "POST", url, headers: auth(adminToken) })).statusCode, 204);
+    assert.ok(sfu.calls.every((call) => call.room === roomId && call.kind === "disconnect"));
+    const member = await db.query("select removed_at from server_members where server_id = $1 and user_id = $2", [serverId, memberId]);
+    assert.equal(member.rows[0]?.removed_at, null);
+    assert.equal((await app.inject({ method: "POST", url: `/api/v1/rooms/${roomId}/join`, headers: auth(memberToken), payload: {} })).statusCode, 200);
+    await db.query("update server_members set removed_at = now() where server_id = $1 and user_id = $2", [serverId, ownerId]);
+    assert.equal((await app.inject({ method: "POST", url, headers: auth(adminToken) })).statusCode, 404);
+  } finally {
+    await app.close();
+    await pg.close();
+  }
+});
+
 test("a removed member gets no token and no invite back until the SFU confirms the cut", async () => {
   const pg = new PGlite();
   const db = pgliteClient(pg);

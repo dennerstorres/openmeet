@@ -12,7 +12,7 @@ Cliente desktop Windows e cliente web, servido pela própria instância, para sa
 1. Configurar múltiplas URLs de instâncias; identidade e sessão locais por instância (sem federação).
 2. Bootstrap seguro de administrador único, inscrição controlada, login, logout, refresh com revogação e recuperação de conta via procedimento administrativo documentado.
 3. Salas persistentes, convites com expiração/revogação e lista de participantes; reunião temporária pode ser criada via API sem histórico de chat.
-4. Áudio bidirecional, mute de publicação, mute local individual, volume individual, escolha de entrada/saída quando suportada, câmera liga/desliga e alternância de dispositivos.
+4. Áudio bidirecional, mute de publicação, mute local individual, volume individual, volume de entrada do microfone (0–200%, padrão 100%), escolha de entrada/saída quando suportada, câmera liga/desliga e alternância de dispositivos.
 5. Compartilhar monitor ou janela com consentimento explícito; visualização em destaque e parar compartilhamento com sinal claro.
 6. Reconexão, estado de conexão, métricas WebRTC (perda, jitter, RTT quando disponíveis), logs diagnósticos sem conteúdo de mídia.
 7. Bandeja do sistema e preferências persistidas localmente; atalhos globais apenas após verificação de conflitos e consentimento.
@@ -54,7 +54,7 @@ Mensagens persistentes, federação, apps móveis, macOS/Linux, gravações, tra
 ## Requisitos não funcionais
 - Segredo jamais incluído no repo, logs ou CI; TLS em produção; Argon2id com parâmetros documentados.
 - Sem pré-requisito de Node/Rust para o usuário final (runtime WebView2 considerado pela instalação).
-- Suporte inicial Windows 10/11 em versões suportadas pelo Tauri/WebView2; matriz de versões testadas explicitamente. Web: Chrome, Edge e Firefox atuais em computador; celular não testado.
+- Suporte inicial Windows 10/11 em versões suportadas pelo Tauri/WebView2; matriz de versões testadas explicitamente. Web: Chrome, Edge e Firefox atuais em computador; responsividade mínima para navegador de celular (F12-08), mídia em aparelho físico ainda não validada.
 - Teste funcional de cinco participantes simultâneos e reunião contínua de 60 min em ambiente homologado.
 - Meta de p95 de entrada <= 5s em rede estável e sessão pronta; reconexão <=15s após queda de 5s, mediante servidor alcançável. São metas, não garantias.
 - Monitoramento: logs JSON no backend, requestId/roomId pseudonimizados e healthchecks; retenção configurável.

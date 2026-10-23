@@ -1,5 +1,6 @@
 import {
   DisconnectReason,
+  LocalAudioTrack,
   Room,
   RoomEvent,
   Track,
@@ -10,6 +11,7 @@ import {
   type TrackPublication,
 } from "livekit-client";
 import { describeMediaError, mediaActionError, sanitizeDiagnostic, type DiagnosticEvent } from "./diagnostics.js";
+import { InputGain } from "./input-gain.js";
 import { browserLabel, readBrowserMedia, type BrowserMedia } from "./browser.js";
 import { buildDiagnosticExport, dropOpenReconnect, pushReconnect, summarizeReconnect, type ReconnectMark, type ReconnectSummary } from "./report.js";
 import { screenAudioState, type ScreenAudioState } from "./layout.js";
@@ -120,6 +122,7 @@ function readTrackDisplaySurface(track: Track): string | null {
 }
 
 export class LiveKitPocSession {
+  private readonly inputGain = new InputGain();
   private readonly room: Room;
   private readonly tiles = new Map<string, TrackTile>();
   private readonly listeners = new Set<Listener>();
@@ -312,8 +315,35 @@ export class LiveKitPocSession {
   }
 
   async setMicrophone(enabled: boolean): Promise<void> {
-    await this.toggle(() => this.room.localParticipant.setMicrophoneEnabled(enabled), "microphone");
+    await this.toggle(async () => {
+      const local = this.room.localParticipant;
+      const existing = local.getTrackPublication(Track.Source.Microphone)?.track;
+      if (enabled && !existing) {
+        // createTracks assigns the room AudioContext. Capture options apply processors too early
+        // in this SDK version, before that context exists. Process before publishing instead.
+        const tracks = await local.createTracks({ audio: true, video: false });
+        try {
+          const track = tracks.find((candidate) => candidate instanceof LocalAudioTrack);
+          const audioTrack: unknown = track;
+          if (!track || !(audioTrack instanceof LocalAudioTrack)) throw new Error("Microphone unavailable");
+          await audioTrack.setProcessor(this.inputGain);
+          await local.publishTrack(track);
+        } catch (error) {
+          for (const track of tracks) track.stop();
+          throw error;
+        }
+      } else {
+        if (enabled && existing instanceof LocalAudioTrack && existing.getProcessor() !== this.inputGain) {
+          await existing.setProcessor(this.inputGain);
+        }
+        await local.setMicrophoneEnabled(enabled);
+      }
+    }, "microphone");
     await this.refreshDevices();
+  }
+
+  setMicrophoneVolume(value: number): void {
+    this.inputGain.setVolume(value);
   }
 
   async setCamera(enabled: boolean): Promise<void> {

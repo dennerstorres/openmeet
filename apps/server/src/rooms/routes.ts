@@ -24,6 +24,7 @@ import {
   listServerRooms,
   listServers,
   removeMember,
+  kickParticipant,
   removeServerMember,
   revokeInvite,
   revokeServerInvite,
@@ -356,6 +357,17 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
         throw new RoomError("invalid_body");
       }
       await endRoom(db, actor, param(request, "id"), media);
+      return reply.code(204).header("cache-control", "no-store").send();
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/rooms/:id/participants/:userId/kick", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      await kickParticipant(db, actor, param(request, "id"), param(request, "userId"), media);
       return reply.code(204).header("cache-control", "no-store").send();
     } catch (error) {
       return sendError(request, reply, error);

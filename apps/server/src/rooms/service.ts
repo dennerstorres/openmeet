@@ -532,6 +532,29 @@ export async function removeMember(db: MigrationClient, actor: PublicUser, id: s
   await removeFromServer(db, actor, access, memberId, media);
 }
 
+/** Disconnect this call only. Membership remains valid for a deliberate rejoin. */
+export async function kickParticipant(db: MigrationClient, actor: PublicUser, id: string, memberId: string, media: RoomMedia | undefined): Promise<void> {
+  if (!media) throw new RoomError("room_unconfigured");
+  const { room, access } = await loadRoomAccess(db, actor, roomId(id));
+  if (!activeRole(access.membership)) throw new RoomError("room_not_found");
+  if (actor.role !== "admin" && !canManage(access.membership)) throw new RoomError("forbidden");
+  if (!UUID.test(memberId) || memberId === actor.id) throw new RoomError("forbidden");
+  await db.transaction(async (tx) => {
+    await tx.query("select id from rooms where id = $1 for update", [room.id]);
+    const target = await tx.query("select role, last_join_nbf from server_members where server_id = $1 and user_id = $2 and removed_at is null for update", [
+      room.serverId,
+      memberId,
+    ]);
+    const row = target.rows[0];
+    const role = text(row?.role);
+    if (!row || role === "owner" || (role === "moderator" && actor.role !== "admin" && access.membership?.role !== "owner")) {
+      throw new RoomError("forbidden");
+    }
+    await disconnectMedia(() => media.disconnect(room.id, memberId, revokeAfter(row.last_join_nbf)));
+    await audit(tx, actor.id, "room_kick", "user", memberId);
+  });
+}
+
 export async function createInvite(
   db: MigrationClient,
   actor: PublicUser,

@@ -2,6 +2,12 @@
 
 Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, `VERIFIED`, `DONE`, `BLOCKED`.
 
+F07-03 — Entrega 0.2.0: IN_PROGRESS. Selecionada READY em 2026-10-23 por autorização explícita de deploy e novo exe. Versão, testes, NSIS 0.2.0 e checksum concluídos; falta publicar GitHub Release, atualizar `openmeet-api` no Coolify e verificar produção. Sem declarar gates de mídia concluídos.
+
+F12-08 — Responsividade mínima da web: WAITING_VALIDATION. Selecionada READY em 2026-10-23 por solicitação explícita; depende de F12-03/F12-06 implementadas. Branch `codex/F12-08-web-mobile`. Layout verificado em Edge emulado, falta aparelho físico e revisão independente. Escopo/testes em plans/phase-12-web.md. Alterações locais anteriores de F04-05 preservadas, sem escrita concorrente.
+
+F04-05 — Ajustes, kick da sala e volume de entrada: WAITING_VALIDATION. Selecionada READY em 2026-10-23 pelo pedido do usuário, dependências F04-02/F09-01 implementadas. Branch `codex/F04-05-controles-sala`; gates G3/G4/G9. Falta revisão independente, inspeção visual e prova real de áudio/kick. Escopo e validação em `plans/phase-04-meeting-ui.md`.
+
 > A evidência de dois PCs e o GO/NO-GO ficam no fim. Não bloqueiam a implementação de F03–F07, F09 nem F10. Bloqueiam o aceite final e o F08.
 
 | ID | Fase | Tarefa | Depende de | Estado | Dono inicial | Gate |

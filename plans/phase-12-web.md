@@ -3,6 +3,8 @@
 Objetivo: implementar o ADR 0014. A instância serve em `https://{API_DOMAIN}/` o mesmo cliente do `.exe`, com sessão em cookie `HttpOnly`. Não começar antes do ADR aceito. Não marcar `DONE` nem PASS sem a prova pedida.
 
 ## Execução
+F12-08 selecionada READY → IN_PROGRESS → WAITING_VALIDATION em 2026-10-23: navegação, login, cards, dock e menus adaptados para 320px em diante, toque e orientação horizontal. Arquivos: MeetingApp.tsx, App.css, index.html, SPEC/ADR0014 e registros. Sem alteração no transporte/autenticação. Layouts em Edge emulado (320/390/768/844/1280), overflow, navegação, grade, tela cheia e menus verificados. Typecheck, lint, builds e 16 testes desktop PASS. Evidência e fixture em artifacts/mobile; não é aprovação de mídia. Falta celular físico, teclado virtual, Safari/iOS, Chrome/Android e revisão independente.
+
 Uma tarefa por branch, na ordem das dependências do `PLAN.md`. Nada desta fase muda o `.exe`: o alvo desktop continua com o processo nativo da F10.
 
 ## Critério de saída

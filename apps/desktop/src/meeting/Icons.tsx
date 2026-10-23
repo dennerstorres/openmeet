@@ -105,8 +105,9 @@ export function IconSignal({ size }: { size?: number }) {
 export function IconGear({ size }: { size?: number }) {
   return (
     <Icon size={size}>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9L7 7M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" />
+      <path d="M4 7h3m4 0h9M4 17h9m4 0h3" />
+      <circle cx="9" cy="7" r="2" />
+      <circle cx="15" cy="17" r="2" />
     </Icon>
   );
 }
