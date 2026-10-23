@@ -5,6 +5,8 @@ Objetivo: UI de reunião e controles.
 ## F04-05 — controles solicitados em 2026-10-23
 READY → IN_PROGRESS → WAITING_VALIDATION. Alterados Icons.tsx, MeetingApp.tsx, session.ts de mídia, processor novo, MeetingModel, allowlists web/nativa, serviço/rota de salas e testes. Sol substituído por ajustes; kick só da sala (ADR 0015); ganho de entrada 0–200%. Testes cobrem RBAC negativo, membership preservado, erro do SFU, contrato nativo, processor/restart/cleanup. Comandos e resultados em HISTORY.md. Prova de áudio e desconexão real em dois PCs e revisão independente exigidas antes de DONE.
 
+Ajuste de 2026-10-23: consentimento de atalhos saiu da tela principal e passou para Configurações no menu da conta. Menus de conta e de dispositivos fecham ao clicar fora. O bundle web continua sem shell nem texto de atalhos nativos.
+
 Roteiro pendente: abrir web e instalador; conferir ambos os ícones e menus por teclado; falar entre dois PCs com volume em 0/50/100/200%; trocar microfone, mutar/desmutar, sair/entrar e reconectar; verificar ausência de eco local e áudio da tela inalterado. Como admin membro do servidor, desconectar participante pela sidebar, conferir encerramento da mídia remota e novo ingresso permitido; como participante, chamada direta deve retornar 403. SFU indisponível deve mostrar erro e permitir repetir. Nada disso foi marcado PASS por mock.
 
 ## Execução

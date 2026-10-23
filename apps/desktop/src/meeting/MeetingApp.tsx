@@ -160,6 +160,7 @@ export function MeetingApp() {
   const [now, setNow] = useState(() => Date.now());
   const [shell, setShell] = useState<ShellStatus | null>(null);
   const [shellPending, setShellPending] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportConsent, setExportConsent] = useState(false);
   const mediaRef = useRef(media);
   mediaRef.current = media;
@@ -250,6 +251,17 @@ export function MeetingApp() {
     void shellStatus()
       .then(setShell)
       .catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    function closeMenus(event: PointerEvent): void {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      document.querySelectorAll<HTMLDetailsElement>("details.account-menu[open], details.more[open]").forEach((menu) => {
+        if (!menu.contains(target)) menu.open = false;
+      });
+    }
+    document.addEventListener("pointerdown", closeMenus);
+    return () => document.removeEventListener("pointerdown", closeMenus);
   }, []);
   useEffect(() => {
     if (!isTauri()) return;
@@ -819,9 +831,21 @@ export function MeetingApp() {
                 Atualizar
               </button>
               {__WEB__ ? null : (
-                <button type="button" className="ghost" onClick={() => void model.changeInstance()}>
-                  Trocar instância
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={(event) => {
+                      event.currentTarget.closest("details")?.removeAttribute("open");
+                      setSettingsOpen(true);
+                    }}
+                  >
+                    Configurações
+                  </button>
+                  <button type="button" className="ghost" onClick={() => void model.changeInstance()}>
+                    Trocar instância
+                  </button>
+                </>
               )}
               <button type="button" className="ghost danger-text" onClick={() => void model.signOut()} disabled={state.pending}>
                 Sair da conta
@@ -853,7 +877,26 @@ export function MeetingApp() {
         {notice ? <p className="error">{notice}</p> : null}
         {invitePanel}
         {mediaError ? <p className="error">{mediaError}</p> : null}
-        {consent}
+        {!__WEB__ && settingsOpen ? (
+          <section className="settings-page" aria-labelledby="settings-title">
+            <header>
+              <div>
+                <p className="eyebrow">Aplicativo</p>
+                <h1 id="settings-title">Configurações</h1>
+              </div>
+              <button type="button" className="ghost" onClick={() => setSettingsOpen(false)}>
+                Fechar
+              </button>
+            </header>
+            <div className="settings-content">
+              <div>
+                <h2>Atalhos</h2>
+                <p className="hint">Controle os atalhos globais usados pelo OpenMeet neste computador.</p>
+              </div>
+              {consent}
+            </div>
+          </section>
+        ) : null}
         {inCall ? (
           <>
             <header className="call-strip">

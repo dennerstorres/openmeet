@@ -1,5 +1,10 @@
 # HISTORY — registro cronológico
 
+### 2026-10-23 — configurações de atalhos e fechamento dos menus — Codex
+Continuação de F04-05. O consentimento de atalhos globais foi removido da área principal e colocado em uma página de Configurações acessível pelo menu da conta no desktop. Os menus de conta e de dispositivos/diagnóstico agora fecham em `pointerdown` fora de seus limites; ações internas continuam disponíveis e o botão Configurações fecha o menu antes de abrir a página. A página se adapta abaixo de 900 px. O alvo web não expõe a página nem inclui o shell nativo.
+
+Windows/PowerShell, 2026-10-23: `pnpm --filter @openmeet/desktop test` PASS (16), `pnpm --filter @openmeet/desktop typecheck`, `pnpm --filter @openmeet/desktop build:web`, `pnpm lint` e `git diff --check` PASS. O build mantém apenas o aviso conhecido de chunk acima de 500 kB. Falta inspeção manual na janela Tauri; F04-05 continua `WAITING_VALIDATION`.
+
 ### 2026-10-23 — release 0.2.0 e deploy — Codex
 Branch `codex/F12-08-web-mobile`, base `86e5ab5`. Versão atualizada de 0.1.0 para 0.2.0 em `apps/desktop/package.json`, `src-tauri/Cargo.toml`, `Cargo.lock` e `tauri.conf.json`. A entrega reúne F04-05 e F12-08, sem migration de banco. Autorização explícita do usuário para deploy e novo `.exe`.
 
