@@ -1,6 +1,7 @@
 import {
   DisconnectReason,
   LocalAudioTrack,
+  LocalVideoTrack,
   Room,
   RoomEvent,
   Track,
@@ -12,6 +13,7 @@ import {
 } from "livekit-client";
 import { describeMediaError, mediaActionError, sanitizeDiagnostic, type DiagnosticEvent } from "./diagnostics.js";
 import { InputGain } from "./input-gain.js";
+import { VideoBackground, type VideoBackgroundOptions } from "./video-background.js";
 import { browserLabel, readBrowserMedia, type BrowserMedia } from "./browser.js";
 import { buildDiagnosticExport, dropOpenReconnect, pushReconnect, summarizeReconnect, type ReconnectMark, type ReconnectSummary } from "./report.js";
 import { screenAudioState, type ScreenAudioState } from "./layout.js";
@@ -91,6 +93,8 @@ export interface PocSnapshot {
   audioPlayback: boolean;
   /** Identities the SFU reports as speaking now, loudest first. */
   speakers: string[];
+  backgroundBlurSupported: boolean;
+  backgroundBlur: boolean;
 }
 
 type Listener = (snapshot: PocSnapshot) => void;
@@ -123,6 +127,7 @@ function readTrackDisplaySurface(track: Track): string | null {
 
 export class LiveKitPocSession {
   private readonly inputGain = new InputGain();
+  private readonly videoBackground: VideoBackground;
   private readonly room: Room;
   private readonly tiles = new Map<string, TrackTile>();
   private readonly listeners = new Set<Listener>();
@@ -142,8 +147,9 @@ export class LiveKitPocSession {
   private stats: RtcSnapshot;
   private marks: ReconnectMark[] = [];
 
-  constructor(options?: { appVersion?: string; room?: Room; client?: "desktop" | "web"; browser?: BrowserMedia }) {
+  constructor(options?: { appVersion?: string; room?: Room; client?: "desktop" | "web"; browser?: BrowserMedia; videoBackground?: VideoBackgroundOptions }) {
     this.room = options?.room ?? new Room();
+    this.videoBackground = new VideoBackground(options?.videoBackground);
     this.appVersion = options?.appVersion ?? null;
     this.client = options?.client ?? null;
     this.browser = options?.browser ?? readBrowserMedia();
@@ -262,6 +268,8 @@ export class LiveKitPocSession {
       ),
       audioPlayback: this.audioPlayback,
       speakers: [...this.speakers],
+      backgroundBlurSupported: this.videoBackground.isSupported,
+      backgroundBlur: this.videoBackground.isEnabled,
     };
   }
 
@@ -348,7 +356,17 @@ export class LiveKitPocSession {
 
   async setCamera(enabled: boolean): Promise<void> {
     await this.toggle(() => this.room.localParticipant.setCameraEnabled(enabled), "camera");
+    if (enabled) {
+      const track = this.room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
+      if (track instanceof LocalVideoTrack) await this.videoBackground.apply(track);
+    }
     await this.refreshDevices();
+  }
+
+  async setBackgroundBlur(enabled: boolean): Promise<void> {
+    const track = this.room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
+    await this.videoBackground.setEnabled(track instanceof LocalVideoTrack ? track : undefined, enabled);
+    this.emit();
   }
 
   /** The image and, only when asked, the PC audio in the same picker. Stopping ends both. */

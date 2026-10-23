@@ -1100,6 +1100,20 @@ video {
   text-transform: none;
 }
 
+.effect-toggle {
+  flex-direction: row;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.effect-toggle input {
+  accent-color: var(--accent);
+}
+
 .server-shell.is-fullscreen {
   grid-template-columns: 1fr;
 }

@@ -7,6 +7,9 @@ READY → IN_PROGRESS → WAITING_VALIDATION. Alterados Icons.tsx, MeetingApp.ts
 
 Ajuste de 2026-10-23: consentimento de atalhos saiu da tela principal e passou para Configurações no menu da conta. Menus de conta e de dispositivos fecham ao clicar fora. O bundle web continua sem shell nem texto de atalhos nativos.
 
+## F04-06 — blur de fundo da câmera
+READY → IN_PROGRESS → WAITING_VALIDATION em 2026-10-23. Entregue: sem efeito/blur moderado, processamento só no cliente, assets MediaPipe empacotados, compatibilidade detectada, preservação ao trocar câmera e erro visível. A CSP `wasm-unsafe-eval`, sem `unsafe-eval` de JavaScript, foi autorizada pelo usuário. Testes cobrem ciclo do processor, troca de track e incompatibilidade; typecheck/lint/build e CSP passam. Falta câmera real em desktop/web/celular. Não tratar teste sem câmera como prova visual nem de desempenho.
+
 Roteiro pendente: abrir web e instalador; conferir ambos os ícones e menus por teclado; falar entre dois PCs com volume em 0/50/100/200%; trocar microfone, mutar/desmutar, sair/entrar e reconectar; verificar ausência de eco local e áudio da tela inalterado. Como admin membro do servidor, desconectar participante pela sidebar, conferir encerramento da mídia remota e novo ingresso permitido; como participante, chamada direta deve retornar 403. SFU indisponível deve mostrar erro e permitir repetir. Nada disso foi marcado PASS por mock.
 
 ## Execução

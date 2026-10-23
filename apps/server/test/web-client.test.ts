@@ -19,16 +19,17 @@ async function webRoot(): Promise<string> {
   return root;
 }
 
-test("the web CSP is fixed, without unsafe-inline, and opens only the LiveKit domain", () => {
+test("the web CSP allows only self-hosted Wasm evaluation and the LiveKit domain", () => {
   assert.equal(
     webClientCsp(env),
-    "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' wss://rtc.example.com; media-src 'self' blob: mediastream:; img-src 'self' blob: data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; connect-src 'self' wss://rtc.example.com; media-src 'self' blob: mediastream:; img-src 'self' blob: data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   );
   assert.equal(webClientCsp({}).includes("connect-src 'self';"), true);
   assert.equal(liveKitConnect({ LIVEKIT_URL: "ws://rtc.example.com" }), undefined);
   assert.equal(liveKitConnect({ LIVEKIT_URL: "ws://127.0.0.1:7880" }), "ws://127.0.0.1:7880");
   assert.equal(liveKitConnect({ LIVEKIT_URL: "https://rtc.example.com" }), undefined);
-  assert.equal(webClientCsp(env).includes("unsafe"), false);
+  assert.equal(webClientCsp(env).split(/[ ;]/).includes("'unsafe-eval'"), false);
+  assert.equal(webClientCsp(env).includes("'unsafe-inline'"), false);
 });
 
 test("index.html has the CSP and no cache; hashed assets cache for a year", async () => {

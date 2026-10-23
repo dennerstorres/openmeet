@@ -12,7 +12,7 @@ Cliente desktop Windows e cliente web, servido pela própria instância, para sa
 1. Configurar múltiplas URLs de instâncias; identidade e sessão locais por instância (sem federação).
 2. Bootstrap seguro de administrador único, inscrição controlada, login, logout, refresh com revogação e recuperação de conta via procedimento administrativo documentado.
 3. Salas persistentes, convites com expiração/revogação e lista de participantes; reunião temporária pode ser criada via API sem histórico de chat.
-4. Áudio bidirecional, mute de publicação, mute local individual, volume individual, volume de entrada do microfone (0–200%, padrão 100%), escolha de entrada/saída quando suportada, câmera liga/desliga e alternância de dispositivos.
+4. Áudio bidirecional, mute de publicação, mute local individual, volume individual, volume de entrada do microfone (0–200%, padrão 100%), escolha de entrada/saída quando suportada, câmera liga/desliga, alternância de dispositivos e blur local opcional do fundo quando o cliente suportar processamento de vídeo.
 5. Compartilhar monitor ou janela com consentimento explícito; visualização em destaque e parar compartilhamento com sinal claro.
 6. Reconexão, estado de conexão, métricas WebRTC (perda, jitter, RTT quando disponíveis), logs diagnósticos sem conteúdo de mídia.
 7. Bandeja do sistema e preferências persistidas localmente; atalhos globais apenas após verificação de conflitos e consentimento.
@@ -50,6 +50,7 @@ Mensagens persistentes, federação, apps móveis, macOS/Linux, gravações, tra
 - RF-17: "Incluir áudio do PC" nasce desligado. Se a origem não entregar a faixa, a imagem continua e a tela avisa. ADR 0008.
 - RF-18: Login Google abre o navegador do sistema. As chaves ficam no servidor. Sem elas, o botão não aparece. Não cria o administrador. ADR 0010.
 - RF-19: A instância serve o cliente web na mesma origem da API, sem escolher outra instância. Cookie só autentica com `Origin` da instância e `X-OpenMeet-Web: 1`. O que o navegador não suporta (áudio do PC, saída de som) some da tela em vez de falhar. ADR 0014.
+- RF-20: O usuário pode desfocar o fundo da câmera localmente. Modelo e runtime ficam no bundle da aplicação; clientes incompatíveis mostram a indisponibilidade e continuam enviando câmera sem efeito. ADR 0016.
 
 ## Requisitos não funcionais
 - Segredo jamais incluído no repo, logs ou CI; TLS em produção; Argon2id com parâmetros documentados.

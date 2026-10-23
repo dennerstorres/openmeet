@@ -28,6 +28,8 @@ const idleSnapshot: PocSnapshot = {
   screenAudio: "off",
   camera: false,
   screen: false,
+  backgroundBlurSupported: false,
+  backgroundBlur: false,
 };
 
 export function PocApp() {

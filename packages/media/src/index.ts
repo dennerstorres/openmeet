@@ -22,6 +22,8 @@ export type { ScreenAudioState } from "./layout.js";
 export type { CardLayout, CardPerson, CardPlacement, CardTile, LayoutTile, MeetingCard, TilePlacement } from "./layout.js";
 export type { PlaybackLevel } from "./playback.js";
 export { LiveKitPocSession, participantLabel, shouldAttachPlayback, shouldShowLiveVideo } from "./session.js";
+export { VideoBackground } from "./video-background.js";
+export type { VideoBackgroundOptions } from "./video-background.js";
 export { emptyStats, summarizeRtcStats } from "./stats.js";
 export { nextPhase } from "./phase.js";
 export type { DiagnosticEvent } from "./diagnostics.js";

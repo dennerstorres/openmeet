@@ -10,6 +10,7 @@
     }
   },
   "dependencies": {
+    "@livekit/track-processors": "0.8.2",
     "@openmeet/shared": "workspace:*",
     "livekit-client": "^2.23.0"
   },

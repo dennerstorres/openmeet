@@ -8,6 +8,8 @@ F12-08 — Responsividade mínima da web: WAITING_VALIDATION. Selecionada READY 
 
 F04-05 — Ajustes, kick da sala e volume de entrada: WAITING_VALIDATION. Selecionada READY em 2026-10-23 pelo pedido do usuário, dependências F04-02/F09-01 implementadas. Branch `codex/F04-05-controles-sala`; gates G3/G4/G9. Falta revisão independente, inspeção visual e prova real de áudio/kick. Escopo e validação em `plans/phase-04-meeting-ui.md`.
 
+F04-06 — Blur de fundo da câmera: WAITING_VALIDATION. Selecionada READY em 2026-10-23 por pedido explícito, depende de F04-02. Pipeline local com `@livekit/track-processors`, assets MediaPipe no bundle, fallback visível e CSP limitada a `wasm-unsafe-eval`, autorizada pelo usuário. Faltam câmera real no WebView2/web, qualidade do recorte e desempenho em celular. Escopo e validação em `plans/phase-04-meeting-ui.md` e ADR 0016.
+
 > A evidência de dois PCs e o GO/NO-GO ficam no fim. Não bloqueiam a implementação de F03–F07, F09 nem F10. Bloqueiam o aceite final e o F08.
 
 | ID | Fase | Tarefa | Depende de | Estado | Dono inicial | Gate |
@@ -25,6 +27,7 @@ F04-05 — Ajustes, kick da sala e volume de entrada: WAITING_VALIDATION. Seleci
 | F04-02 | Reuniões | Controles de volume/mute/câmera | F04-01 | IMPLEMENTED | Grok | G4 |
 | F04-03 | Reuniões | Compartilhamento e layouts | F04-01 | IMPLEMENTED | Grok | G4 |
 | F04-04 | Reuniões | E2E 5 participantes e persistência | F04-02,F04-03 | WAITING_VALIDATION | Codex review | G4 |
+| F04-06 | Reuniões | Blur local opcional do fundo da câmera | F04-02 | WAITING_VALIDATION | Codex | G4,G10,G12 |
 | F05-01 | Desktop | Bandeja, atalhos, notificações, sessão | F04-04 | IMPLEMENTED | Grok | G5 |
 | F06-01 | Resiliência | Stats WebRTC/logs/reconexão/export | F05-01 | IMPLEMENTED | Grok | G6 |
 | F07-01 | Infra | Compose/TLS/TURN/backup/restauração | F06-01 | IMPLEMENTED | Grok | G7 |

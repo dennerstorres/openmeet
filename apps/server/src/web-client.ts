@@ -45,7 +45,7 @@ export function webClientCsp(env: AppEnv): string {
   const livekit = liveKitConnect(env);
   return [
     "default-src 'self'",
-    "script-src 'self'",
+    "script-src 'self' 'wasm-unsafe-eval'",
     "style-src 'self'",
     `connect-src 'self'${livekit ? ` ${livekit}` : ""}`,
     "media-src 'self' blob: mediastream:",

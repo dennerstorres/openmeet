@@ -63,6 +63,8 @@ const idleSnapshot: PocSnapshot = {
   screen: false,
   audioPlayback: true,
   speakers: [],
+  backgroundBlurSupported: false,
+  backgroundBlur: false,
   screenAudio: "off",
 };
 
@@ -1090,6 +1092,23 @@ export function MeetingApp() {
                       />
                     ) : null}
                     <DeviceSelect label="Câmera" kind="videoinput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
+                    <label className="effect-toggle">
+                      <input
+                        type="checkbox"
+                        checked={media.backgroundBlur}
+                        disabled={!media.backgroundBlurSupported || controlPending}
+                        onChange={(event) => {
+                          const enabled = event.currentTarget.checked;
+                          void runControl("blur de fundo", () => session().setBackgroundBlur(enabled));
+                        }}
+                      />
+                      Desfocar fundo da câmera
+                    </label>
+                    {media.backgroundBlurSupported ? (
+                      <p className="hint">O efeito é processado neste aparelho e pode aumentar o uso de bateria.</p>
+                    ) : (
+                      <p className="hint">Este navegador não oferece o processamento necessário para o blur.</p>
+                    )}
                     <button type="button" disabled={!controlsEnabled} onClick={() => void refreshDevices()}>
                       Atualizar dispositivos
                     </button>

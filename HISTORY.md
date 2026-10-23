@@ -1,5 +1,10 @@
 # HISTORY — registro cronológico
 
+### 2026-10-23 — F04-06, blur de fundo — Codex
+Branch `codex/F04-05-settings-menu`, continuação isolada após `3944cc2`. Blur moderado opcional usa `@livekit/track-processors` 0.8.2 e MediaPipe no cliente antes da publicação; runtime Wasm, modelo e aviso Apache-2.0 entram no bundle, sem CDN em execução. A opção fica nos ajustes de câmera, detecta incompatibilidade, mantém a preferência com câmera desligada e reaplica numa nova track. O usuário autorizou `script-src 'self' 'wasm-unsafe-eval'` para desktop/web; `unsafe-eval` de JavaScript segue proibido.
+
+Windows/PowerShell, 2026-10-23: mídia 52 PASS, desktop 16 PASS; typecheck de mídia/desktop, builds desktop/web, lint e `git diff --check` PASS. Os assets adicionam cerca de 19,4 MB a cada bundle; o JS sobe para cerca de 994 kB e mantém o aviso de chunk acima de 500 kB. Sem câmera real nesta execução: qualidade, FPS, consumo, WebView2 e celular continuam `WAITING_VALIDATION`.
+
 ### 2026-10-23 — configurações de atalhos e fechamento dos menus — Codex
 Continuação de F04-05. O consentimento de atalhos globais foi removido da área principal e colocado em uma página de Configurações acessível pelo menu da conta no desktop. Os menus de conta e de dispositivos/diagnóstico agora fecham em `pointerdown` fora de seus limites; ações internas continuam disponíveis e o botão Configurações fecha o menu antes de abrir a página. A página se adapta abaixo de 900 px. O alvo web não expõe a página nem inclui o shell nativo.
 
