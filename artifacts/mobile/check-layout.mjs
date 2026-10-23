@@ -29,6 +29,16 @@ await page.route("**/api/v1/**", async (route) => {
       ended: false,
     }));
   else if (p.endsWith("/presence")) body = { [rid]: [{ id: uid, displayName: "Pessoa de teste" }] };
+  else if (p.endsWith("/members"))
+    body = {
+      policy: { allowInvisible: true, managersSeeInvisible: true },
+      selfMode: "visible",
+      members: [
+        { id: uid, displayName: "Pessoa de teste", role: "owner", status: "online", self: true },
+        { id: "33333333-3333-4333-8333-333333333333", displayName: "João Ação", role: "participant", status: "away", self: false },
+        { id: "55555555-5555-4555-8555-555555555555", displayName: "Gustavo Pavão", role: "participant", status: "offline", self: false },
+      ],
+    };
   else if (p.endsWith("/join")) body = { url: "ws://127.0.0.1:7880", token: "fixture.layout.only" };
   else {
     status = 404;
@@ -61,6 +71,18 @@ await page.screenshot({ path: "artifacts/mobile/login-390.png" });
 await page.getByRole("button", { name: "Entrar", exact: true }).click();
 await page.locator(".room-item").first().waitFor();
 await page.screenshot({ path: "artifacts/mobile/rooms-390.png" });
+await page.getByRole("button", { name: "Mostrar membros", exact: true }).click();
+await page.locator(".members-panel").waitFor();
+await page.screenshot({ path: "artifacts/mobile/members-390.png" });
+await page.getByRole("button", { name: "Recolher membros", exact: true }).click();
+await page.getByRole("button", { name: "Adicionar servidor", exact: true }).click();
+await page.getByRole("dialog", { name: "Adicionar servidor" }).waitFor();
+await page.screenshot({ path: "artifacts/mobile/add-server-390.png" });
+await page.getByRole("button", { name: "Fechar", exact: true }).click();
+await page.getByRole("button", { name: "Configurações do servidor", exact: true }).click();
+await page.getByRole("dialog", { name: /Configurações de/ }).waitFor();
+await page.screenshot({ path: "artifacts/mobile/server-settings-390.png" });
+await page.getByRole("button", { name: "Fechar", exact: true }).click();
 await page.locator(".room-item").first().click();
 await page
   .locator(".dock")

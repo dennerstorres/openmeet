@@ -32,5 +32,8 @@ ADR 0010. `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` só no ambiente do servido
 ## F09-08
 ADR 0017. READY → WAITING_VALIDATION em 2026-10-23. Lista todos os membros do servidor separadamente da ocupação de salas. Heartbeat autenticado: atividade recente online, cinco minutos sem interação ou janela oculta ausente, 75 segundos sem heartbeat desconectado. O dono permite ou proíbe invisibilidade e decide se dono/moderadores identificam invisíveis; os demais recebem desconectado. Banco guarda política e preferência, nunca o estado online. Testes automatizados e bundles desktop/web passaram. Exige dois clientes reais e teste de fechar/minimizar antes de `DONE`.
 
+## F09-09
+READY → WAITING_VALIDATION em 2026-10-23. Reorganiza a navegação sem mudar permissões: coluna esquerda dedicada a salas e criação no topo; painel direito recolhível para membros; configurações do servidor concentram convite e política de presença; Adicionar servidor concentra criação e entrada por convite. A ponte Rust decodifica JSON pelos bytes UTF-8 para preservar nomes acentuados. Builds desktop/web, teste Rust e fixture responsiva passaram. Exige validar o `.exe` e confirmar um nome acentuado já salvo na instância real antes de `DONE`.
+
 ## Observação
 Não concluir fase por implementação superficial ou mocks. Dependências externas e validações reais precisam de evidência ou status WAITING_VALIDATION.

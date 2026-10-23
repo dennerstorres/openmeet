@@ -121,6 +121,15 @@ export function IconUserPlus({ size }: { size?: number }) {
   );
 }
 
+export function IconUsers({ size }: { size?: number }) {
+  return (
+    <Icon size={size}>
+      <circle cx="9" cy="8" r="4" />
+      <path d="M2 21a7 7 0 0 1 14 0M16 4.5a4 4 0 0 1 0 7M18 14a6 6 0 0 1 4 6" />
+    </Icon>
+  );
+}
+
 export function IconExpand({ size }: { size?: number }) {
   return (
     <Icon size={size}>

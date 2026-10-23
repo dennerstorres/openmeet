@@ -1,5 +1,12 @@
 # HISTORY — registro cronológico
 
+### 2026-10-23 — F09-09, navegação de servidor e UTF-8 — Codex
+Branch `main`, alteração ainda não commitada neste registro. A coluna esquerda agora contém as salas e o botão de criar sala no cabeçalho. Membros foram movidos para painel direito recolhível, com drawer no web móvel. O modal Adicionar servidor reúne criação e entrada por convite. Configurações do servidor reúne geração/cópia de convite e, para o dono, política de invisibilidade. Permissões existentes foram preservadas.
+
+A ponte nativa deixou de converter respostas JSON primeiro para texto e passa a desserializar os bytes UTF-8 diretamente. Teste Rust cobre `João Ação` por escape JSON e `Gustavo Pavão` em UTF-8 real. Isso corrige a camada de transporte; se um registro já contiver o caractere substituto `�` no banco, seu texto original não pode ser inferido automaticamente.
+
+Windows/PowerShell, 2026-10-23: desktop 16 PASS; sessão Rust 7 PASS; typecheck desktop, lint e builds desktop/web PASS. `artifacts/mobile/check-layout.mjs` PASS em 320×568, 390×844, 844×390, 768×1024 e 1280×800, sem overflow horizontal ou dock cortado. Inspeção das capturas confirmou a lista com `João Ação`/`Gustavo Pavão`, o modal Adicionar servidor e as configurações de convite/privacidade. Fechamento (Claude, mesma data): `pnpm test`, `typecheck`, `lint`, `format:check` e `git diff --check` PASS; `cargo test` 19 PASS; `cargo fmt --check` não rodou (rustfmt ausente no toolchain 1.98.1). Falta teste no `.exe` com a instância real; F09-09 fica `WAITING_VALIDATION`.
+
 ### 2026-10-23 — F07-04, instalador 0.2.1 — Codex
 Branch `main`. Integração por fast-forward dos commits `3944cc2`, `e8ef5ce` e `8d464de`; versão atualizada de 0.2.0 para 0.2.1 em `apps/desktop/package.json`, `src-tauri/Cargo.toml`, `Cargo.lock` e `tauri.conf.json`. A entrega reúne configurações de atalhos, fechamento externo dos menus, blur local da câmera e presença dos membros do servidor com a migration 0007. Autorização explícita do usuário para gerar o `.exe`, commitar e enviar a `main`.
 

@@ -53,6 +53,7 @@ Mensagens persistentes, federação, apps móveis, macOS/Linux, gravações, tra
 - RF-19: A instância serve o cliente web na mesma origem da API, sem escolher outra instância. Cookie só autentica com `Origin` da instância e `X-OpenMeet-Web: 1`. O que o navegador não suporta (áudio do PC, saída de som) some da tela em vez de falhar. ADR 0014.
 - RF-20: O usuário pode desfocar o fundo da câmera localmente. Modelo e runtime ficam no bundle da aplicação; clientes incompatíveis mostram a indisponibilidade e continuam enviando câmera sem efeito. ADR 0016.
 - RF-21: Cada servidor lista seus membros com presença efêmera. Atividade recente fica online, ausência fica ausente e heartbeat expirado fica desconectado. O dono decide se aceita invisibilidade e se dono/moderadores identificam invisíveis; para os demais, invisível aparece desconectado. ADR 0017.
+- RF-22: A navegação do servidor separa salas, membros e administração. Salas e sua criação ficam na coluna de canais; membros ficam em painel direito recolhível; convite e política de presença ficam nas configurações do servidor; criar ou entrar por convite parte de Adicionar servidor. Nomes Unicode devem atravessar web e ponte nativa em UTF-8.
 
 ## Requisitos não funcionais
 - Segredo jamais incluído no repo, logs ou CI; TLS em produção; Argon2id com parâmetros documentados.

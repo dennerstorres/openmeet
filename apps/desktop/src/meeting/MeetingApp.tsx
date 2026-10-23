@@ -29,7 +29,20 @@ import desktopPackage from "../../package.json";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { holdMeetingLock } from "../shell/background";
 import { CardStage } from "./Cards";
-import { IconCamera, IconClock, IconGear, IconHangUp, IconHeadphones, IconLogo, IconMic, IconPlus, IconScreen, IconSignal, IconSpeaker } from "./Icons";
+import {
+  IconCamera,
+  IconClock,
+  IconGear,
+  IconHangUp,
+  IconHeadphones,
+  IconLogo,
+  IconMic,
+  IconPlus,
+  IconScreen,
+  IconSignal,
+  IconSpeaker,
+  IconUsers,
+} from "./Icons";
 import { ShellConsent } from "../shell/ShellConsent";
 import {
   createDesktopApi,
@@ -165,6 +178,8 @@ export function MeetingApp() {
   const [shell, setShell] = useState<ShellStatus | null>(null);
   const [shellPending, setShellPending] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [serverSettingsOpen, setServerSettingsOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(() => !__WEB__ || window.innerWidth > 900);
   const [exportConsent, setExportConsent] = useState(false);
   const [activity, setActivity] = useState<"online" | "away">("online");
   const mediaRef = useRef(media);
@@ -412,6 +427,20 @@ export function MeetingApp() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [isFullscreen]);
+  useEffect(() => {
+    setServerSettingsOpen(false);
+    model.clearCreatedInvite();
+  }, [model, state.selectedServerId]);
+  useEffect(() => {
+    if (creating !== "server" && !serverSettingsOpen) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setCreating(null);
+      setServerSettingsOpen(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [creating, serverSettingsOpen]);
 
   function exportDiagnostic(): void {
     const body = session().exportDiagnostic(exportConsent, new Date().toISOString());
@@ -557,7 +586,9 @@ export function MeetingApp() {
   }
 
   return (
-    <main className={`server-shell${__WEB__ ? " web-shell" : ""}${mobileRooms ? " mobile-rooms" : " mobile-call"}${isFullscreen ? " is-fullscreen" : ""}`}>
+    <main
+      className={`server-shell${__WEB__ ? " web-shell" : ""}${mobileRooms ? " mobile-rooms" : " mobile-call"}${membersOpen ? " members-open" : " members-closed"}${isFullscreen ? " is-fullscreen" : ""}`}
+    >
       {__WEB__ ? (
         <header className="mobile-navigation">
           <nav aria-label="Navegação da reunião">
@@ -597,44 +628,59 @@ export function MeetingApp() {
             {cardInitial(server.name)}
           </button>
         ))}
-        {state.canCreateServer ? (
-          <button
-            type="button"
-            className="server-pill add"
-            title="Criar servidor"
-            aria-label="Criar servidor"
-            onClick={() => setCreating(creating === "server" ? null : "server")}
-          >
-            <IconPlus size={22} />
-          </button>
-        ) : null}
+        <button
+          type="button"
+          className="server-pill add"
+          title="Adicionar servidor"
+          aria-label="Adicionar servidor"
+          onClick={() => setCreating(creating === "server" ? null : "server")}
+        >
+          <IconPlus size={22} />
+        </button>
       </nav>
 
       <aside className="room-bar">
         <header className="room-bar-head">
-          <strong>{selectedServer?.name ?? state.instanceName ?? "OpenMeet"}</strong>
-          {selectedServer ? <span>{roleLabel(selectedServer.role)}</span> : null}
+          <div>
+            <strong>{selectedServer?.name ?? state.instanceName ?? "OpenMeet"}</strong>
+            {selectedServer ? <span>{roleLabel(selectedServer.role)}</span> : null}
+          </div>
+          <div className="room-head-actions">
+            {selectedServer ? (
+              <button
+                type="button"
+                className="icon-btn mobile-members-button"
+                aria-label="Mostrar membros"
+                title="Mostrar membros"
+                onClick={() => setMembersOpen(true)}
+              >
+                <IconUsers size={18} />
+              </button>
+            ) : null}
+            {selectedServer && state.canCreate ? (
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label="Criar sala"
+                title="Criar sala"
+                onClick={() => setCreating(creating === "room" ? null : "room")}
+              >
+                <IconPlus size={18} />
+              </button>
+            ) : null}
+            {selectedServer && (selectedServer.role === "owner" || selectedServer.role === "moderator") ? (
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label="Configurações do servidor"
+                title="Configurações do servidor"
+                onClick={() => setServerSettingsOpen(true)}
+              >
+                <IconGear size={18} />
+              </button>
+            ) : null}
+          </div>
         </header>
-        {creating === "server" ? (
-          <form
-            className="inline-form"
-            onSubmit={(event: FormEvent) => {
-              event.preventDefault();
-              void model.createServer(serverName).then(() => {
-                setServerName("");
-                setCreating(null);
-              });
-            }}
-          >
-            <label>
-              Nome do servidor
-              <input value={serverName} onChange={(event) => setServerName(event.currentTarget.value)} maxLength={80} autoFocus />
-            </label>
-            <button type="submit" disabled={state.pending}>
-              Criar servidor
-            </button>
-          </form>
-        ) : null}
         {state.servers.length === 0 ? (
           <p className="hint">
             {state.canCreateServer ? "Crie o primeiro servidor no botão + à esquerda." : "Você ainda não participa de nenhum servidor. Peça um convite."}
@@ -691,99 +737,7 @@ export function MeetingApp() {
             </li>
           ))}
         </ul>
-        {selectedServer && state.serverPresence ? (
-          <section className="server-members" aria-label={`Membros de ${selectedServer.name}`}>
-            <details open>
-              <summary>Membros — {state.serverPresence.members.length}</summary>
-              <ul>
-                {state.serverPresence.members.map((member) => (
-                  <li key={member.id}>
-                    <span className={`presence-dot ${member.status}`} aria-hidden="true" />
-                    <span className="member-name">{member.label}</span>
-                    <span className="member-status">{presenceLabel(member.status, member.activity)}</span>
-                  </li>
-                ))}
-              </ul>
-            </details>
-            {state.serverPresence.allowInvisible ? (
-              <label className="presence-option">
-                <input
-                  type="checkbox"
-                  checked={state.serverPresence.selfMode === "invisible"}
-                  onChange={(event) => void model.setPresenceMode(event.currentTarget.checked ? "invisible" : "visible")}
-                />
-                Aparecer como invisível
-              </label>
-            ) : null}
-            {selectedServer.role === "owner" ? (
-              <details className="presence-policy">
-                <summary>Privacidade de presença</summary>
-                <label className="presence-option">
-                  <input
-                    type="checkbox"
-                    checked={state.serverPresence.allowInvisible}
-                    onChange={(event) => void model.setPresencePolicy(event.currentTarget.checked, state.serverPresence?.managersSeeInvisible ?? false)}
-                  />
-                  Permitir modo invisível
-                </label>
-                <label className="presence-option">
-                  <input
-                    type="checkbox"
-                    checked={state.serverPresence.managersSeeInvisible}
-                    disabled={!state.serverPresence.allowInvisible}
-                    onChange={(event) => void model.setPresencePolicy(true, event.currentTarget.checked)}
-                  />
-                  Dono e moderadores veem invisíveis
-                </label>
-              </details>
-            ) : null}
-          </section>
-        ) : null}
         {selectedServer && state.rooms.length === 0 ? <p className="hint">Nenhuma sala neste servidor.</p> : null}
-        {state.canCreate ? (
-          state.createdInvite ? (
-            <div className="inline-form invite-out">
-              <span className="hint">Link de convite · vale 24 h e 10 usos</span>
-              <input readOnly value={state.createdInvite} aria-label="Link de convite" onFocus={(event) => event.currentTarget.select()} />
-              <div className="row">
-                <button
-                  type="button"
-                  className="primary"
-                  onClick={() =>
-                    void navigator.clipboard
-                      .writeText(state.createdInvite ?? "")
-                      .then(() => setCopied(true))
-                      .catch(() => setMediaError("Não foi possível copiar. Selecione o link e copie."))
-                  }
-                >
-                  {copied ? "Copiado" : "Copiar link"}
-                </button>
-                <button
-                  type="button"
-                  className="ghost"
-                  onClick={() => {
-                    setCopied(false);
-                    model.clearCreatedInvite();
-                  }}
-                >
-                  Fechar
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="ghost add-room"
-              disabled={state.pending}
-              onClick={() => {
-                setCopied(false);
-                void model.createInvite();
-              }}
-            >
-              Convidar para {selectedServer?.name ?? "o servidor"}
-            </button>
-          )
-        ) : null}
         {state.canCreate ? (
           creating === "room" ? (
             <form
@@ -821,31 +775,8 @@ export function MeetingApp() {
                 </button>
               </div>
             </form>
-          ) : (
-            <button type="button" className="ghost add-room" onClick={() => setCreating("room")}>
-              + Nova sala
-            </button>
-          )
+          ) : null
         ) : null}
-        <form
-          className="paste-invite"
-          onSubmit={(event: FormEvent) => {
-            event.preventDefault();
-            model.offerInvite(pastedInvite);
-            setPastedInvite("");
-          }}
-        >
-          <label>
-            <span className="hint">Tenho um convite</span>
-            <input
-              value={pastedInvite}
-              onChange={(event) => setPastedInvite(event.currentTarget.value)}
-              placeholder="Cole o link ou o código"
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </label>
-        </form>
         {inCall ? (
           <section className="voice-panel" aria-label="Chamada atual">
             <div className="voice-row">
@@ -945,7 +876,51 @@ export function MeetingApp() {
         </footer>
       </aside>
 
+      {membersOpen && selectedServer && state.serverPresence ? (
+        <aside className="members-panel" aria-label={`Membros de ${selectedServer.name}`}>
+          <header>
+            <div>
+              <strong>Membros</strong>
+              <span>{state.serverPresence.members.length}</span>
+            </div>
+            <button type="button" className="icon-btn" aria-label="Recolher membros" title="Recolher membros" onClick={() => setMembersOpen(false)}>
+              ×
+            </button>
+          </header>
+          <ul>
+            {state.serverPresence.members.map((member) => (
+              <li key={member.id}>
+                <span className="member-avatar" aria-hidden="true">
+                  {cardInitial(member.label)}
+                  <span className={`presence-dot ${member.status}`} />
+                </span>
+                <span className="member-copy">
+                  <strong>{member.label}</strong>
+                  <span>{presenceLabel(member.status, member.activity)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {state.serverPresence.allowInvisible ? (
+            <label className="presence-option member-self-mode">
+              <input
+                type="checkbox"
+                checked={state.serverPresence.selfMode === "invisible"}
+                onChange={(event) => void model.setPresenceMode(event.currentTarget.checked ? "invisible" : "visible")}
+              />
+              Aparecer como invisível
+            </label>
+          ) : null}
+        </aside>
+      ) : null}
+
       <section className="call-area">
+        {!membersOpen && selectedServer ? (
+          <button type="button" className="members-toggle" aria-label="Mostrar membros" title="Mostrar membros" onClick={() => setMembersOpen(true)}>
+            <IconUsers size={19} />
+            <span>{state.serverPresence?.members.length ?? 0}</span>
+          </button>
+        ) : null}
         {kickTarget ? (
           <section className="inline-form" role="alertdialog" aria-label="Desconectar participante">
             <p>Desconectar {kickTarget.label} desta sala? A pessoa continua no servidor e pode entrar novamente.</p>
@@ -986,6 +961,159 @@ export function MeetingApp() {
               {consent}
             </div>
           </section>
+        ) : null}
+        {creating === "server" ? (
+          <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.target === event.currentTarget && setCreating(null)}>
+            <section className="app-modal" role="dialog" aria-modal="true" aria-labelledby="add-server-title">
+              <header>
+                <div>
+                  <h1 id="add-server-title">Adicionar servidor</h1>
+                  <p>Crie um espaço novo ou entre usando um convite.</p>
+                </div>
+                <button type="button" className="icon-btn" aria-label="Fechar" onClick={() => setCreating(null)}>
+                  ×
+                </button>
+              </header>
+              {state.canCreateServer ? (
+                <form
+                  className="modal-section"
+                  onSubmit={(event: FormEvent) => {
+                    event.preventDefault();
+                    void model.createServer(serverName).then(() => {
+                      setServerName("");
+                      setCreating(null);
+                    });
+                  }}
+                >
+                  <div>
+                    <h2>Criar servidor</h2>
+                    <p className="hint">Você será o dono e poderá criar salas e convites.</p>
+                  </div>
+                  <label>
+                    Nome do servidor
+                    <input value={serverName} onChange={(event) => setServerName(event.currentTarget.value)} maxLength={80} autoFocus />
+                  </label>
+                  <button type="submit" className="primary" disabled={state.pending || serverName.trim().length === 0}>
+                    Criar servidor
+                  </button>
+                </form>
+              ) : null}
+              <form
+                className="modal-section"
+                onSubmit={(event: FormEvent) => {
+                  event.preventDefault();
+                  model.offerInvite(pastedInvite);
+                  setPastedInvite("");
+                  setCreating(null);
+                }}
+              >
+                <div>
+                  <h2>Entrar com convite</h2>
+                  <p className="hint">Cole o link ou o código recebido.</p>
+                </div>
+                <label>
+                  Convite
+                  <input
+                    value={pastedInvite}
+                    onChange={(event) => setPastedInvite(event.currentTarget.value)}
+                    placeholder="Link ou código do convite"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </label>
+                <button type="submit" disabled={state.pending || pastedInvite.trim().length === 0}>
+                  Entrar no servidor
+                </button>
+              </form>
+            </section>
+          </div>
+        ) : null}
+        {serverSettingsOpen && selectedServer && state.serverPresence ? (
+          <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.target === event.currentTarget && setServerSettingsOpen(false)}>
+            <section className="app-modal server-settings-modal" role="dialog" aria-modal="true" aria-labelledby="server-settings-title">
+              <header>
+                <div>
+                  <h1 id="server-settings-title">Configurações de {selectedServer.name}</h1>
+                  <p>Gerencie convites e a privacidade de presença deste servidor.</p>
+                </div>
+                <button type="button" className="icon-btn" aria-label="Fechar" onClick={() => setServerSettingsOpen(false)}>
+                  ×
+                </button>
+              </header>
+              <section className="modal-section">
+                <div>
+                  <h2>Convite</h2>
+                  <p className="hint">O link vale por 24 horas e pode ser usado até 10 vezes.</p>
+                </div>
+                {state.createdInvite ? (
+                  <div className="invite-out">
+                    <input readOnly value={state.createdInvite} aria-label="Link de convite" onFocus={(event) => event.currentTarget.select()} />
+                    <div className="row">
+                      <button
+                        type="button"
+                        className="primary"
+                        onClick={() =>
+                          void navigator.clipboard
+                            .writeText(state.createdInvite ?? "")
+                            .then(() => setCopied(true))
+                            .catch(() => setMediaError("Não foi possível copiar. Selecione o link e copie."))
+                        }
+                      >
+                        {copied ? "Copiado" : "Copiar link"}
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost"
+                        onClick={() => {
+                          setCopied(false);
+                          model.clearCreatedInvite();
+                        }}
+                      >
+                        Gerar outro
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="primary modal-action"
+                    disabled={state.pending}
+                    onClick={() => {
+                      setCopied(false);
+                      void model.createInvite();
+                    }}
+                  >
+                    Criar link de convite
+                  </button>
+                )}
+              </section>
+              {selectedServer.role === "owner" ? (
+                <section className="modal-section">
+                  <div>
+                    <h2>Privacidade de presença</h2>
+                    <p className="hint">Defina se membros podem ficar invisíveis e quem pode identificá-los.</p>
+                  </div>
+                  <label className="presence-option">
+                    <input
+                      type="checkbox"
+                      checked={state.serverPresence.allowInvisible}
+                      onChange={(event) => void model.setPresencePolicy(event.currentTarget.checked, state.serverPresence?.managersSeeInvisible ?? false)}
+                    />
+                    Permitir modo invisível
+                  </label>
+                  <label className="presence-option">
+                    <input
+                      type="checkbox"
+                      checked={state.serverPresence.managersSeeInvisible}
+                      disabled={!state.serverPresence.allowInvisible}
+                      onChange={(event) => void model.setPresencePolicy(true, event.currentTarget.checked)}
+                    />
+                    Dono e moderadores podem identificar membros invisíveis
+                  </label>
+                </section>
+              ) : null}
+            </section>
+          </div>
         ) : null}
         {inCall ? (
           <>

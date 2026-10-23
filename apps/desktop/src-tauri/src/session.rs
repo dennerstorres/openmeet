@@ -13,6 +13,10 @@ use crate::shell::{accept_origin, accept_token, clear_slot, drop_legacy_item, lo
 /// Stands in for the access token in the page, so the page can tell it is signed in. It opens nothing.
 const ACCESS_MARKER: &str = "held-by-native";
 
+fn parse_json(bytes: &[u8]) -> Value {
+    serde_json::from_slice(bytes).unwrap_or(Value::Null)
+}
+
 /// The access token of the signed-in instance. Never serialized, never sent to the page.
 #[derive(Default)]
 pub struct NativeSession(Mutex<Option<(String, String)>>);
@@ -81,8 +85,8 @@ async fn post(origin: &str, path: &str, body: &Value) -> Result<(u16, Value), St
         .await
         .map_err(|_| "request_failed".to_string())?;
     let status = response.status().as_u16();
-    let text = response.text().await.unwrap_or_default();
-    Ok((status, serde_json::from_str(&text).unwrap_or(Value::Null)))
+    let bytes = response.bytes().await.unwrap_or_default();
+    Ok((status, parse_json(&bytes)))
 }
 
 async fn start(held: &NativeSession, origin: &str, path: &str, body: Value) -> Result<Reply, String> {
@@ -218,16 +222,16 @@ pub async fn instance_call(held: tauri::State<'_, NativeSession>, origin: String
         .await
         .map_err(|_| "request_failed".to_string())?;
     let status = response.status().as_u16();
-    let text = response.text().await.unwrap_or_default();
+    let bytes = response.bytes().await.unwrap_or_default();
     if status == 401 {
         held.forget();
     }
-    Ok(Reply { status, body: serde_json::from_str(&text).unwrap_or(Value::Null) })
+    Ok(Reply { status, body: parse_json(&bytes) })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{allowed_call, take_access, take_refresh, NativeSession, Reply, ACCESS_MARKER};
+    use super::{allowed_call, parse_json, take_access, take_refresh, NativeSession, Reply, ACCESS_MARKER};
     use serde_json::json;
 
     #[test]
@@ -316,5 +320,11 @@ mod tests {
         ] {
             assert!(!allowed_call(method, &path), "{method} {path}");
         }
+    }
+
+    #[test]
+    fn json_keeps_utf8_display_names() {
+        assert_eq!(parse_json(b"{\"displayName\":\"Jo\\u00e3o A\\u00e7\\u00e3o\"}"), json!({ "displayName": "João Ação" }));
+        assert_eq!(parse_json("{\"displayName\":\"Gustavo Pavão\"}".as_bytes()), json!({ "displayName": "Gustavo Pavão" }));
     }
 }

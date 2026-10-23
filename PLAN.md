@@ -2,6 +2,8 @@
 
 Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, `VERIFIED`, `DONE`, `BLOCKED`.
 
+F09-09 — Navegação de servidor e UTF-8: WAITING_VALIDATION. Implementada em 2026-10-23, depende de F09-08. Salas ficam na coluna esquerda com criação no topo; membros passam a painel direito recolhível; convite e política vão para modais de servidor; entrada por convite acompanha Adicionar servidor. A ponte nativa lê JSON diretamente como UTF-8. Testes, builds e inspeção web responsiva passaram; falta validar no `.exe` contra a instância real e confirmar um nome acentuado já salvo.
+
 F07-04 — Entrega 0.2.1: WAITING_VALIDATION. Versão e instalador NSIS gerados em 2026-10-23 com atalhos/configurações, blur local e presença global do servidor. Testes automatizados e checksum passaram; falta instalar o `.exe`, validar câmera/presença com dois clientes e aplicar a migration 0007 em implantação real. Sem tag, GitHub Release ou deploy nesta tarefa.
 
 F07-03 — Entrega 0.2.0: WAITING_VALIDATION. GitHub Release `v0.2.0`, instalador NSIS e checksum publicados; `openmeet-api` implantado pelo Coolify no commit `96d206e` e produção respondeu 200 em `/` e `/health/ready`. A execução automática da release não iniciou por limite de Actions, então os artefatos locais foram publicados manualmente e baixados novamente com hash idêntico. Faltam instalar a 0.2.0 e executar as provas físicas de mídia/mobile; sem declarar esses gates concluídos.
@@ -50,6 +52,7 @@ F09-08 — Presença dos membros do servidor: WAITING_VALIDATION. Implementada e
 | F09-06 | Sala | Áudio do PC opcional no compartilhamento | F04-03 | WAITING_VALIDATION | Claude | G9 |
 | F09-07 | Identidade | Login Google pelo navegador, chaves só no servidor | F03-02 | WAITING_VALIDATION | Claude | G9 |
 | F09-08 | Servidores | Lista de membros e presença com invisibilidade governada | F09-01 | WAITING_VALIDATION | Codex | G9,G10,G12 |
+| F09-09 | Servidores | Separar salas, membros e configurações; preservar nomes UTF-8 | F09-08 | WAITING_VALIDATION | Codex | G9,G10,G12 |
 | F10-01 | Segurança | Recusar controle e bidi nos nomes (S-21) | F03-03 | IMPLEMENTED | Claude | G10 |
 | F10-02 | Segurança | Sala só para membro, sem username (S-01, S-10) | F03-03 | IMPLEMENTED | Claude | G10 |
 | F10-03 | Segurança | Reuso de refresh revoga a família (S-03) | F03-02 | IMPLEMENTED | Claude | G10 |
