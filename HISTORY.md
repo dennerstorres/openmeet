@@ -1,5 +1,16 @@
 # HISTORY — registro cronológico
 
+### 2026-10-24 — ADR 0018, atualização automática — Claude
+Proposta em `docs/adr/0018-atualizacao-automatica.md`: `tauri-plugin-updater` com `latest.json` na GitHub Release, chave de assinatura só no secret do Actions e cópia offline, checagem no Rust com dois comandos próprios, instalação apenas com confirmação e fora de chamada. Substitui o veto ao updater da revisão de 2026-10-19 se aceito. PLAN ganhou F07-05 `PENDING`. Sem código, sem testes.
+
+### 2026-10-24 — fix: saída Bluetooth Hands-Free com outro microfone — Claude
+Branch `main`, não commitado. Sintoma relatado: fone Bluetooth como saída e microfone na P2 deixa o fone mudo; só funciona com o Bluetooth nos dois. Hipótese (não confirmada, fone indisponível): o Windows expõe saída Estéreo e saída Hands-Free, e a Hands-Free só toca com o microfone do fone aberto. Novo `packages/media/src/bluetooth-output.ts`: se a saída escolhida é Hands-Free e o microfone ativo não é do mesmo fone (groupId ou nome), a chamada toca na saída Estéreo irmã; volta à Hands-Free se o microfone do fone for escolhido. A lista marca a Hands-Free com "só com o microfone do fone". Sessão reavalia a saída ao trocar microfone e ao ligá-lo.
+Comandos: `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm --filter @openmeet/desktop build` — todos passaram (Windows 11). 7 testes novos em `packages/media/test/bluetooth-output.test.ts`.
+Testes manuais: não executados. Status `WAITING_VALIDATION`: validar segunda-feira no PC do trabalho com o fone Bluetooth + mic P2, conferindo os nomes reais das saídas no Windows.
+
+### 2026-10-23 — F09-09, instalador regenerado — Claude
+Commit `d6f3a09`, versão mantida 0.2.1. `tauri build --bundles nsis` (com `~/.cargo/bin` no PATH) gerou `OpenMeet_0.2.1_x64-setup.exe`, 7.334.865 bytes, SHA-256 `3ff5928f3fd49bac9df09a4ce6130f1defb7246436abe42dc6374a25458f4e03`. O 0.2.1 anterior foi movido para `bundle/nsis/archive`. Sem assinatura, sem instalação manual, sem release.
+
 ### 2026-10-23 — F09-09, navegação de servidor e UTF-8 — Codex
 Branch `main`, alteração ainda não commitada neste registro. A coluna esquerda agora contém as salas e o botão de criar sala no cabeçalho. Membros foram movidos para painel direito recolhível, com drawer no web móvel. O modal Adicionar servidor reúne criação e entrada por convite. Configurações do servidor reúne geração/cópia de convite e, para o dono, política de invisibilidade. Permissões existentes foram preservadas.
 

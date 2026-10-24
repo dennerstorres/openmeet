@@ -12,6 +12,7 @@ import {
   type TrackPublication,
 } from "livekit-client";
 import { describeMediaError, mediaActionError, sanitizeDiagnostic, type DiagnosticEvent } from "./diagnostics.js";
+import { HANDS_FREE_HINT, isHandsFree, playbackOutput, type AudioDevice } from "./bluetooth-output.js";
 import { InputGain } from "./input-gain.js";
 import { VideoBackground, type VideoBackgroundOptions } from "./video-background.js";
 import { browserLabel, readBrowserMedia, type BrowserMedia } from "./browser.js";
@@ -29,13 +30,15 @@ export interface DeviceOption {
   active: boolean;
 }
 
-export function buildDeviceList(
-  found: Array<{ deviceId: string; label: string; kind: DeviceKind }>,
-  activeIds: Partial<Record<DeviceKind, string | undefined>>,
-): DeviceOption[] {
+export function buildDeviceList(found: AudioDevice[], activeIds: Partial<Record<DeviceKind, string | undefined>>): DeviceOption[] {
   return found.map((device) => ({
     deviceId: device.deviceId,
-    label: device.label.length > 0 ? device.label : "permissão pendente",
+    label:
+      device.label.length === 0
+        ? "permissão pendente"
+        : device.kind === "audiooutput" && isHandsFree(device.label)
+          ? `${device.label} · ${HANDS_FREE_HINT}`
+          : device.label,
     kind: device.kind,
     active: device.deviceId.length > 0 && activeIds[device.kind] === device.deviceId,
   }));
@@ -141,6 +144,9 @@ export class LiveKitPocSession {
   private disconnectReason: string | null = null;
   private explicitLeave = false;
   private devices: DeviceOption[] = [];
+  private found: AudioDevice[] = [];
+  /** Output the user picked; the one in use may be its stereo sibling. */
+  private requestedOutput: string | undefined;
   private audioPlayback = true;
   private speakers: string[] = [];
   private screenAudioRequested = false;
@@ -348,6 +354,7 @@ export class LiveKitPocSession {
       }
     }, "microphone");
     await this.refreshDevices();
+    await this.alignOutput();
   }
 
   setMicrophoneVolume(value: number): void {
@@ -381,10 +388,8 @@ export class LiveKitPocSession {
     }
   }
 
-  applyDeviceList(
-    found: Array<{ deviceId: string; label: string; kind: DeviceKind }>,
-    activeIds: Partial<Record<DeviceKind, string | undefined>>,
-  ): DeviceOption[] {
+  applyDeviceList(found: AudioDevice[], activeIds: Partial<Record<DeviceKind, string | undefined>>): DeviceOption[] {
+    this.found = found;
     this.devices = buildDeviceList(found, activeIds);
     this.emit();
     return this.devices;
@@ -392,13 +397,13 @@ export class LiveKitPocSession {
 
   async refreshDevices(): Promise<DeviceOption[]> {
     const kinds: DeviceKind[] = ["audioinput", "audiooutput", "videoinput"];
-    const found: Array<{ deviceId: string; label: string; kind: DeviceKind }> = [];
+    const found: AudioDevice[] = [];
     const activeIds: Partial<Record<DeviceKind, string | undefined>> = {};
     for (const kind of kinds) {
       activeIds[kind] = this.room.getActiveDevice(kind);
       const listed = await Room.getLocalDevices(kind, false);
       for (const device of listed) {
-        found.push({ deviceId: device.deviceId, label: device.label, kind });
+        found.push({ deviceId: device.deviceId, label: device.label, kind, groupId: device.groupId });
       }
     }
     return this.applyDeviceList(found, activeIds);
@@ -406,15 +411,31 @@ export class LiveKitPocSession {
 
   async selectDevice(kind: DeviceKind, deviceId: string): Promise<void> {
     try {
-      const switched = await this.room.switchActiveDevice(kind, deviceId);
+      if (kind === "audiooutput") this.requestedOutput = deviceId;
+      const target = kind === "audiooutput" ? playbackOutput(this.found, deviceId, this.room.getActiveDevice("audioinput")) : deviceId;
+      const switched = await this.room.switchActiveDevice(kind, target);
       this.note(switched ? "info" : "error", switched ? `device selected: ${kind}` : `device switch failed: ${kind}`);
+      if (target !== deviceId) this.note("info", "hands-free output replaced by stereo: microphone is not the headset");
       if (switched) {
         await this.refreshDevices();
+        if (kind === "audioinput") await this.alignOutput();
       }
     } catch (error) {
       this.note("error", describeMediaError(error));
       throw error;
     }
+  }
+
+  /** A new microphone may turn a Hands-Free output silent, or make it usable again. */
+  private async alignOutput(): Promise<void> {
+    const current = this.room.getActiveDevice("audiooutput");
+    const requested = this.requestedOutput ?? current;
+    if (!requested) return;
+    const target = playbackOutput(this.found, requested, this.room.getActiveDevice("audioinput"));
+    if (target === current) return;
+    await this.room.switchActiveDevice("audiooutput", target);
+    this.note("info", target === requested ? "output returned to the picked device" : "hands-free output replaced by stereo: microphone is not the headset");
+    await this.refreshDevices();
   }
 
   async refreshStats(): Promise<RtcSnapshot> {
