@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { MeetingApp } from "./meeting/MeetingApp";
+import { UpdateNotice } from "./shell/UpdateNotice";
 import "./App.css";
 
 // S-13: the media proof never ships in the installer. A production build replaces DEV with false,
@@ -13,6 +14,9 @@ export default function App() {
       <PocApp />
     </Suspense>
   ) : (
-    <MeetingApp />
+    <>
+      <MeetingApp />
+      {__WEB__ ? null : <UpdateNotice />}
+    </>
   );
 }

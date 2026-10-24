@@ -20,6 +20,10 @@ export const setShortcutConsent: typeof Native.setShortcutConsent = () => Promis
 
 export const shellTracks: typeof Native.shellTracks = async () => undefined;
 
+export const checkUpdate: typeof Native.checkUpdate = async () => null;
+
+export const installUpdate: typeof Native.installUpdate = () => Promise.reject(new Error("no updater in the browser"));
+
 export const showWindow: typeof Native.showWindow = async () => undefined;
 
 export const listenShell: typeof Native.listenShell = async () => () => undefined;

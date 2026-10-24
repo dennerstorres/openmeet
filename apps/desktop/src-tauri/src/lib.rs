@@ -2,6 +2,7 @@ mod google;
 mod invite;
 mod session;
 mod shell;
+mod updater;
 
 /// The page shipped inside the installer. No dev port, no https.
 fn is_bundle_origin(url: &tauri::Url) -> bool {
@@ -58,6 +59,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(shell::shortcut_plugin())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .on_permission_request(|webview, kind| {
             use tauri::webview::PermissionResponse;
             let Ok(url) = webview.url() else {
@@ -71,6 +73,8 @@ pub fn run() {
         })
         .manage(invite::PendingInvite::default())
         .manage(session::NativeSession::default())
+        .manage(updater::CallLive::default())
+        .manage(updater::PendingUpdate::default())
         .setup(|app| {
             use tauri_plugin_deep_link::DeepLinkExt;
             // `install` looks the window up by its label, so it is created first.
@@ -98,7 +102,9 @@ pub fn run() {
             shell::shell_tracks,
             shell::shell_show,
             invite::invite_take,
-            google::open_google_login
+            google::open_google_login,
+            updater::update_check,
+            updater::update_install
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

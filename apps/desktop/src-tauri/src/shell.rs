@@ -415,7 +415,15 @@ pub fn shell_show(app: AppHandle) {
 }
 
 #[tauri::command]
-pub fn shell_tracks(app: AppHandle, live: bool, microphone: bool, camera: bool, announce: Option<String>) -> Result<(), String> {
+pub fn shell_tracks(
+    app: AppHandle,
+    call: tauri::State<'_, crate::updater::CallLive>,
+    live: bool,
+    microphone: bool,
+    camera: bool,
+    announce: Option<String>,
+) -> Result<(), String> {
+    call.set(live);
     replace_menu(&app, live, microphone, camera)?;
     if let Some(kind) = announce {
         let on = match kind.as_str() {

@@ -38,7 +38,7 @@ F09-08 — Presença dos membros do servidor: WAITING_VALIDATION. Implementada e
 | F06-01 | Resiliência | Stats WebRTC/logs/reconexão/export | F05-01 | IMPLEMENTED | Grok | G6 |
 | F07-01 | Infra | Compose/TLS/TURN/backup/restauração | F06-01 | IMPLEMENTED | Grok | G7 |
 | F07-02 | Distribuição | Instalador Windows + CI release | F07-01 | IMPLEMENTED | Grok | G7 |
-| F07-05 | Distribuição | Atualização automática assinada (ADR 0018) | F07-02 | IN_PROGRESS | Claude | G7,G10 |
+| F07-05 | Distribuição | Atualização automática assinada (ADR 0018) | F07-02 | WAITING_VALIDATION | Claude | G7,G10 |
 | F02-02 | POC | Conectar dois clientes Windows ao mesmo room | F02-01 | WAITING_VALIDATION | Grok | G2 |
 | F02-03 | POC | Áudio bidirecional, mic/câmera e devices | F02-02 | WAITING_VALIDATION | Grok | G2 |
 | F02-04 | POC | Captura de monitor e janela | F02-02 | WAITING_VALIDATION | Grok | G2 |

@@ -57,3 +57,13 @@ commands.allow = ["invite_take"]
 identifier = "allow-open-google-login"
 description = "Enables the open_google_login command without any pre-configured scope."
 commands.allow = ["open_google_login"]
+
+[[permission]]
+identifier = "allow-update-check"
+description = "Enables the update_check command without any pre-configured scope."
+commands.allow = ["update_check"]
+
+[[permission]]
+identifier = "allow-update-install"
+description = "Enables the update_install command without any pre-configured scope."
+commands.allow = ["update_install"]

@@ -2,6 +2,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { ApiResult, InstanceApi, SessionBroker } from "@openmeet/shared";
 import { createRenewal } from "./renew";
+import type { UpdateView } from "./update";
 
 export { isTauri };
 
@@ -60,6 +61,15 @@ export function setShortcutConsent(consent: boolean): Promise<ShellStatus> {
 
 export function shellTracks(live: boolean, microphone: boolean, camera: boolean, announce: "microphone" | "camera" | null): Promise<void> {
   return invoke("shell_tracks", { live, microphone, camera, announce });
+}
+
+/** ADR 0018: the check and the install run in Rust; the install refuses a live meeting. */
+export function checkUpdate(): Promise<UpdateView | null> {
+  return invoke<UpdateView | null>("update_check");
+}
+
+export function installUpdate(): Promise<void> {
+  return invoke("update_install");
 }
 
 export function showWindow(): Promise<void> {

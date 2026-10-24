@@ -47,6 +47,12 @@
     }
   },
   "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlDMTM4RDJDRDk1RTBCMjEKUldRaEMxN1pMSTBUbkwzZjhMRjhJYkJVemlRc2RPU1JObXNWa2diYVJ1V2JDQnBHVlhPUkNxYnMK",
+      "windows": {
+        "installMode": "passive"
+      }
+    },
     "deep-link": {
       "desktop": {
         "schemes": ["openmeet"]

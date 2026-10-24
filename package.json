@@ -13,7 +13,7 @@
     ]
   },
   "scripts": {
-    "test": "pnpm --filter @openmeet/shared build && node --test scripts/workspace.test.mjs scripts/livekit-config.test.mjs scripts/pg-copy.test.mjs scripts/installer-checksum.test.mjs scripts/host.test.mjs scripts/dockerignore.test.mjs && pnpm -r --if-present test",
+    "test": "pnpm --filter @openmeet/shared build && node --test scripts/workspace.test.mjs scripts/livekit-config.test.mjs scripts/pg-copy.test.mjs scripts/installer-checksum.test.mjs scripts/updater-manifest.test.mjs scripts/host.test.mjs scripts/dockerignore.test.mjs && pnpm -r --if-present test",
     "lint": "eslint .",
     "format:check": "prettier --check .",
     "typecheck": "pnpm --filter @openmeet/shared --filter @openmeet/media build && pnpm -r --if-present typecheck",
