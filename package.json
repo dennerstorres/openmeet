@@ -2,6 +2,7 @@
   "name": "openmeet",
   "private": true,
   "version": "0.0.0",
+  "license": "Apache-2.0",
   "description": "OpenMeet monorepo. Codename; not a published application.",
   "packageManager": "pnpm@10.30.2",
   "engines": {

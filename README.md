@@ -23,3 +23,7 @@ Na primeira abertura, a pessoa cola o endereço HTTPS da API e entra com o usuá
 ## Desenvolvimento
 
 Node.js LTS, pnpm, Rust e Docker. O contrato dos agentes está em `AGENTS.md`. Requisitos em `SPEC.md`, tarefas em `PLAN.md`.
+
+## Licença
+
+Apache-2.0. Veja `LICENSE` e `NOTICE`.

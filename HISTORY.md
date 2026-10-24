@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-24 — licença Apache-2.0 — Claude
+Branch `main`. Decisão do usuário: repositório inteiro open source, sem fins comerciais, antes de torná-lo público. `LICENSE` (texto oficial da Apache-2.0 via API do GitHub), `NOTICE`, campo `license` nos cinco `package.json` e no `Cargo.toml`, seção no README. Varredura do histórico antes de abrir: nenhum segredo real; ficam públicos os domínios de produção e o e-mail dos commits.
+
 ### 2026-10-24 — ADR 0018, atualização automática — Claude
 Proposta em `docs/adr/0018-atualizacao-automatica.md`: `tauri-plugin-updater` com `latest.json` na GitHub Release, chave de assinatura só no secret do Actions e cópia offline, checagem no Rust com dois comandos próprios, instalação apenas com confirmação e fora de chamada. Substitui o veto ao updater da revisão de 2026-10-19 se aceito. PLAN ganhou F07-05 `PENDING`. Sem código, sem testes.
 
