@@ -22,7 +22,7 @@ export type { ScreenAudioState } from "./layout.js";
 export type { CardLayout, CardPerson, CardPlacement, CardTile, LayoutTile, MeetingCard, TilePlacement } from "./layout.js";
 export type { PlaybackLevel } from "./playback.js";
 export { LiveKitPocSession, participantLabel, shouldAttachPlayback, shouldShowLiveVideo } from "./session.js";
-export { VideoBackground } from "./video-background.js";
+export { BLUR_RADIUS_DEFAULT, BLUR_RADIUS_MAX, BLUR_RADIUS_MIN, VideoBackground, clampBlurRadius } from "./video-background.js";
 export type { VideoBackgroundOptions } from "./video-background.js";
 export { emptyStats, summarizeRtcStats } from "./stats.js";
 export { nextPhase } from "./phase.js";

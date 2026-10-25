@@ -8,6 +8,10 @@ O cliente pode aplicar blur moderado ao fundo da câmera antes de publicar a fai
 
 A opção nasce desligada. Cliente incompatível mantém a câmera normal e informa que o efeito não está disponível. Ao trocar dispositivo, o processor acompanha a faixa reiniciada pelo SDK; se uma faixa nova for criada, o cliente reaplica a preferência. Falha no processor não impede desligar o efeito nem deve derrubar a reunião.
 
+## Adendo 2026-10-25 — intensidade (F04-08)
+
+O usuário escolhe o raio do blur entre 2 e 30 px; 10 continua o padrão. Só o raio fica salvo neste aparelho, o efeito segue nascendo desligado. A troca reaproveita o processor da faixa publicada (`switchTo`), sem republicar a câmera. O teto de 30 px limita custo e preserva o recorte; nada muda na CSP nem no processamento local.
+
 ## Segurança e desempenho
 
 WebAssembly exige uma diretiva CSP específica, limitada a `wasm-unsafe-eval`; `unsafe-eval` geral continua proibido. O usuário autorizou essa mudança em 2026-10-23. Modelo e runtime têm aviso Apache-2.0 no bundle e versão fixada no lockfile.

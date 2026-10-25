@@ -493,6 +493,16 @@ Testes manuais (máquina/rede): não executados; nenhum segundo cliente nem jane
 Pendências e riscos: reiniciar a API apaga a presença até o próximo heartbeat; fechar abruptamente pode levar até 75 segundos para aparecer desconectado. A UI, minimizar/ausência, fechar e a privacidade entre duas contas exigem validação real. F09-08 fica `WAITING_VALIDATION`, nunca `DONE`.
 Próxima tarefa: abrir dois clientes com contas no mesmo servidor e validar verde, âmbar, vermelho, invisível comum e invisível visível ao dono/moderador conforme política.
 
+### 2026-10-25 — F04-08 — Claude
+Branch / commit: `task/F04-08-intensidade-blur` (partindo da main 5b4b6f1) / sem commit, aguardando autorização.
+Arquivos alterados: `packages/media/src/video-background.ts`, `session.ts`, `index.ts`, `packages/media/test/video-background.test.ts`, `apps/desktop/src/meeting/MeetingApp.tsx`, `apps/desktop/src/poc/PocApp.tsx`, PLAN, plano da fase 04 e adendo do ADR 0016.
+Decisão tomada: raio do blur ajustável 2–30 px (padrão 10), salvo em `localStorage`; mudança aplicada por `switchTo` no processor existente, sem republicar. CSP inalterada.
+Comandos executados: `pnpm test`; `pnpm typecheck`; `pnpm lint`; `pnpm format:check`; `pnpm --filter ./apps/desktop build`; `pnpm --filter ./apps/desktop build:web`. Windows 11, 2026-10-25.
+Resultados/artefatos: testes passaram (scripts 27, shared 45, media 60, server 73, desktop 19); typecheck, lint, formatação e os dois bundles passaram.
+Testes manuais (máquina/rede): não executados; nenhuma câmera foi aberta.
+Pendências e riscos: raio alto pode pesar em aparelho fraco; qualidade e FPS só com câmera real. F04-08 fica `WAITING_VALIDATION`.
+Próxima tarefa: ligar o blur numa chamada, mover o slider e conferir no outro cliente que o vídeo segue sem queda.
+
 ## Template de registro
 ```
 ### YYYY-MM-DD HH:mm — TASK-ID — Agente
