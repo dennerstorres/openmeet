@@ -1,4 +1,4 @@
-# ADR 0009 — Layout da sala no estilo Discord
+# ADR 0009 — Layout da sala com servidores, salas e membros
 Status: Accepted. Data: 2026-10-19. Aceito para a F09. A tela ainda é a faixa única.
 
 ## Contexto

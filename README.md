@@ -1,8 +1,6 @@
 # OpenMeet
 
-Cliente desktop Windows para reuniões de áudio, vídeo e tela, com servidor próprio. Cada instalação é uma instância independente. Não há conta global.
-
-O repositório permanece privado até o mantenedor decidir publicar.
+Reuniões de áudio, vídeo e compartilhamento de tela com servidor próprio: app desktop Windows e cliente web. Cada instalação do servidor é uma instância independente, sem conta global e sem serviço pago obrigatório. A mídia passa pelo LiveKit da própria instância.
 
 ## Servidor
 
@@ -16,7 +14,7 @@ O script grava `infra/compose/.env` e o YAML do LiveKit fora do Git. Na primeira
 
 ## Aplicativo Windows
 
-O instalador é NSIS, por usuário, sem assinatura. Quem participa não precisa de Node nem de Rust. O build está em `docs/RELEASE.md`. Nenhuma tag `v*` foi publicada, então ainda não há download pronto.
+O instalador NSIS, por usuário, fica na página de Releases do GitHub. Ele não tem assinatura de código do Windows, então o SmartScreen avisa na primeira instalação. A partir dele, o app se atualiza sozinho com pacotes assinados e só instala quando a pessoa confirma (ADR 0018). Quem participa não precisa de Node nem de Rust. O build está em `docs/RELEASE.md`.
 
 Na primeira abertura, a pessoa cola o endereço HTTPS da API e entra com o usuário daquela instância.
 

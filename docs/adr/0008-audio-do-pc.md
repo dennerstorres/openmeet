@@ -2,7 +2,7 @@
 Status: Accepted. Data: 2026-10-19. Aceito para a F09. O compartilhamento ainda pede só a imagem.
 
 ## Contexto
-Quem compartilha a tela quer que os outros ouçam o som do PC, como no Discord. Hoje o compartilhamento pede só a imagem. O código passa `audio: false`. Monitor e janela já apareceram nos dois PCs. O áudio do PC não foi provado.
+Quem compartilha a tela quer que os outros ouçam o som do PC, como em outros apps de chamada. Hoje o compartilhamento pede só a imagem. O código passa `audio: false`. Monitor e janela já apareceram nos dois PCs. O áudio do PC não foi provado.
 
 O ADR 0004 continua aberto para a captura nativa. Este desenho não autoriza uma captura própria do Windows.
 

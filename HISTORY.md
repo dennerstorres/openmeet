@@ -2,6 +2,7 @@
 
 ### 2026-10-24 — licença Apache-2.0 — Claude
 Branch `main`. Decisão do usuário: repositório inteiro open source, sem fins comerciais, antes de torná-lo público. `LICENSE` (texto oficial da Apache-2.0 via API do GitHub), `NOTICE`, campo `license` nos cinco `package.json` e no `Cargo.toml`, seção no README. Varredura do histórico antes de abrir: nenhum segredo real; ficam públicos os domínios de produção e o e-mail dos commits.
+
 ### 2026-10-24 — F07-05, atualização automática — Claude
 Branch `task/F07-05-updater`. `tauri-plugin-updater` 2.14.0 registrado no Rust; a página só ganhou `update_check` e `update_install` (`src-tauri/src/updater.rs`). O install recusa reunião ao vivo (`shell_tracks` marca o estado) e só instala o update achado no último check. Aviso fixo no canto (`UpdateNotice`) checa ao abrir e a cada 6 h. Chave pública no `tauri.conf.json`; o endpoint entra só na build da release a partir de `GITHUB_REPOSITORY`. O workflow assina, gera `.sig` e `latest.json` (`scripts/updater-manifest.mjs`) e recusa tag diferente da versão.
 Chave gerada em `~/.tauri/openmeet-updater.key` com senha em `~/.tauri/openmeet-updater.password`, fora do repo. Falta guardar cópia offline e criar os secrets `TAURI_SIGNING_PRIVATE_KEY` e `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
