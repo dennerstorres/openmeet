@@ -24,15 +24,34 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build workspace packages
         run: pnpm --filter @openmeet/shared --filter @openmeet/media build
-      - name: Build the Windows installer
-        run: pnpm --filter @openmeet/desktop exec tauri build --bundles nsis
+      - name: Build the signed Windows installer
+        # ADR 0018: the updater signature needs the private key, kept only as an Actions secret.
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        # The endpoint follows the repository that publishes, so the config names no owner.
+        shell: bash
+        run: |
+          config=$(printf '{"bundle":{"createUpdaterArtifacts":true},"plugins":{"updater":{"endpoints":["https://github.com/%s/releases/latest/download/latest.json"]}}}' "${GITHUB_REPOSITORY}")
+          pnpm --filter @openmeet/desktop exec tauri build --bundles nsis --config "${config}"
       - name: Checksums
         run: node scripts/installer-checksum.mjs apps/desktop/src-tauri/target/release/bundle/nsis
+      - name: Updater manifest
+        shell: bash
+        run: |
+          version=$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "tag ${GITHUB_REF_NAME} does not match version ${version}" >&2
+            exit 1
+          fi
+          node scripts/updater-manifest.mjs apps/desktop/src-tauri/target/release/bundle/nsis "${version}" "${GITHUB_REPOSITORY}"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: openmeet-windows-nsis
           path: |
             apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+            apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe.sig
+            apps/desktop/src-tauri/target/release/bundle/nsis/latest.json
             apps/desktop/src-tauri/target/release/bundle/nsis/SHA256SUMS
           if-no-files-found: error
 

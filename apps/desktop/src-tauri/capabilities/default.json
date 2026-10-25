@@ -18,6 +18,8 @@
     "allow-shell-tracks",
     "allow-shell-show",
     "allow-invite-take",
-    "allow-open-google-login"
+    "allow-open-google-login",
+    "allow-update-check",
+    "allow-update-install"
   ]
 }

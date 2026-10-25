@@ -1948,3 +1948,43 @@ textarea {
     flex-basis: 110px;
   }
 }
+
+.update-notice {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 20;
+  display: grid;
+  gap: 8px;
+  width: min(calc(100% - 32px), 360px);
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  color: var(--text-body);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+}
+
+.update-notice strong {
+  color: var(--text);
+}
+
+.update-notes {
+  max-height: 120px;
+  margin: 0;
+  overflow: auto;
+  color: var(--text-muted);
+  white-space: pre-line;
+}
+
+.update-error {
+  margin: 0;
+  color: var(--danger-text);
+}
+
+.update-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

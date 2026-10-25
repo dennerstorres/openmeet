@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/scaffold.test.mjs test/bundle.test.mjs test/web.test.mjs test/renew.test.mjs",
+    "test": "node --test test/scaffold.test.mjs test/bundle.test.mjs test/web.test.mjs test/renew.test.mjs test/update.test.mjs",
     "build:web": "tsc && vite build --mode web",
     "preview": "vite preview",
     "tauri": "tauri"
