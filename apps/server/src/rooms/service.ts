@@ -1,5 +1,5 @@
-import { randomBytes } from "node:crypto";
-import { parseLabel, parseSignalUrl } from "@openmeet/shared";
+import { createHash, randomBytes } from "node:crypto";
+import { hasControlCharacter, parseLabel, parseSignalUrl, sniffImage } from "@openmeet/shared";
 import { AccessToken } from "livekit-server-sdk";
 import type { AppEnv } from "../poc-join.js";
 import type { MigrationClient } from "../db/migrate.js";
@@ -25,7 +25,9 @@ export type RoomErrorCode =
   | "room_unconfigured"
   | "media_disconnect_failed"
   | "presence_unavailable"
-  | "user_not_found";
+  | "user_not_found"
+  | "invalid_image"
+  | "image_not_found";
 
 export class RoomError extends Error {
   readonly code: RoomErrorCode;
@@ -57,6 +59,11 @@ interface ServerRecord {
   name: string;
 }
 
+interface ServerListing extends ServerRecord {
+  role: string;
+  iconId: string | null;
+}
+
 interface ServerMembership {
   role: string;
   removed: boolean;
@@ -71,19 +78,26 @@ export interface ServerMember {
   id: string;
   displayName: string;
   role: string;
+  avatarId: string | null;
 }
 
 export interface ServerPresenceMember extends ServerMember {
   status: "online" | "away" | "offline" | "invisible";
   activity?: ActivityState;
   self: boolean;
+  globalName: string;
 }
 
 export interface ServerPresenceView {
   policy: { allowInvisible: boolean; managersSeeInvisible: boolean };
   selfMode: "visible" | "invisible";
   members: ServerPresenceMember[];
+  selfProfile: { nickname: string | null; avatarId: string | null; globalAvatarId: string | null };
 }
+
+// ADR 0019: the server nickname and avatar win over the account ones.
+const EFFECTIVE_NAME = "coalesce(m.nickname, u.display_name)";
+const EFFECTIVE_AVATAR = "coalesce(m.avatar_image_id, u.avatar_image_id)";
 
 function isTrue(value: unknown): boolean {
   return value === true || value === "t" || value === "true" || value === 1;
@@ -240,9 +254,9 @@ async function insertServer(tx: MigrationClient, actor: PublicUser, name: string
   return { id, name, role: "owner" };
 }
 
-export async function listServers(db: MigrationClient, actor: PublicUser): Promise<(ServerRecord & { role: string })[]> {
+export async function listServers(db: MigrationClient, actor: PublicUser): Promise<ServerListing[]> {
   const listed = await db.query(
-    `select s.id, s.name, m.role
+    `select s.id, s.name, m.role, s.icon_image_id
      from servers s
      join server_members m on m.server_id = s.id and m.user_id = $1 and m.removed_at is null
      order by s.created_at, s.id`,
@@ -252,7 +266,7 @@ export async function listServers(db: MigrationClient, actor: PublicUser): Promi
     const id = text(row.id);
     const name = text(row.name);
     const role = text(row.role);
-    return id && name && role ? [{ id, name, role }] : [];
+    return id && name && role ? [{ id, name, role, iconId: text(row.icon_image_id) ?? null }] : [];
   });
 }
 
@@ -283,14 +297,16 @@ export async function listServerPresence(db: MigrationClient, actor: PublicUser,
   const managersSeeInvisible = isTrue(policyRow.rows[0]?.managers_see_invisible);
   const manager = canManage(access.membership);
   const listed = await db.query(
-    `select u.id, u.display_name, m.role, m.presence_mode
+    `select u.id, ${EFFECTIVE_NAME} as display_name, u.display_name as global_name, m.role, m.presence_mode,
+            ${EFFECTIVE_AVATAR} as avatar_id, m.nickname, m.avatar_image_id as server_avatar_id, u.avatar_image_id as global_avatar_id
      from server_members m
      join users u on u.id = m.user_id
      where m.server_id = $1 and m.removed_at is null and u.disabled_at is null
-     order by u.display_name, u.id`,
+     order by ${EFFECTIVE_NAME}, u.id`,
     [access.server.id],
   );
   let selfMode: "visible" | "invisible" = "visible";
+  let selfProfile: ServerPresenceView["selfProfile"] = { nickname: null, avatarId: null, globalAvatarId: null };
   const members = listed.rows.flatMap((row): ServerPresenceMember[] => {
     const userId = text(row.id);
     const displayName = text(row.display_name);
@@ -299,18 +315,18 @@ export async function listServerPresence(db: MigrationClient, actor: PublicUser,
     const invisible = allowInvisible && row.presence_mode === "invisible";
     const activity = presence.read(access.server.id, userId);
     const self = userId === actor.id;
-    if (self) selfMode = invisible ? "invisible" : "visible";
-    if (!invisible) return [{ id: userId, displayName, role, status: activity, self }];
-    if (self || (manager && managersSeeInvisible)) {
-      return [
-        activity === "offline"
-          ? { id: userId, displayName, role, status: "invisible", self }
-          : { id: userId, displayName, role, status: "invisible", activity, self },
-      ];
+    const person = { id: userId, displayName, role, avatarId: text(row.avatar_id) ?? null, globalName: text(row.global_name) ?? displayName, self };
+    if (self) {
+      selfMode = invisible ? "invisible" : "visible";
+      selfProfile = { nickname: text(row.nickname) ?? null, avatarId: text(row.server_avatar_id) ?? null, globalAvatarId: text(row.global_avatar_id) ?? null };
     }
-    return [{ id: userId, displayName, role, status: "offline", self }];
+    if (!invisible) return [{ ...person, status: activity }];
+    if (self || (manager && managersSeeInvisible)) {
+      return [activity === "offline" ? { ...person, status: "invisible" } : { ...person, status: "invisible", activity }];
+    }
+    return [{ ...person, status: "offline" }];
   });
-  return { policy: { allowInvisible, managersSeeInvisible }, selfMode, members };
+  return { policy: { allowInvisible, managersSeeInvisible }, selfMode, members, selfProfile };
 }
 
 export async function setServerPresenceMode(db: MigrationClient, actor: PublicUser, id: string, mode: string): Promise<void> {
@@ -360,18 +376,18 @@ export async function listServerRooms(db: MigrationClient, actor: PublicUser, id
 
 async function serverMembers(db: MigrationClient, id: string): Promise<ServerMember[]> {
   const members = await db.query(
-    `select u.id, u.display_name, m.role
+    `select u.id, ${EFFECTIVE_NAME} as display_name, m.role, ${EFFECTIVE_AVATAR} as avatar_id
      from server_members m
      join users u on u.id = m.user_id
      where m.server_id = $1 and m.removed_at is null
-     order by u.display_name, u.id`,
+     order by ${EFFECTIVE_NAME}, u.id`,
     [id],
   );
   return members.rows.flatMap((row) => {
     const memberId = text(row.id);
     const displayName = text(row.display_name);
     const role = text(row.role);
-    return memberId && displayName && role ? [{ id: memberId, displayName, role }] : [];
+    return memberId && displayName && role ? [{ id: memberId, displayName, role, avatarId: text(row.avatar_id) ?? null }] : [];
   });
 }
 
@@ -446,7 +462,7 @@ async function removeFromServer(db: MigrationClient, actor: PublicUser, access: 
   if (!UUID.test(memberId) || memberId === actor.id) throw new RoomError("forbidden");
   const pending = await db.transaction(async (tx) => {
     const target = await tx.query(
-      `select role, removed_at is not null as removed, media_cut_at is not null as cut, last_join_nbf
+      `select role, removed_at is not null as removed, media_cut_at is not null as cut, last_join_nbf, avatar_image_id
        from server_members where server_id = $1 and user_id = $2 for update`,
       [access.server.id, memberId],
     );
@@ -456,7 +472,12 @@ async function removeFromServer(db: MigrationClient, actor: PublicUser, access: 
     if (targetRole === "owner") throw new RoomError("forbidden");
     if (targetRole === "moderator" && access.membership?.role !== "owner") throw new RoomError("forbidden");
     if (!isTrue(row.removed)) {
-      await tx.query("update server_members set removed_at = now(), media_cut_at = null where server_id = $1 and user_id = $2", [access.server.id, memberId]);
+      // ADR 0019: leaving the server takes the nickname and avatar used there with it.
+      await tx.query(
+        "update server_members set removed_at = now(), media_cut_at = null, nickname = null, avatar_image_id = null where server_id = $1 and user_id = $2",
+        [access.server.id, memberId],
+      );
+      await dropImage(tx, text(row.avatar_image_id));
       await audit(tx, actor.id, "member_remove", "user", memberId);
     } else if (isTrue(row.cut)) {
       return undefined;
@@ -502,7 +523,12 @@ export async function serverPresence(
   const identities = [...new Set(lists.flat().filter((identity) => UUID.test(identity)))];
   const names = new Map<string, string>();
   if (identities.length > 0) {
-    const found = await db.query("select id, display_name from users where id = any($1::uuid[])", [identities]);
+    const found = await db.query(
+      `select u.id, ${EFFECTIVE_NAME} as display_name
+       from users u left join server_members m on m.user_id = u.id and m.server_id = $2 and m.removed_at is null
+       where u.id = any($1::uuid[])`,
+      [identities, access.server.id],
+    );
     for (const row of found.rows) {
       const userId = text(row.id);
       const displayName = text(row.display_name);
@@ -715,7 +741,8 @@ export async function joinRoom(
       await redeemInvite(tx, room.serverId, actor.id, code);
       await audit(tx, actor.id, "server_join", "server", room.serverId);
     }
-    const signed = await issueRoomToken(env, room.id, actor.id, text(userRow.display_name) ?? "");
+    const own = await tx.query("select nickname from server_members where server_id = $1 and user_id = $2 and removed_at is null", [room.serverId, actor.id]);
+    const signed = await issueRoomToken(env, room.id, actor.id, text(own.rows[0]?.nickname) ?? text(userRow.display_name) ?? "");
     const nbf = tokenNotBefore(signed.token);
     await tx.query("update server_members set last_join_nbf = greatest(coalesce(last_join_nbf, 0), $3) where server_id = $1 and user_id = $2", [
       room.serverId,
@@ -826,4 +853,124 @@ function readRoom(row: Record<string, unknown> | undefined): RoomRecord | undefi
   const kind = text(row.kind);
   if (!id || !server || !name || !slug || !kind) return undefined;
   return { id, serverId: server, name, slug, kind, ended: isTrue(row.ended) };
+}
+
+// Profiles (ADR 0019)
+
+export interface StoredImage {
+  contentType: string;
+  bytes: Uint8Array;
+}
+
+async function storeImage(tx: MigrationClient, actorId: string, bytes: Uint8Array): Promise<string> {
+  const info = sniffImage(bytes);
+  if (!info) throw new RoomError("invalid_image");
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  const inserted = await tx.query(
+    "insert into images (content_type, bytes, byte_size, width, height, sha256, created_by) values ($1, $2, $3, $4, $5, $6, $7) returning id",
+    [info.type, Buffer.from(bytes), bytes.length, info.width, info.height, sha256, actorId],
+  );
+  const id = text(inserted.rows[0]?.id);
+  if (!id) throw new RoomError("conflict");
+  return id;
+}
+
+// Each image fills one slot, so the previous one goes once the slot points elsewhere.
+async function dropImage(tx: MigrationClient, id: string | undefined): Promise<void> {
+  if (id) await tx.query("delete from images where id = $1", [id]);
+}
+
+async function replaceImage(
+  tx: MigrationClient,
+  actorId: string,
+  image: Uint8Array | null,
+  swap: (next: string | null) => Promise<string | undefined>,
+): Promise<string | null> {
+  const next = image === null ? null : await storeImage(tx, actorId, image);
+  await dropImage(tx, await swap(next));
+  return next;
+}
+
+export async function setAccountAvatar(db: MigrationClient, actor: PublicUser, image: Uint8Array | null): Promise<{ avatarId: string | null }> {
+  return db.transaction(async (tx) => {
+    const current = await tx.query("select avatar_image_id from users where id = $1 for update", [actor.id]);
+    if (!current.rows[0]) throw new AuthError("unauthorized");
+    const avatarId = await replaceImage(tx, actor.id, image, async (next) => {
+      await tx.query("update users set avatar_image_id = $2, updated_at = now() where id = $1", [actor.id, next]);
+      return text(current.rows[0]?.avatar_image_id);
+    });
+    return { avatarId };
+  });
+}
+
+export async function setServerIcon(db: MigrationClient, actor: PublicUser, id: string, image: Uint8Array | null): Promise<{ iconId: string | null }> {
+  const access = await loadServerAccess(db, actor, serverId(id));
+  requireMember(access);
+  if (activeRole(access.membership) !== "owner") throw new RoomError("forbidden");
+  return db.transaction(async (tx) => {
+    const current = await tx.query("select icon_image_id from servers where id = $1 for update", [access.server.id]);
+    const iconId = await replaceImage(tx, actor.id, image, async (next) => {
+      await tx.query("update servers set icon_image_id = $2, updated_at = now() where id = $1", [access.server.id, next]);
+      return text(current.rows[0]?.icon_image_id);
+    });
+    await audit(tx, actor.id, "server_icon", "server", access.server.id);
+    return { iconId };
+  });
+}
+
+/** `undefined` keeps the field, `null` clears it. A member only ever edits their own row. */
+export async function setServerProfile(
+  db: MigrationClient,
+  actor: PublicUser,
+  id: string,
+  input: { nickname: string | null | undefined; avatar: Uint8Array | null | undefined },
+): Promise<{ nickname: string | null; avatarId: string | null }> {
+  const access = await loadServerAccess(db, actor, serverId(id));
+  requireMember(access);
+  let nickname: string | null | undefined = input.nickname;
+  if (typeof nickname === "string") {
+    nickname = nickname.trim() === "" && !hasControlCharacter(nickname) ? null : parseLabel(nickname);
+    if (nickname === undefined) throw new RoomError("invalid_display_name");
+  }
+  return db.transaction(async (tx) => {
+    const current = await tx.query(
+      "select nickname, avatar_image_id from server_members where server_id = $1 and user_id = $2 and removed_at is null for update",
+      [access.server.id, actor.id],
+    );
+    const row = current.rows[0];
+    if (!row) throw new RoomError("server_not_found");
+    if (nickname !== undefined) {
+      await tx.query("update server_members set nickname = $3 where server_id = $1 and user_id = $2", [access.server.id, actor.id, nickname]);
+    }
+    let avatarId = text(row.avatar_image_id) ?? null;
+    if (input.avatar !== undefined) {
+      avatarId = await replaceImage(tx, actor.id, input.avatar, async (next) => {
+        await tx.query("update server_members set avatar_image_id = $3 where server_id = $1 and user_id = $2", [access.server.id, actor.id, next]);
+        return text(row.avatar_image_id);
+      });
+    }
+    return { nickname: nickname === undefined ? (text(row.nickname) ?? null) : nickname, avatarId };
+  });
+}
+
+// Readable by its uploader and by anyone who shares an active server with the slot it fills. Anything else is 404.
+export async function readImage(db: MigrationClient, actor: PublicUser, id: string): Promise<StoredImage> {
+  if (!UUID.test(id)) throw new RoomError("image_not_found");
+  const found = await db.query(
+    `select i.content_type, i.bytes from images i
+     where i.id = $1 and (
+       i.created_by = $2
+       or exists (select 1 from servers s join server_members me on me.server_id = s.id and me.user_id = $2 and me.removed_at is null where s.icon_image_id = i.id)
+       or exists (select 1 from server_members t join server_members me on me.server_id = t.server_id and me.user_id = $2 and me.removed_at is null
+                  where t.avatar_image_id = i.id and t.removed_at is null)
+       or exists (select 1 from users u join server_members t on t.user_id = u.id and t.removed_at is null
+                  join server_members me on me.server_id = t.server_id and me.user_id = $2 and me.removed_at is null where u.avatar_image_id = i.id)
+     )`,
+    [id, actor.id],
+  );
+  const row = found.rows[0];
+  const contentType = text(row?.content_type);
+  const bytes = row?.bytes;
+  if (!contentType || !(bytes instanceof Uint8Array)) throw new RoomError("image_not_found");
+  return { contentType, bytes };
 }

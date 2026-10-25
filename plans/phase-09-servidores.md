@@ -35,5 +35,8 @@ ADR 0017. READY → WAITING_VALIDATION em 2026-10-23. Lista todos os membros do 
 ## F09-09
 READY → WAITING_VALIDATION em 2026-10-23. Reorganiza a navegação sem mudar permissões: coluna esquerda dedicada a salas e criação no topo; painel direito recolhível para membros; configurações do servidor concentram convite e política de presença; Adicionar servidor concentra criação e entrada por convite. A ponte Rust decodifica JSON pelos bytes UTF-8 para preservar nomes acentuados. Builds desktop/web, teste Rust e fixture responsiva passaram. Exige validar o `.exe` e confirmar um nome acentuado já salvo na instância real antes de `DONE`.
 
+## F09-10
+ADR 0019. Aceito e PENDING → WAITING_VALIDATION em 2026-10-25. Imagens no Postgres, só PNG/JPEG/WebP por magic bytes, até 256 KB e 512 px, sem SVG. Dono troca o ícone; cada membro só o próprio apelido e avatar no servidor; sem perfil vale o global. `.exe` busca a imagem por comando Rust fechado e monta `blob:`; web por `fetch` com cabeçalho web. CSP não muda. Migration `0008`, testes de permissão e de tipo falso. Exige ver ícone e avatar no `.exe` e na web reais antes de `DONE`.
+
 ## Observação
 Não concluir fase por implementação superficial ou mocks. Dependências externas e validações reais precisam de evidência ou status WAITING_VALIDATION.

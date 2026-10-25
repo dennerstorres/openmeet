@@ -51,6 +51,11 @@ export function createDesktopApi(open: InstanceApi): InstanceApi {
   };
 }
 
+/** ADR 0019: one icon or avatar through the native session. The page checks the bytes again. */
+export async function fetchImage(origin: string, id: string): Promise<Uint8Array> {
+  return new Uint8Array(await invoke<ArrayBuffer>("instance_image", { origin, id }));
+}
+
 export function shellStatus(): Promise<ShellStatus> {
   return invoke<ShellStatus>("shell_status");
 }

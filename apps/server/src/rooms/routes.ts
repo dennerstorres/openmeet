@@ -1,4 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { IMAGE_MAX_BYTES } from "@openmeet/shared";
+import { createAttemptGate } from "../auth/limit.js";
 import { AuthError, type AuthErrorCode, currentUser, type PublicUser } from "../auth/service.js";
 import { readAccessToken } from "../auth/tokens.js";
 import { requireAccessToken } from "../auth/web-session.js";
@@ -33,6 +35,10 @@ import {
   heartbeatServerPresence,
   setServerPresenceMode,
   setServerPresencePolicy,
+  readImage,
+  setAccountAvatar,
+  setServerIcon,
+  setServerProfile,
   RoomError,
   type RoomErrorCode,
 } from "./service.js";
@@ -71,6 +77,8 @@ const ROOM_STATUS: Record<RoomErrorCode, number> = {
   media_disconnect_failed: 502,
   presence_unavailable: 503,
   user_not_found: 404,
+  invalid_image: 400,
+  image_not_found: 404,
 };
 
 function configuredSecret(env: AppEnv): string | undefined {
@@ -107,6 +115,27 @@ function booleanField(body: unknown, key: string): boolean {
   return value;
 }
 
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
+const BASE64_MAX = Math.ceil(IMAGE_MAX_BYTES / 3) * 4;
+
+/** ADR 0019: absent keeps, `null` removes, a base64 string replaces. The bytes are judged later by sniffImage. */
+function imageField(body: unknown, key: string): Uint8Array | null | undefined {
+  if (typeof body !== "object" || body === null || Array.isArray(body) || !(key in body)) return undefined;
+  const value = (body as Record<string, unknown>)[key];
+  if (value === null) return null;
+  if (typeof value !== "string" || value.length === 0 || value.length > BASE64_MAX || value.length % 4 !== 0 || !BASE64.test(value)) {
+    throw new RoomError("invalid_image");
+  }
+  return new Uint8Array(Buffer.from(value, "base64"));
+}
+
+function nullableText(body: unknown, key: string): string | null | undefined {
+  if (typeof body !== "object" || body === null || Array.isArray(body) || !(key in body)) return undefined;
+  const value = (body as Record<string, unknown>)[key];
+  if (value === null || typeof value === "string") return value;
+  throw new RoomError("invalid_body");
+}
+
 function param(request: FastifyRequest, key: string): string {
   if (typeof request.params !== "object" || request.params === null) return "";
   const value = (request.params as Record<string, unknown>)[key];
@@ -115,6 +144,10 @@ function param(request: FastifyRequest, key: string): string {
 
 export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationClient | undefined, media: RoomMedia | undefined): void {
   const platformPresence = new PlatformPresence();
+  const uploads = createAttemptGate(10, 60_000);
+  function allowUpload(actor: PublicUser): void {
+    if (!uploads.allow(actor.id, Date.now())) throw new AuthError("rate_limited");
+  }
   async function caller(request: FastifyRequest): Promise<PublicUser> {
     const secret = configuredSecret(env);
     if (!db || !secret) throw new AuthError("auth_unconfigured");
@@ -322,6 +355,73 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
         managersSeeInvisible: booleanField(request.body, "managersSeeInvisible"),
       });
       return reply.code(204).header("cache-control", "no-store").send();
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/profile/avatar", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const image = imageField(request.body, "image");
+      if (image === undefined) throw new RoomError("invalid_body");
+      allowUpload(actor);
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await setAccountAvatar(db, actor, image));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/servers/:id/icon", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const image = imageField(request.body, "image");
+      if (image === undefined) throw new RoomError("invalid_body");
+      allowUpload(actor);
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await setServerIcon(db, actor, param(request, "id"), image));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/servers/:id/profile", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const nickname = nullableText(request.body, "nickname");
+      const avatar = imageField(request.body, "avatar");
+      if (nickname === undefined && avatar === undefined) throw new RoomError("invalid_body");
+      allowUpload(actor);
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await setServerProfile(db, actor, param(request, "id"), { nickname, avatar }));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  // The id changes with every upload, so the bytes behind one id never change.
+  app.get("/api/v1/images/:id", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const image = await readImage(db, actor, param(request, "id"));
+      return reply
+        .code(200)
+        .header("content-type", image.contentType)
+        .header("x-content-type-options", "nosniff")
+        .header("content-security-policy", "default-src 'none'; sandbox")
+        .header("cache-control", "private, max-age=31536000, immutable")
+        .send(Buffer.from(image.bytes));
     } catch (error) {
       return sendError(request, reply, error);
     }

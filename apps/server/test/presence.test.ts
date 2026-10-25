@@ -187,7 +187,16 @@ test("server presence expires, honors invisible policy and reveals it only to ma
     await setServerPresencePolicy(db, owner, serverId, { allowInvisible: true, managersSeeInvisible: true });
     const revealed = await listServerPresence(db, mod, serverId, live);
     const invisible = revealed.members.find((item) => item.id === member.id);
-    assert.deepEqual(invisible, { id: member.id, displayName: "Membro", role: "participant", status: "invisible", activity: "online", self: false });
+    assert.deepEqual(invisible, {
+      id: member.id,
+      displayName: "Membro",
+      role: "participant",
+      avatarId: null,
+      globalName: "Membro",
+      self: false,
+      status: "invisible",
+      activity: "online",
+    });
 
     now += 75_001;
     const expired = await listServerPresence(db, owner, serverId, live);

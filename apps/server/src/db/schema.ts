@@ -1,9 +1,26 @@
 import { sql } from "drizzle-orm";
-import { bigint, boolean, check, index, integer, pgEnum, pgTable, primaryKey, smallint, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  boolean,
+  check,
+  customType,
+  index,
+  integer,
+  pgEnum,
+  pgTable,
+  primaryKey,
+  smallint,
+  text,
+  timestamp,
+  unique,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 const createdAt = () => timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow();
 const updatedAt = () => timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow();
+const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({ dataType: () => "bytea" });
 
 export const userRole = pgEnum("user_role", ["admin", "moderator", "participant"]);
 export const roomKind = pgEnum("room_kind", ["persistent", "temporary"]);
@@ -21,6 +38,7 @@ export const users = pgTable(
     role: userRole("role").notNull().default("participant"),
     disabledAt: timestamp("disabled_at", { withTimezone: true, mode: "date" }),
     livekitHold: boolean("livekit_hold").notNull().default(false),
+    avatarImageId: uuid("avatar_image_id").references((): AnyPgColumn => images.id, { onDelete: "set null" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -61,6 +79,7 @@ export const servers = pgTable(
       .references(() => users.id),
     allowInvisible: boolean("allow_invisible").notNull().default(false),
     managersSeeInvisible: boolean("managers_see_invisible").notNull().default(false),
+    iconImageId: uuid("icon_image_id").references((): AnyPgColumn => images.id, { onDelete: "set null" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -81,6 +100,8 @@ export const serverMembers = pgTable(
     mediaCutAt: timestamp("media_cut_at", { withTimezone: true, mode: "date" }),
     lastJoinNbf: bigint("last_join_nbf", { mode: "bigint" }),
     presenceMode: text("presence_mode").notNull().default("visible"),
+    nickname: text("nickname"),
+    avatarImageId: uuid("avatar_image_id").references((): AnyPgColumn => images.id, { onDelete: "set null" }),
     createdAt: createdAt(),
   },
   (table) => [
@@ -89,6 +110,7 @@ export const serverMembers = pgTable(
       .on(table.serverId)
       .where(sql`${table.role} = 'owner'`),
     check("server_members_presence_mode", sql`${table.presenceMode} in ('visible', 'invisible')`),
+    check("server_members_nickname_safe", sql`${table.nickname} is null or openmeet_is_label(${table.nickname})`),
   ],
 );
 
@@ -178,6 +200,30 @@ export const invites = pgTable(
     check("invites_code_hash_present", sql`char_length(${table.codeHash}) > 0`),
     check("invites_max_uses_positive", sql`${table.maxUses} >= 1`),
     check("invites_use_count_bounds", sql`${table.useCount} >= 0 and ${table.useCount} <= ${table.maxUses}`),
+  ],
+);
+
+// ADR 0019. One row per uploaded icon or avatar; replacing it deletes the old row.
+export const images = pgTable(
+  "images",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    contentType: text("content_type").notNull(),
+    bytes: bytea("bytes").notNull(),
+    byteSize: integer("byte_size").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    sha256: text("sha256").notNull(),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references((): AnyPgColumn => users.id),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    check("images_content_type", sql`${table.contentType} in ('image/png', 'image/jpeg', 'image/webp')`),
+    check("images_byte_size", sql`${table.byteSize} between 1 and 262144 and ${table.byteSize} = octet_length(${table.bytes})`),
+    check("images_dimensions", sql`${table.width} between 1 and 512 and ${table.height} between 1 and 512`),
+    check("images_sha256", sql`${table.sha256} ~ '^[0-9a-f]{64}$'`),
   ],
 );
 
@@ -272,6 +318,7 @@ export const identityTables = [
   serverMembers,
   serverInvites,
   rooms,
+  images,
   memberships,
   invites,
   auditEvents,

@@ -97,6 +97,7 @@ pub fn run() {
             session::session_refresh,
             session::session_logout,
             session::instance_call,
+            session::instance_image,
             shell::shell_status,
             shell::shell_set_consent,
             shell::shell_tracks,

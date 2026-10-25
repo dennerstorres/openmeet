@@ -196,8 +196,8 @@ test("room members carry name and role, never the username", async () => {
     assert.deepEqual(
       members.map((member) => [member.displayName, member.role, Object.keys(member).sort().join(",")]),
       [
-        ["Admin", "owner", "displayName,id,role"],
-        ["Bia", "participant", "displayName,id,role"],
+        ["Admin", "owner", "avatarId,displayName,id,role"],
+        ["Bia", "participant", "avatarId,displayName,id,role"],
       ],
     );
 

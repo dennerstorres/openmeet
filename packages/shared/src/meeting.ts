@@ -572,6 +572,43 @@ export class MeetingModel {
     await this.refreshServerPresence("online");
   }
 
+  /** ADR 0019: `image` is base64 PNG, JPEG or WebP; null removes it. Only the owner gets a 200. */
+  async setServerIcon(image: string | null): Promise<boolean> {
+    const serverId = this.selectedServerId;
+    if (serverId === null) return false;
+    const done = await this.profileCall(`/api/v1/servers/${serverId}/icon`, { image });
+    if (done) await this.run((generation) => this.loadServers(generation));
+    return done;
+  }
+
+  async setAccountAvatar(image: string | null): Promise<boolean> {
+    const done = await this.profileCall("/api/v1/profile/avatar", { image });
+    if (done) await this.refreshServerPresence("online");
+    return done;
+  }
+
+  /** Nickname and avatar in the selected server. A missing key keeps the value; null goes back to the account. */
+  async setServerProfile(change: { nickname?: string | null; avatar?: string | null }): Promise<boolean> {
+    const serverId = this.selectedServerId;
+    if (serverId === null) return false;
+    const done = await this.profileCall(`/api/v1/servers/${serverId}/profile`, change);
+    if (done) await this.refreshServerPresence("online");
+    return done;
+  }
+
+  private async profileCall(path: string, body: unknown): Promise<boolean> {
+    const origin = this.origin;
+    const accessToken = this.accessToken;
+    if (origin === null || accessToken === null) return false;
+    const result = await this.api.request(origin, "POST", path, body, accessToken);
+    if (result.status !== 200) {
+      this.error = readErrorCode(result.body);
+      this.publish();
+      return false;
+    }
+    return true;
+  }
+
   async enterRoom(roomId: string, code: string): Promise<void> {
     await this.run(async (generation) => {
       const origin = this.pinned();

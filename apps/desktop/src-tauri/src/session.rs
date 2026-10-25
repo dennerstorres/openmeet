@@ -189,6 +189,8 @@ fn allowed_call(method: &str, path: &str) -> bool {
         ("GET", ["", "api", "v1", "servers", id, "presence"]) => is_id(id),
         ("GET", ["", "api", "v1", "servers", id, "members"]) => is_id(id),
         ("POST", ["", "api", "v1", "servers", id, "presence", "heartbeat" | "mode" | "policy"]) => is_id(id),
+        ("POST", ["", "api", "v1", "servers", id, "icon" | "profile"]) => is_id(id),
+        ("POST", ["", "api", "v1", "profile", "avatar"]) => true,
         _ => false,
     }
 }
@@ -229,9 +231,67 @@ pub async fn instance_call(held: tauri::State<'_, NativeSession>, origin: String
     Ok(Reply { status, body: parse_json(&bytes) })
 }
 
+/// ADR 0019: the same caps the API applies to an upload.
+const IMAGE_MAX_BYTES: usize = 256 * 1024;
+
+/// PNG, JPEG or WebP by the first bytes. The page checks the whole header again before showing it.
+fn image_kind(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(&[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) {
+        Some("image/png")
+    } else if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
+        Some("image/jpeg")
+    } else if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+        Some("image/webp")
+    } else {
+        None
+    }
+}
+
+/// The bytes of one icon or avatar, `GET /api/v1/images/:id` and nothing else. The answer must say and be
+/// an accepted image type within the size cap; anything else comes back as an error, never as bytes.
+#[tauri::command]
+pub async fn instance_image(held: tauri::State<'_, NativeSession>, origin: String, id: String) -> Result<tauri::ipc::Response, String> {
+    if !is_id(&id) {
+        return Err("invalid_path".to_string());
+    }
+    let access = held.access_for(&origin).ok_or("unauthorized")?;
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(10))
+        .build()
+        .map_err(|_| "request_failed".to_string())?;
+    let response = client
+        .get(format!("{origin}/api/v1/images/{id}"))
+        .bearer_auth(access)
+        .send()
+        .await
+        .map_err(|_| "request_failed".to_string())?;
+    let status = response.status().as_u16();
+    if status == 401 {
+        held.forget();
+    }
+    if status != 200 {
+        return Err(if status == 404 { "image_not_found" } else { "request_failed" }.to_string());
+    }
+    let declared = response
+        .headers()
+        .get("content-type")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_string();
+    if response.content_length().is_some_and(|length| length > IMAGE_MAX_BYTES as u64) {
+        return Err("invalid_image".to_string());
+    }
+    let bytes = response.bytes().await.map_err(|_| "request_failed".to_string())?;
+    if bytes.len() > IMAGE_MAX_BYTES || image_kind(&bytes) != Some(declared.as_str()) {
+        return Err("invalid_image".to_string());
+    }
+    Ok(tauri::ipc::Response::new(bytes.to_vec()))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{allowed_call, parse_json, take_access, take_refresh, NativeSession, Reply, ACCESS_MARKER};
+    use super::{allowed_call, image_kind, parse_json, take_access, take_refresh, NativeSession, Reply, ACCESS_MARKER};
     use serde_json::json;
 
     #[test]
@@ -301,6 +361,9 @@ mod tests {
             ("POST", format!("/api/v1/servers/{id}/presence/heartbeat")),
             ("POST", format!("/api/v1/servers/{id}/presence/mode")),
             ("POST", format!("/api/v1/servers/{id}/presence/policy")),
+            ("POST", format!("/api/v1/servers/{id}/icon")),
+            ("POST", format!("/api/v1/servers/{id}/profile")),
+            ("POST", "/api/v1/profile/avatar".to_string()),
         ] {
             assert!(allowed_call(method, &path), "{method} {path}");
         }
@@ -317,9 +380,24 @@ mod tests {
             ("POST", format!("/api/v1/rooms/{id}/join?x=1")),
             ("GET", "//evil.example/api/v1/rooms".to_string()),
             ("POST", format!("/api/v1/servers/{id}/presence")),
+            ("GET", format!("/api/v1/servers/{id}/icon")),
+            ("POST", format!("/api/v1/servers/not-an-id/profile")),
+            ("POST", format!("/api/v1/servers/{id}/members/{id}/profile")),
+            ("GET", format!("/api/v1/images/{id}")),
+            ("POST", "/api/v1/profile".to_string()),
         ] {
             assert!(!allowed_call(method, &path), "{method} {path}");
         }
+    }
+
+    #[test]
+    fn only_png_jpeg_and_webp_bytes_pass_as_images() {
+        assert_eq!(image_kind(&[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]), Some("image/png"));
+        assert_eq!(image_kind(&[0xff, 0xd8, 0xff, 0xe0]), Some("image/jpeg"));
+        assert_eq!(image_kind(b"RIFF\x10\0\0\0WEBPVP8L"), Some("image/webp"));
+        assert_eq!(image_kind(b"<svg xmlns=\"http://www.w3.org/2000/svg\"/>"), None);
+        assert_eq!(image_kind(b"GIF89a"), None);
+        assert_eq!(image_kind(b"RIFF"), None);
     }
 
     #[test]

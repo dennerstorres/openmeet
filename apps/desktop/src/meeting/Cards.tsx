@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
+import { Face } from "./images";
 import {
   applyPlayback,
-  cardInitial,
   effectivePlayback,
   shouldAttachPlayback,
   shouldShowLiveVideo,
@@ -13,6 +13,11 @@ import {
 
 export interface CardStageProps {
   cards: readonly MeetingCard[];
+  origin: string | null;
+  /** ADR 0019: the avatar of a person in the call, from the member list. */
+  avatarFor: (identity: string) => string | null;
+  /** The account name behind a nickname, shown on hover. */
+  accountFor: (identity: string) => string | null;
   tiles: readonly TrackTile[];
   layout: CardLayout;
   featuredId: string | null;
@@ -38,6 +43,9 @@ export function CardStage(props: CardStageProps) {
     <CardView
       key={card.id}
       card={card}
+      origin={props.origin}
+      avatarId={props.avatarFor(card.identity)}
+      account={props.accountFor(card.identity)}
       size={size}
       video={card.videoId === null ? undefined : tileById.get(card.videoId)}
       pinned={props.pinnedId === card.id}
@@ -71,6 +79,9 @@ export function CardStage(props: CardStageProps) {
 
 function CardView(props: {
   card: MeetingCard;
+  origin: string | null;
+  avatarId: string | null;
+  account: string | null;
   size: "center" | "strip" | "grid";
   video: TrackTile | undefined;
   pinned: boolean;
@@ -89,11 +100,15 @@ function CardView(props: {
         <VideoSink tile={props.video} />
       ) : (
         <div className="avatar" aria-hidden="true">
-          <span>{cardInitial(card.label)}</span>
+          <span>
+            <Face origin={props.origin} imageId={props.avatarId} label={card.label} />
+          </span>
         </div>
       )}
       <footer>
-        <span className="name">{name}</span>
+        <span className="name" title={props.account !== null && props.account !== card.label ? `Conta: ${props.account}` : undefined}>
+          {name}
+        </span>
         {props.speaking ? <span className="sr">falando</span> : null}
         {hearable && !props.playback.heard ? <span className="badge">mudo aqui</span> : null}
         <button type="button" className="ghost" aria-pressed={props.pinned} onClick={props.onPin}>

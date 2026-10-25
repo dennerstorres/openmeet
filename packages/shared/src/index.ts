@@ -14,6 +14,8 @@ export {
   prepareInstanceRequest,
   readErrorCode,
 } from "./instance.js";
+export { IMAGE_MAX_BYTES, IMAGE_MAX_SIDE, IMAGE_TYPES, sniffImage } from "./image.js";
+export type { ImageInfo, ImageType } from "./image.js";
 export { inviteFromFragment, inviteLink, invitePageLink, isInviteCode, parseInvite } from "./invite.js";
 export type { InviteLink } from "./invite.js";
 export { MeetingModel, MemorySessionVault, vaultSessionBroker } from "./meeting.js";
@@ -27,6 +29,7 @@ export type {
   PreparedRequest,
   RoomOccupant,
   RoomSummary,
+  SelfProfile,
   ServerPresenceMember,
   ServerPresenceView,
   ServerSummary,
