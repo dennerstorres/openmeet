@@ -1028,6 +1028,101 @@ a {
   align-self: flex-start;
 }
 
+/* ADR 0019: icon and avatar pictures fill the round (or rounded) wrapper they replace the initial in. */
+.face {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
+.image-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+
+.image-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profile-face {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.profile-face.server-face {
+  border-radius: 16px;
+  background: var(--bg-main);
+  color: var(--text-body);
+}
+
+.image-pick {
+  position: relative;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  border-radius: 4px;
+  padding: 8px 14px;
+  color: var(--text-muted);
+  font-size: inherit;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.image-pick:hover:not(.disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.image-pick:focus-within {
+  outline: 2px solid var(--glow);
+  outline-offset: 1px;
+}
+
+.image-pick.disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.image-pick input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.nickname-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nickname-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
 .modal-section .invite-out {
   display: flex;
   flex-direction: column;

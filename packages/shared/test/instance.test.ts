@@ -124,7 +124,8 @@ test("server presence validates policy, status and safe member labels", () => {
       allowInvisible: true,
       managersSeeInvisible: true,
       selfMode: "invisible",
-      members: [{ id: roomId, label: "Ada", role: "owner", status: "invisible", activity: "online", self: true }],
+      members: [{ id: roomId, label: "Ada", role: "owner", status: "invisible", activity: "online", self: true, avatarId: null, globalName: "Ada" }],
+      selfProfile: { nickname: null, avatarId: null, globalAvatarId: null },
     },
   );
   assert.throws(

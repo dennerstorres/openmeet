@@ -2,6 +2,8 @@
 
 Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, `VERIFIED`, `DONE`, `BLOCKED`.
 
+F09-10 — Ícone do servidor, avatar e perfil por servidor: WAITING_VALIDATION. ADR 0019 aceito em 2026-10-25; implementada na branch `task/F09-10-imagens-perfil`. Migration 0008, rotas com testes de permissão e de tipo falso, comando Rust `instance_image`, UI na barra, membros, cards e modal de perfil. Testes, typecheck, lint, format:check e build passaram; web vista localmente com PGlite. Falta o `.exe` contra a instância real, migration 0008 em implantação real e revisão independente. Escopo em `plans/phase-09-servidores.md`.
+
 F09-09 — Navegação de servidor e UTF-8: WAITING_VALIDATION. Implementada em 2026-10-23, depende de F09-08. Salas ficam na coluna esquerda com criação no topo; membros passam a painel direito recolhível; convite e política vão para modais de servidor; entrada por convite acompanha Adicionar servidor. A ponte nativa lê JSON diretamente como UTF-8. Testes, builds e inspeção web responsiva passaram; falta validar no `.exe` contra a instância real e confirmar um nome acentuado já salvo.
 
 F07-04 — Entrega 0.2.1: WAITING_VALIDATION. Versão e instalador NSIS gerados em 2026-10-23 com atalhos/configurações, blur local e presença global do servidor. Testes automatizados e checksum passaram; falta instalar o `.exe`, validar câmera/presença com dois clientes e aplicar a migration 0007 em implantação real. Sem tag, GitHub Release ou deploy nesta tarefa.
@@ -54,6 +56,7 @@ F09-08 — Presença dos membros do servidor: WAITING_VALIDATION. Implementada e
 | F09-07 | Identidade | Login Google pelo navegador, chaves só no servidor | F03-02 | WAITING_VALIDATION | Claude | G9 |
 | F09-08 | Servidores | Lista de membros e presença com invisibilidade governada | F09-01 | WAITING_VALIDATION | Codex | G9,G10,G12 |
 | F09-09 | Servidores | Separar salas, membros e configurações; preservar nomes UTF-8 | F09-08 | WAITING_VALIDATION | Codex | G9,G10,G12 |
+| F09-10 | Servidores | Ícone do servidor, avatar e perfil por servidor (ADR 0019) | F09-08 | WAITING_VALIDATION | Claude | G9,G10,G12 |
 | F10-01 | Segurança | Recusar controle e bidi nos nomes (S-21) | F03-03 | IMPLEMENTED | Claude | G10 |
 | F10-02 | Segurança | Sala só para membro, sem username (S-01, S-10) | F03-03 | IMPLEMENTED | Claude | G10 |
 | F10-03 | Segurança | Reuso de refresh revoga a família (S-03) | F03-02 | IMPLEMENTED | Claude | G10 |

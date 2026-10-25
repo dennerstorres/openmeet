@@ -38,6 +38,8 @@ export interface ServerSummary {
   id: string;
   name: string;
   role: "owner" | "moderator" | "participant";
+  /** ADR 0019: the server icon, or null. Older servers omit it. */
+  iconId: string | null;
 }
 
 export interface RoomOccupant {
@@ -54,6 +56,17 @@ export interface ServerPresenceMember {
   status: PlatformPresenceStatus;
   activity: "online" | "away" | null;
   self: boolean;
+  /** ADR 0019: server avatar, else account avatar, else null. */
+  avatarId: string | null;
+  /** The account name behind a server nickname; equal to label when there is none. */
+  globalName: string;
+}
+
+/** ADR 0019: what the caller set for themself, to fill the profile form. */
+export interface SelfProfile {
+  nickname: string | null;
+  avatarId: string | null;
+  globalAvatarId: string | null;
 }
 
 export interface ServerPresenceView {
@@ -61,6 +74,16 @@ export interface ServerPresenceView {
   managersSeeInvisible: boolean;
   selfMode: "visible" | "invisible";
   members: ServerPresenceMember[];
+  selfProfile: SelfProfile;
+}
+
+function imageId(value: unknown): string | null {
+  return typeof value === "string" && UUID.test(value) ? value.toLowerCase() : null;
+}
+
+function safeLabel(value: unknown): string | undefined {
+  const label = text(value);
+  return label === undefined || label.length > 80 || hasControlCharacter(label) ? undefined : label;
 }
 
 export function parseServerPresence(value: unknown): ServerPresenceView {
@@ -90,13 +113,16 @@ export function parseServerPresence(value: unknown): ServerPresenceView {
     ) {
       throw new PocInputError("invalid_instance", "Server member is incomplete");
     }
-    return { id, label, role, status, activity, self: member.self };
+    const globalName = safeLabel(member.globalName) ?? label;
+    return { id, label, role, status, activity, self: member.self, avatarId: imageId(member.avatarId), globalName };
   });
+  const own = typeof record.selfProfile === "object" && record.selfProfile !== null ? (record.selfProfile as Record<string, unknown>) : {};
   return {
     allowInvisible: policy.allowInvisible,
     managersSeeInvisible: policy.managersSeeInvisible,
     selfMode: record.selfMode,
     members,
+    selfProfile: { nickname: safeLabel(own.nickname) ?? null, avatarId: imageId(own.avatarId), globalAvatarId: imageId(own.globalAvatarId) },
   };
 }
 
@@ -208,7 +234,7 @@ export function parseServer(value: unknown): ServerSummary {
   ) {
     throw new PocInputError("invalid_instance", "Server is incomplete");
   }
-  return { id, name, role };
+  return { id, name, role, iconId: imageId(record.iconId) };
 }
 
 const GOOGLE_AUTHORIZE = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -297,7 +323,8 @@ function instancePath(path: string): string {
     path === "/api/v1/servers" ||
     path === "/api/v1/invites/accept" ||
     path === "/api/v1/auth/google/start" ||
-    path === "/api/v1/auth/google/poll"
+    path === "/api/v1/auth/google/poll" ||
+    path === "/api/v1/profile/avatar"
   ) {
     return path;
   }
@@ -305,10 +332,12 @@ function instancePath(path: string): string {
   if (join?.[1] !== undefined && UUID.test(join[1])) return path;
   const kick = /^\/api\/v1\/rooms\/([0-9a-f-]{36})\/participants\/([0-9a-f-]{36})\/kick$/i.exec(path);
   if (kick?.[1] !== undefined && kick[2] !== undefined && UUID.test(kick[1]) && UUID.test(kick[2])) return path;
-  const serverRooms = /^\/api\/v1\/servers\/([0-9a-f-]{36})\/(?:rooms|invites|presence|members)$/i.exec(path);
+  const serverRooms = /^\/api\/v1\/servers\/([0-9a-f-]{36})\/(?:rooms|invites|presence|members|icon|profile)$/i.exec(path);
   if (serverRooms?.[1] !== undefined && UUID.test(serverRooms[1])) return path;
   const serverPresenceAction = /^\/api\/v1\/servers\/([0-9a-f-]{36})\/presence\/(?:heartbeat|mode|policy)$/i.exec(path);
   if (serverPresenceAction?.[1] !== undefined && UUID.test(serverPresenceAction[1])) return path;
+  const image = /^\/api\/v1\/images\/([0-9a-f-]{36})$/i.exec(path);
+  if (image?.[1] !== undefined && UUID.test(image[1])) return path;
   throw new PocInputError("invalid_api_base", "Request path is not part of the instance API");
 }
 

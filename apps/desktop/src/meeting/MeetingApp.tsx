@@ -1,7 +1,6 @@
 import {
   browserLabel,
   buildCards,
-  cardInitial,
   DEFAULT_PLAYBACK,
   describeMediaError,
   emptyStats,
@@ -24,11 +23,20 @@ import {
   type PlaybackLevel,
   type PocSnapshot,
 } from "@openmeet/media";
-import { inviteFromFragment, invitePageLink, MeetingModel, type InstanceApi, type SessionBroker, type ShellSnapshot } from "@openmeet/shared";
+import {
+  inviteFromFragment,
+  invitePageLink,
+  MeetingModel,
+  type InstanceApi,
+  type ServerPresenceMember,
+  type SessionBroker,
+  type ShellSnapshot,
+} from "@openmeet/shared";
 import desktopPackage from "../../package.json";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { holdMeetingLock } from "../shell/background";
 import { CardStage } from "./Cards";
+import { Face, ImagePicker } from "./images";
 import {
   IconCamera,
   IconClock,
@@ -108,6 +116,9 @@ const ERROR_TEXT: Record<string, string> = {
   request_failed: "A instância não respondeu.",
   instance_outdated: "A instância está desatualizada para este app. Peça ao operador para atualizar a API.",
   instance_unavailable: "A instância não confirmou os metadados.",
+  invalid_image: "Use uma imagem PNG, JPEG ou WebP de até 256 KB.",
+  invalid_display_name: "O apelido não pode ter caracteres de controle e vai até 80 letras.",
+  rate_limited: "Muitas trocas seguidas. Espere um minuto.",
 };
 
 const PRESENCE_MS = 5000;
@@ -179,6 +190,8 @@ export function MeetingApp() {
   const [shellPending, setShellPending] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [serverSettingsOpen, setServerSettingsOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [nickname, setNickname] = useState("");
   const [membersOpen, setMembersOpen] = useState(() => !__WEB__ || window.innerWidth > 900);
   const [exportConsent, setExportConsent] = useState(false);
   const [activity, setActivity] = useState<"online" | "away">("online");
@@ -395,6 +408,11 @@ export function MeetingApp() {
   const pin = keepPin(cards, pinnedId);
   const placement = placeCards(cards, layout, pin);
   const selectedServer = state.servers.find((server) => server.id === state.selectedServerId);
+  // ADR 0019: the member list of the selected server carries nickname and avatar. A call in another
+  // server keeps the LiveKit name and the initial.
+  const selfMember = state.serverPresence?.members.find((member) => member.self);
+  const memberById = new Map((state.serverPresence?.members ?? []).map((member) => [member.id, member]));
+  const callMembers = inCall && state.activeServerId === state.selectedServerId ? memberById : new Map<string, ServerPresenceMember>();
   const browsingAway = inCall && state.activeServerId !== null && state.activeServerId !== state.selectedServerId;
   const caption = screenCaption(localScreenSurface(media.tiles), media.screen);
   const isFullscreen = inCall && fullscreen && layout === "spotlight";
@@ -625,7 +643,7 @@ export function MeetingApp() {
             aria-current={server.id === state.selectedServerId ? "true" : undefined}
             onClick={() => void model.selectServer(server.id)}
           >
-            {cardInitial(server.name)}
+            <Face origin={state.origin} imageId={server.iconId} label={server.name} />
           </button>
         ))}
         <button
@@ -710,7 +728,9 @@ export function MeetingApp() {
                     return (
                       <li key={person.id} className={speaking ? "speaking" : undefined}>
                         <span className="avatar tiny" aria-hidden="true">
-                          <span>{cardInitial(person.label)}</span>
+                          <span>
+                            <Face origin={state.origin} imageId={memberById.get(person.id)?.avatarId ?? null} label={person.label} />
+                          </span>
                         </span>
                         <span className="room-name">{person.label}</span>
                         {(state.canCreate || state.role === "admin") && !media.participants.some((p) => p.local && p.identity === person.id) ? (
@@ -813,10 +833,12 @@ export function MeetingApp() {
         ) : null}
         <footer className="account">
           <span className="avatar small" aria-hidden="true">
-            <span>{cardInitial(state.userLabel ?? "?")}</span>
+            <span>
+              <Face origin={state.origin} imageId={selfMember?.avatarId ?? null} label={selfMember?.label ?? state.userLabel ?? "?"} />
+            </span>
           </span>
           <div className="you-name">
-            <strong>{state.userLabel}</strong>
+            <strong>{selfMember?.label ?? state.userLabel}</strong>
             <p className="origin">{inCall ? `Em ${state.activeRoomName ?? "reunião"}` : state.origin}</p>
           </div>
           {inCall ? (
@@ -848,6 +870,19 @@ export function MeetingApp() {
               <IconGear />
             </summary>
             <div className="menu">
+              {state.serverPresence ? (
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={(event) => {
+                    event.currentTarget.closest("details")?.removeAttribute("open");
+                    setNickname(state.serverPresence?.selfProfile.nickname ?? "");
+                    setProfileOpen(true);
+                  }}
+                >
+                  Perfil
+                </button>
+              ) : null}
               <button type="button" className="ghost" onClick={() => void model.reloadRooms()} disabled={state.pending}>
                 Atualizar
               </button>
@@ -889,9 +924,9 @@ export function MeetingApp() {
           </header>
           <ul>
             {state.serverPresence.members.map((member) => (
-              <li key={member.id}>
+              <li key={member.id} title={member.globalName !== member.label ? `Conta: ${member.globalName}` : undefined}>
                 <span className="member-avatar" aria-hidden="true">
-                  {cardInitial(member.label)}
+                  <Face origin={state.origin} imageId={member.avatarId} label={member.label} />
                   <span className={`presence-dot ${member.status}`} />
                 </span>
                 <span className="member-copy">
@@ -1028,6 +1063,108 @@ export function MeetingApp() {
             </section>
           </div>
         ) : null}
+        {profileOpen && selectedServer && state.serverPresence ? (
+          <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.target === event.currentTarget && setProfileOpen(false)}>
+            <section className="app-modal profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-title">
+              <header>
+                <div>
+                  <h1 id="profile-title">Perfil</h1>
+                  <p>A foto da conta vale em todos os servidores. Cada servidor pode ter apelido e foto próprios.</p>
+                </div>
+                <button type="button" className="icon-btn" aria-label="Fechar" onClick={() => setProfileOpen(false)}>
+                  ×
+                </button>
+              </header>
+              <section className="modal-section">
+                <h2>Conta</h2>
+                <div className="image-row">
+                  <span className="profile-face" aria-hidden="true">
+                    <Face origin={state.origin} imageId={state.serverPresence.selfProfile.globalAvatarId} label={state.userLabel ?? "?"} />
+                  </span>
+                  <div className="image-copy">
+                    <strong>{state.userLabel}</strong>
+                    <div className="row">
+                      <ImagePicker
+                        label="Trocar foto"
+                        disabled={state.pending}
+                        onPick={(image) => void model.setAccountAvatar(image)}
+                        onError={setMediaError}
+                      />
+                      {state.serverPresence.selfProfile.globalAvatarId ? (
+                        <button type="button" className="ghost danger-text" disabled={state.pending} onClick={() => void model.setAccountAvatar(null)}>
+                          Remover
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              </section>
+              <section className="modal-section">
+                <div>
+                  <h2>Em {selectedServer.name}</h2>
+                  <p className="hint">Sem apelido ou foto aqui, vale o perfil da conta.</p>
+                </div>
+                <div className="image-row">
+                  <span className="profile-face" aria-hidden="true">
+                    <Face
+                      origin={state.origin}
+                      imageId={state.serverPresence.selfProfile.avatarId ?? state.serverPresence.selfProfile.globalAvatarId}
+                      label={state.serverPresence.selfProfile.nickname ?? state.userLabel ?? "?"}
+                    />
+                  </span>
+                  <div className="row">
+                    <ImagePicker
+                      label="Foto só aqui"
+                      disabled={state.pending}
+                      onPick={(avatar) => void model.setServerProfile({ avatar })}
+                      onError={setMediaError}
+                    />
+                    {state.serverPresence.selfProfile.avatarId ? (
+                      <button
+                        type="button"
+                        className="ghost danger-text"
+                        disabled={state.pending}
+                        onClick={() => void model.setServerProfile({ avatar: null })}
+                      >
+                        Remover
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+                <form
+                  className="nickname-form"
+                  onSubmit={(event: FormEvent) => {
+                    event.preventDefault();
+                    void model.setServerProfile({ nickname: nickname.trim() === "" ? null : nickname });
+                  }}
+                >
+                  <label>
+                    Apelido
+                    <input value={nickname} onChange={(event) => setNickname(event.currentTarget.value)} maxLength={80} placeholder={state.userLabel ?? ""} />
+                  </label>
+                  <div className="row">
+                    <button type="submit" disabled={state.pending || nickname.trim() === (state.serverPresence.selfProfile.nickname ?? "")}>
+                      Salvar apelido
+                    </button>
+                    {state.serverPresence.selfProfile.nickname !== null || state.serverPresence.selfProfile.avatarId !== null ? (
+                      <button
+                        type="button"
+                        className="ghost"
+                        disabled={state.pending}
+                        onClick={() => {
+                          setNickname("");
+                          void model.setServerProfile({ nickname: null, avatar: null });
+                        }}
+                      >
+                        Usar perfil da conta
+                      </button>
+                    ) : null}
+                  </div>
+                </form>
+              </section>
+            </section>
+          </div>
+        ) : null}
         {serverSettingsOpen && selectedServer && state.serverPresence ? (
           <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.target === event.currentTarget && setServerSettingsOpen(false)}>
             <section className="app-modal server-settings-modal" role="dialog" aria-modal="true" aria-labelledby="server-settings-title">
@@ -1087,6 +1224,25 @@ export function MeetingApp() {
                   </button>
                 )}
               </section>
+              {selectedServer.role === "owner" ? (
+                <section className="modal-section">
+                  <div>
+                    <h2>Ícone</h2>
+                    <p className="hint">Aparece na barra de servidores para todos os membros. PNG, JPEG ou WebP.</p>
+                  </div>
+                  <div className="image-row">
+                    <span className="profile-face server-face" aria-hidden="true">
+                      <Face origin={state.origin} imageId={selectedServer.iconId} label={selectedServer.name} />
+                    </span>
+                    <ImagePicker label="Escolher imagem" disabled={state.pending} onPick={(image) => void model.setServerIcon(image)} onError={setMediaError} />
+                    {selectedServer.iconId ? (
+                      <button type="button" className="ghost danger-text" disabled={state.pending} onClick={() => void model.setServerIcon(null)}>
+                        Remover
+                      </button>
+                    ) : null}
+                  </div>
+                </section>
+              ) : null}
               {selectedServer.role === "owner" ? (
                 <section className="modal-section">
                   <div>
@@ -1169,7 +1325,13 @@ export function MeetingApp() {
               </p>
             ) : null}
             <CardStage
-              cards={cards}
+              cards={cards.map((card) => {
+                const member = callMembers.get(card.identity);
+                return member ? { ...card, label: member.label } : card;
+              })}
+              origin={state.origin}
+              avatarFor={(identity) => callMembers.get(identity)?.avatarId ?? null}
+              accountFor={(identity) => callMembers.get(identity)?.globalName ?? null}
               tiles={media.tiles}
               layout={layout}
               featuredId={placement.featuredId}

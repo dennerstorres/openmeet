@@ -1,3 +1,4 @@
+import { prepareInstanceRequest } from "@openmeet/shared";
 import type * as Native from "../shell/native";
 
 // ADR 0014: the web build resolves `../shell/native` to this file (see vite.config.ts). Tray, global
@@ -35,4 +36,16 @@ export const listenInvite: typeof Native.listenInvite = async () => () => undefi
 /** ADR 0014: Google opens in a new browser window; the page keeps polling. */
 export const openGoogleLogin: typeof Native.openGoogleLogin = async (url) => {
   window.open(url, "_blank", "noopener,noreferrer");
+};
+
+/** ADR 0019: same-origin image read with the session cookie and the web header, like every web call. */
+export const fetchImage: typeof Native.fetchImage = async (origin, id) => {
+  const prepared = prepareInstanceRequest(origin, origin, "GET", `/api/v1/images/${id}`, null, null);
+  const response = await fetch(prepared.url, {
+    headers: { "x-openmeet-web": "1" },
+    credentials: "same-origin",
+    redirect: "error",
+  });
+  if (response.status !== 200) throw new Error("image_not_found");
+  return new Uint8Array(await response.arrayBuffer());
 };

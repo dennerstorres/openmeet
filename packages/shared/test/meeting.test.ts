@@ -111,6 +111,10 @@ function apiFor(role: string): { api: InstanceApi; calls: string[]; bodies: unkn
         };
       }
       if (path.endsWith("/presence/mode") || path.endsWith("/presence/policy")) return { status: 204, body: null };
+      if (path === `/api/v1/servers/${serverId}/icon`)
+        return role === "admin" ? { status: 200, body: { iconId: roomId } } : { status: 403, body: { error: "forbidden" } };
+      if (path === `/api/v1/servers/${serverId}/profile`) return { status: 200, body: { nickname: "Aninha", avatarId: null } };
+      if (path === "/api/v1/profile/avatar") return { status: 200, body: { avatarId: roomId } };
       if (path.endsWith("/join")) return { status: 200, body: { url: "wss://sfu.example", token: joinToken } };
       if (path === "/api/v1/auth/logout") return { status: 204, body: null };
       return { status: 404, body: { error: "room_not_found" } };
@@ -668,4 +672,25 @@ test("a new sign-in stops the logout retries of the session before it", async ()
   await new Promise((resolve) => setTimeout(resolve, 10));
   assert.equal(logouts, 1);
   assert.equal(model.snapshot().step, "rooms");
+});
+
+test("profile calls go to the selected server and surface a refusal", async () => {
+  for (const role of ["admin", "participant"]) {
+    const { api, calls, bodies } = apiFor(role);
+    const model = new MeetingModel(api, mediaFor());
+    await model.confirmInstance("https://meet.example");
+    await model.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+    assert.equal(await model.setServerIcon("aW1n"), role === "admin");
+    assert.equal(model.snapshot().error, role === "admin" ? null : "forbidden");
+    assert.equal(await model.setServerProfile({ nickname: "Aninha" }), true);
+    assert.equal(await model.setAccountAvatar(null), true);
+    assert.equal(calls.includes(`POST https://meet.example/api/v1/servers/${serverId}/icon`), true);
+    assert.equal(calls.includes(`POST https://meet.example/api/v1/servers/${serverId}/profile`), true);
+    for (const sent of [{ nickname: "Aninha" }, { image: null }, { image: "aW1n" }]) {
+      assert.equal(
+        bodies.some((body) => JSON.stringify(body) === JSON.stringify(sent)),
+        true,
+      );
+    }
+  }
 });
