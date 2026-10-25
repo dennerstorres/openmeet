@@ -13,6 +13,18 @@ export interface VideoBackgroundOptions {
   supported?: () => boolean;
   create?: ProcessorFactory;
   assetBase?: () => string;
+  /** Strength restored from the user's saved choice; clamped like any later change. */
+  blurRadius?: number;
+}
+
+/** Blur radius in pixels. 10 is the moderate default of ADR 0016; the range keeps the face readable and the cost bounded. */
+export const BLUR_RADIUS_MIN = 2;
+export const BLUR_RADIUS_MAX = 30;
+export const BLUR_RADIUS_DEFAULT = 10;
+
+export function clampBlurRadius(value: number): number {
+  if (!Number.isFinite(value)) return BLUR_RADIUS_DEFAULT;
+  return Math.min(BLUR_RADIUS_MAX, Math.max(BLUR_RADIUS_MIN, Math.round(value)));
 }
 
 function defaultAssetBase(): string {
@@ -26,11 +38,13 @@ export class VideoBackground {
   private processor: Processor | null = null;
   private track: LocalVideoTrack | null = null;
   private enabled = false;
+  private radius = BLUR_RADIUS_DEFAULT;
 
   constructor(options: VideoBackgroundOptions = {}) {
     this.supportedCheck = options.supported ?? supportsBackgroundProcessors;
     this.createProcessor = options.create ?? BackgroundProcessor;
     this.assetBase = options.assetBase ?? defaultAssetBase;
+    if (options.blurRadius !== undefined) this.radius = clampBlurRadius(options.blurRadius);
   }
 
   get isSupported(): boolean {
@@ -39,6 +53,16 @@ export class VideoBackground {
 
   get isEnabled(): boolean {
     return this.enabled;
+  }
+
+  get blurRadius(): number {
+    return this.radius;
+  }
+
+  /** Changes the strength in place: the processor stays on the published track, nothing is republished. */
+  async setBlurRadius(value: number): Promise<void> {
+    this.radius = clampBlurRadius(value);
+    if (this.enabled && this.processor) await this.processor.switchTo({ mode: "background-blur", blurRadius: this.radius });
   }
 
   async setEnabled(track: LocalVideoTrack | undefined, enabled: boolean): Promise<void> {
@@ -60,13 +84,13 @@ export class VideoBackground {
   async apply(track: LocalVideoTrack): Promise<void> {
     if (!this.enabled) return;
     if (this.track === track && this.processor) {
-      await this.processor.switchTo({ mode: "background-blur", blurRadius: 10 });
+      await this.processor.switchTo({ mode: "background-blur", blurRadius: this.radius });
       return;
     }
     const base = this.assetBase();
     const processor = this.createProcessor({
       mode: "background-blur",
-      blurRadius: 10,
+      blurRadius: this.radius,
       assetPaths: {
         tasksVisionFileSet: new URL("vision/", base).href.replace(/\/$/, ""),
         modelAssetPath: new URL("selfie_segmenter.tflite", base).href,

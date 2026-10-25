@@ -98,6 +98,7 @@ export interface PocSnapshot {
   speakers: string[];
   backgroundBlurSupported: boolean;
   backgroundBlur: boolean;
+  backgroundBlurRadius: number;
 }
 
 type Listener = (snapshot: PocSnapshot) => void;
@@ -276,6 +277,7 @@ export class LiveKitPocSession {
       speakers: [...this.speakers],
       backgroundBlurSupported: this.videoBackground.isSupported,
       backgroundBlur: this.videoBackground.isEnabled,
+      backgroundBlurRadius: this.videoBackground.blurRadius,
     };
   }
 
@@ -373,6 +375,11 @@ export class LiveKitPocSession {
   async setBackgroundBlur(enabled: boolean): Promise<void> {
     const track = this.room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
     await this.videoBackground.setEnabled(track instanceof LocalVideoTrack ? track : undefined, enabled);
+    this.emit();
+  }
+
+  async setBackgroundBlurRadius(radius: number): Promise<void> {
+    await this.videoBackground.setBlurRadius(radius);
     this.emit();
   }
 

@@ -10,6 +10,9 @@ Ajuste de 2026-10-23: consentimento de atalhos saiu da tela principal e passou p
 ## F04-06 — blur de fundo da câmera
 READY → IN_PROGRESS → WAITING_VALIDATION em 2026-10-23. Entregue: sem efeito/blur moderado, processamento só no cliente, assets MediaPipe empacotados, compatibilidade detectada, preservação ao trocar câmera e erro visível. A CSP `wasm-unsafe-eval`, sem `unsafe-eval` de JavaScript, foi autorizada pelo usuário. Testes cobrem ciclo do processor, troca de track e incompatibilidade; typecheck/lint/build e CSP passam. Falta câmera real em desktop/web/celular. Não tratar teste sem câmera como prova visual nem de desempenho.
 
+## F04-08 — intensidade do blur de fundo
+READY → IN_PROGRESS → WAITING_VALIDATION em 2026-10-25. Alterados `video-background.ts`, `session.ts` e `index.ts` de mídia, `MeetingApp.tsx`, `PocApp.tsx` e o teste do processor. Slider "Intensidade do desfoque" (raio 2–30 px, padrão 10) logo abaixo da opção de blur; valor salvo em `localStorage` (`openmeet.blurRadius`), o efeito continua nascendo desligado. Com o blur ligado, a troca chama `switchTo` no mesmo processor e não republica a faixa. Teste cobre limite, valor salvo, troca sem novo processor e ajuste com efeito desligado. Falta prova humana: câmera real em desktop e web, mexer no slider durante a chamada e conferir que o outro lado vê a mudança sem queda de vídeo.
+
 Roteiro pendente: abrir web e instalador; conferir ambos os ícones e menus por teclado; falar entre dois PCs com volume em 0/50/100/200%; trocar microfone, mutar/desmutar, sair/entrar e reconectar; verificar ausência de eco local e áudio da tela inalterado. Como admin membro do servidor, desconectar participante pela sidebar, conferir encerramento da mídia remota e novo ingresso permitido; como participante, chamada direta deve retornar 403. SFU indisponível deve mostrar erro e permitir repetir. Nada disso foi marcado PASS por mock.
 
 ## Execução

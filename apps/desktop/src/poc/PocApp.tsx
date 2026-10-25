@@ -30,6 +30,7 @@ const idleSnapshot: PocSnapshot = {
   screen: false,
   backgroundBlurSupported: false,
   backgroundBlur: false,
+  backgroundBlurRadius: 10,
 };
 
 export function PocApp() {

@@ -1,7 +1,11 @@
 import {
+  BLUR_RADIUS_DEFAULT,
+  BLUR_RADIUS_MAX,
+  BLUR_RADIUS_MIN,
   browserLabel,
   buildCards,
   cardInitial,
+  clampBlurRadius,
   DEFAULT_PLAYBACK,
   describeMediaError,
   emptyStats,
@@ -78,6 +82,7 @@ const idleSnapshot: PocSnapshot = {
   speakers: [],
   backgroundBlurSupported: false,
   backgroundBlur: false,
+  backgroundBlurRadius: BLUR_RADIUS_DEFAULT,
   screenAudio: "off",
 };
 
@@ -130,6 +135,18 @@ function storedShareAudio(): boolean {
   }
 }
 
+const BLUR_RADIUS_KEY = "openmeet.blurRadius";
+
+// ADR 0016: only the strength is kept on this PC; the effect itself still starts off.
+function storedBlurRadius(): number {
+  try {
+    const saved = localStorage.getItem(BLUR_RADIUS_KEY);
+    return saved === null ? BLUR_RADIUS_DEFAULT : clampBlurRadius(Number(saved));
+  } catch {
+    return BLUR_RADIUS_DEFAULT;
+  }
+}
+
 // ADR 0014: the web build has one instance, the origin that served the page. `__WEB__` is replaced at
 // build time (vite.config.ts), so the branches of the other target leave the bundle.
 function platform(): { api: InstanceApi; broker: SessionBroker | undefined } {
@@ -169,6 +186,7 @@ export function MeetingApp() {
   const [deafened, setDeafened] = useState(false);
   const [shareAudio, setShareAudio] = useState(storedShareAudio);
   const [microphoneVolume, setMicrophoneVolume] = useState(100);
+  const [blurRadius, setBlurRadius] = useState(storedBlurRadius);
   const [kickTarget, setKickTarget] = useState<{ roomId: string; userId: string; label: string } | null>(null);
   const [levels, setLevels] = useState<Record<string, PlaybackLevel>>({});
   const [mediaError, setMediaError] = useState<string | null>(null);
@@ -186,7 +204,11 @@ export function MeetingApp() {
   mediaRef.current = media;
 
   function session(): LiveKitPocSession {
-    sessionRef.current ??= new LiveKitPocSession({ appVersion: desktopPackage.version, client: __WEB__ ? "web" : "desktop" });
+    sessionRef.current ??= new LiveKitPocSession({
+      appVersion: desktopPackage.version,
+      client: __WEB__ ? "web" : "desktop",
+      videoBackground: { blurRadius: storedBlurRadius() },
+    });
     return sessionRef.current;
   }
 
@@ -1320,6 +1342,31 @@ export function MeetingApp() {
                       />
                       Desfocar fundo da câmera
                     </label>
+                    {media.backgroundBlurSupported ? (
+                      <label>
+                        Intensidade do desfoque: {blurRadius}
+                        <input
+                          type="range"
+                          min={BLUR_RADIUS_MIN}
+                          max={BLUR_RADIUS_MAX}
+                          step={1}
+                          value={blurRadius}
+                          aria-valuetext={`raio ${blurRadius} px`}
+                          onChange={(event) => {
+                            const value = clampBlurRadius(Number(event.currentTarget.value));
+                            setBlurRadius(value);
+                            try {
+                              localStorage.setItem(BLUR_RADIUS_KEY, String(value));
+                            } catch {
+                              // The choice still holds for this window.
+                            }
+                            session()
+                              .setBackgroundBlurRadius(value)
+                              .catch(() => setMediaError("Não foi possível ajustar o desfoque."));
+                          }}
+                        />
+                      </label>
+                    ) : null}
                     {media.backgroundBlurSupported ? (
                       <p className="hint">O efeito é processado neste aparelho e pode aumentar o uso de bateria.</p>
                     ) : (
