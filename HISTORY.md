@@ -2,6 +2,7 @@
 
 ### 2026-10-26 — F07-07, release 0.2.3 — Claude
 Branch `main`. Repo `dennerstorres/openmeet` tornado público pelo usuário após auditoria: gitleaks v8.21.2 via Docker em 93 commits de todas as branches, sem achados; busca manual só achou valores de teste e os domínios `openmeet`/`livekit.dennerstorres.dev`. Tag `v0.2.2` falhou (run 40339165942): `dtolnay/rust-toolchain` fixado por SHA sem `toolchain`, mesmo defeito da run da 0.2.0. Workflow passa `toolchain: 1.98.1` (igual ao `rust-toolchain.toml`). Versão 0.2.2 → 0.2.3 nos quatro arquivos, porque a 0.2.2 local já foi instalada. A tag `v0.2.2` ficou sem release. Quem tem build local precisa instalar a 0.2.3 uma vez; prova N → N+1 do ADR 0018 pendente.
+Run 40339799398: instalador e assinatura gerados (SHA-256 `cc034966cf1878ca914b6709c75d570f3f09375bb580b7084371bb49a541d816`), mas o job `publish` falhou: `gh release create` sem checkout precisa de `--repo`. Release `v0.2.3` publicada à mão com os artefatos dessa run; workflow corrigido para as próximas.
 
 ### 2026-10-26 — F07-06, instalador 0.2.2 — Claude
 Branch `main`. Versão 0.2.1 → 0.2.2 em `apps/desktop/package.json`, `src-tauri/Cargo.toml`, `Cargo.lock` e `tauri.conf.json`, por pedido do usuário. Reúne a intensidade do blur (F04-08) e ícone/avatar/perfil por servidor (F09-10, merge `95ec029`). O 0.2.1 local foi movido para `bundle/nsis/archive`.
