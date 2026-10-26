@@ -2,6 +2,9 @@
 
 Objetivo: Infra Docker + instalador.
 
+## F07-06 — 0.2.2
+READY → WAITING_VALIDATION em 2026-10-26. Pedido explícito de trocar a versão, gerar o `.exe`, commitar e enviar a `main`. O NSIS 0.2.2 local reúne a intensidade do blur e imagens/perfil por servidor; checksum, suíte TypeScript e testes Rust passaram. Falta instalar o bundle e validar câmera e imagens com dois clientes. Sem tag, GitHub Release ou deploy.
+
 ## F07-04 — 0.2.1
 READY → WAITING_VALIDATION em 2026-10-23. Pedido explícito de novo `.exe`, commit e push na `main`. O NSIS 0.2.1 local reúne atalhos/configurações, blur e presença de servidor; checksum, suíte TypeScript e testes Rust passaram. Faltam instalar o bundle, validar câmera e presença com dois clientes e aplicar a migration 0007 em implantação real. Sem tag, GitHub Release ou deploy público nesta tarefa.
 

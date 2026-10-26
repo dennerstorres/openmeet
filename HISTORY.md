@@ -1,5 +1,19 @@
 # HISTORY — registro cronológico
 
+### 2026-10-26 — F07-06, instalador 0.2.2 — Claude
+Branch `main`. Versão 0.2.1 → 0.2.2 em `apps/desktop/package.json`, `src-tauri/Cargo.toml`, `Cargo.lock` e `tauri.conf.json`, por pedido do usuário. Reúne a intensidade do blur (F04-08) e ícone/avatar/perfil por servidor (F09-10, merge `95ec029`). O 0.2.1 local foi movido para `bundle/nsis/archive`.
+Windows 11: após o merge da F09-10, `pnpm test` (scripts 27, shared 49, media 60, server 78, desktop 19), `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, builds desktop e web passaram; `cargo test --lib` (22) passou. `tauri build --bundles nsis` gerou `OpenMeet_0.2.2_x64-setup.exe`, 7.984.830 bytes, SHA-256 `4501849064d2d4adbcf9efe4df62dd3dc4a43735a889c3c966a5b4f1457a53c5`. Build local, sem assinatura do updater, sem tag, release ou deploy. Instalação e câmera real não testadas.
+
+### 2026-10-25 — F04-08 — Claude
+Branch / commit: `task/F04-08-intensidade-blur` (partindo da main 5b4b6f1) / `f9d4f01`, mesclado na `main` em `d3692a5`.
+Arquivos alterados: `packages/media/src/video-background.ts`, `session.ts`, `index.ts`, `packages/media/test/video-background.test.ts`, `apps/desktop/src/meeting/MeetingApp.tsx`, `apps/desktop/src/poc/PocApp.tsx`, PLAN, plano da fase 04 e adendo do ADR 0016.
+Decisão tomada: raio do blur ajustável 2–30 px (padrão 10), salvo em `localStorage`; mudança aplicada por `switchTo` no processor existente, sem republicar. CSP inalterada.
+Comandos executados: `pnpm test`; `pnpm typecheck`; `pnpm lint`; `pnpm format:check`; `pnpm --filter ./apps/desktop build`; `pnpm --filter ./apps/desktop build:web`. Windows 11, 2026-10-25.
+Resultados/artefatos: testes passaram (scripts 27, shared 45, media 60, server 73, desktop 19); typecheck, lint, formatação e os dois bundles passaram.
+Testes manuais (máquina/rede): não executados; nenhuma câmera foi aberta.
+Pendências e riscos: raio alto pode pesar em aparelho fraco; qualidade e FPS só com câmera real. F04-08 fica `WAITING_VALIDATION`.
+Próxima tarefa: ligar o blur numa chamada, mover o slider e conferir no outro cliente que o vídeo segue sem queda.
+
 ### 2026-10-25 — F09-10, ícone, avatar e perfil por servidor — Claude
 Branch `task/F09-10-imagens-perfil`, não commitado. ADR 0019 aceito pelo usuário. Migration `0008_images_profiles.sql`: tabela `images` (`bytea`, tipo, tamanho, lado, SHA-256, CHECKs de 256 KB e 512 px), `users.avatar_image_id`, `servers.icon_image_id`, `server_members.nickname` e `avatar_image_id`. `sniffImage` em `packages/shared` aceita só PNG (exige IEND), JPEG (exige SOF e FFD9) e WebP (tamanho RIFF exato, sem animação). Rotas: avatar da conta, ícone (só dono, auditado), perfil no servidor (só o próprio membro, apelido com a validação de nome da F10-01) e `GET /api/v1/images/:id` com `nosniff`, CSP `sandbox` e cache imutável; 10 envios por minuto por conta. Lista de membros, ocupação das salas e token LiveKit usam o nome efetivo. Remoção do servidor apaga apelido e avatar dali. Rust: `instance_image` só aceita id UUID e devolve bytes PNG/JPEG/WebP até 256 KB; três rotas novas na lista fechada. Web: `fetch` com cabeçalho web. As duas CSPs não mudaram. UI: ícone na barra, avatar em membros, ocupantes, cards e conta; modal Perfil (conta e servidor) e seção Ícone nas configurações do dono. O cliente corta e reduz para 256 px em WebP antes de enviar.
 Comandos (Windows 11): `pnpm test` (scripts 27, shared 49, media 59, server 78, desktop 19), `pnpm typecheck`, `pnpm lint`, `pnpm --filter @openmeet/desktop build` e `build:web`, `cargo test` (22) — passaram. `pnpm format:check` só acusa `apps/desktop/.impeccable/hook.cache.json`, cache local fora do Git. `cargo fmt` e `clippy` não estão instalados nesta máquina.
@@ -497,16 +511,6 @@ Resultados/artefatos: 210 testes TypeScript passaram (scripts 24, shared 45, med
 Testes manuais (máquina/rede): não executados; nenhum segundo cliente nem janela do produto foi aberto nesta tarefa.
 Pendências e riscos: reiniciar a API apaga a presença até o próximo heartbeat; fechar abruptamente pode levar até 75 segundos para aparecer desconectado. A UI, minimizar/ausência, fechar e a privacidade entre duas contas exigem validação real. F09-08 fica `WAITING_VALIDATION`, nunca `DONE`.
 Próxima tarefa: abrir dois clientes com contas no mesmo servidor e validar verde, âmbar, vermelho, invisível comum e invisível visível ao dono/moderador conforme política.
-
-### 2026-10-25 — F04-08 — Claude
-Branch / commit: `task/F04-08-intensidade-blur` (partindo da main 5b4b6f1) / sem commit, aguardando autorização.
-Arquivos alterados: `packages/media/src/video-background.ts`, `session.ts`, `index.ts`, `packages/media/test/video-background.test.ts`, `apps/desktop/src/meeting/MeetingApp.tsx`, `apps/desktop/src/poc/PocApp.tsx`, PLAN, plano da fase 04 e adendo do ADR 0016.
-Decisão tomada: raio do blur ajustável 2–30 px (padrão 10), salvo em `localStorage`; mudança aplicada por `switchTo` no processor existente, sem republicar. CSP inalterada.
-Comandos executados: `pnpm test`; `pnpm typecheck`; `pnpm lint`; `pnpm format:check`; `pnpm --filter ./apps/desktop build`; `pnpm --filter ./apps/desktop build:web`. Windows 11, 2026-10-25.
-Resultados/artefatos: testes passaram (scripts 27, shared 45, media 60, server 73, desktop 19); typecheck, lint, formatação e os dois bundles passaram.
-Testes manuais (máquina/rede): não executados; nenhuma câmera foi aberta.
-Pendências e riscos: raio alto pode pesar em aparelho fraco; qualidade e FPS só com câmera real. F04-08 fica `WAITING_VALIDATION`.
-Próxima tarefa: ligar o blur numa chamada, mover o slider e conferir no outro cliente que o vídeo segue sem queda.
 
 ## Template de registro
 ```
