@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-26 — F07-07, release 0.2.3 — Claude
+Branch `main`. Repo `dennerstorres/openmeet` tornado público pelo usuário após auditoria: gitleaks v8.21.2 via Docker em 93 commits de todas as branches, sem achados; busca manual só achou valores de teste e os domínios `openmeet`/`livekit.dennerstorres.dev`. Tag `v0.2.2` falhou (run 40339165942): `dtolnay/rust-toolchain` fixado por SHA sem `toolchain`, mesmo defeito da run da 0.2.0. Workflow passa `toolchain: 1.98.1` (igual ao `rust-toolchain.toml`). Versão 0.2.2 → 0.2.3 nos quatro arquivos, porque a 0.2.2 local já foi instalada. A tag `v0.2.2` ficou sem release. Quem tem build local precisa instalar a 0.2.3 uma vez; prova N → N+1 do ADR 0018 pendente.
+
 ### 2026-10-26 — F07-06, instalador 0.2.2 — Claude
 Branch `main`. Versão 0.2.1 → 0.2.2 em `apps/desktop/package.json`, `src-tauri/Cargo.toml`, `Cargo.lock` e `tauri.conf.json`, por pedido do usuário. Reúne a intensidade do blur (F04-08) e ícone/avatar/perfil por servidor (F09-10, merge `95ec029`). O 0.2.1 local foi movido para `bundle/nsis/archive`.
 Windows 11: após o merge da F09-10, `pnpm test` (scripts 27, shared 49, media 60, server 78, desktop 19), `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, builds desktop e web passaram; `cargo test --lib` (22) passou. `tauri build --bundles nsis` gerou `OpenMeet_0.2.2_x64-setup.exe`, 7.984.830 bytes, SHA-256 `4501849064d2d4adbcf9efe4df62dd3dc4a43735a889c3c966a5b4f1457a53c5`. Build local, sem assinatura do updater, sem tag, release ou deploy. Instalação e câmera real não testadas.

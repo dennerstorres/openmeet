@@ -28,3 +28,6 @@ Restore test e uso VPS externa. Um restore local não fecha a fase.
 
 ## Observação
 Não concluir fase por implementação superficial ou mocks. Dependências externas e validações reais precisam de evidência ou status WAITING_VALIDATION.
+
+## F07-07 — 0.2.3 pelo GitHub Release
+READY → WAITING_VALIDATION em 2026-10-26. Pedido explícito de tornar o repo público e publicar a release. Auditoria do histórico com gitleaks v8.21.2 (93 commits, todas as branches) sem achados. A tag `v0.2.2` falhou no `rust-toolchain` sem `toolchain`; corrigido com `1.98.1` e versão subida para 0.2.3, porque a 0.2.2 já foi instalada à mão. Falta instalar a 0.2.3 e validar a atualização para a próxima versão.

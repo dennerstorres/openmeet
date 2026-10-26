@@ -6,6 +6,8 @@ F09-10 — Ícone do servidor, avatar e perfil por servidor: WAITING_VALIDATION.
 
 F09-09 — Navegação de servidor e UTF-8: WAITING_VALIDATION. Implementada em 2026-10-23, depende de F09-08. Salas ficam na coluna esquerda com criação no topo; membros passam a painel direito recolhível; convite e política vão para modais de servidor; entrada por convite acompanha Adicionar servidor. A ponte nativa lê JSON diretamente como UTF-8. Testes, builds e inspeção web responsiva passaram; falta validar no `.exe` contra a instância real e confirmar um nome acentuado já salvo.
 
+F07-07 — Release 0.2.3 pelo GitHub Actions: WAITING_VALIDATION. Repo tornado público em 2026-10-26 após auditoria do histórico (gitleaks, sem achados). A tag `v0.2.2` falhou porque o `dtolnay/rust-toolchain` fixado por SHA exige `toolchain`; o workflow agora passa `1.98.1`. Primeira build com endpoint do updater; quem tem 0.2.2 local precisa instalar a 0.2.3 uma vez. Falta validar N → N+1.
+
 F07-06 — Entrega 0.2.2: WAITING_VALIDATION. Versão e instalador NSIS local gerados em 2026-10-26 com intensidade do blur (F04-08) e imagens/perfil por servidor (F09-10). Testes automatizados e checksum passaram; falta instalar o `.exe` e validar câmera e imagens com dois clientes. Sem tag, GitHub Release ou deploy.
 
 F07-04 — Entrega 0.2.1: WAITING_VALIDATION. Versão e instalador NSIS gerados em 2026-10-23 com atalhos/configurações, blur local e presença global do servidor. Testes automatizados e checksum passaram; falta instalar o `.exe`, validar câmera/presença com dois clientes e aplicar a migration 0007 em implantação real. Sem tag, GitHub Release ou deploy nesta tarefa.
@@ -47,6 +49,7 @@ F09-08 — Presença dos membros do servidor: WAITING_VALIDATION. Implementada e
 | F07-02 | Distribuição | Instalador Windows + CI release | F07-01 | IMPLEMENTED | Grok | G7 |
 | F07-05 | Distribuição | Atualização automática assinada (ADR 0018) | F07-02 | WAITING_VALIDATION | Claude | G7,G10 |
 | F07-06 | Distribuição | Entrega 0.2.2 | F04-08,F09-10 | WAITING_VALIDATION | Claude | G7 |
+| F07-07 | Distribuição | Release 0.2.3 com updater | F07-06 | WAITING_VALIDATION | Claude | G7 |
 | F02-02 | POC | Conectar dois clientes Windows ao mesmo room | F02-01 | WAITING_VALIDATION | Grok | G2 |
 | F02-03 | POC | Áudio bidirecional, mic/câmera e devices | F02-02 | WAITING_VALIDATION | Grok | G2 |
 | F02-04 | POC | Captura de monitor e janela | F02-02 | WAITING_VALIDATION | Grok | G2 |
