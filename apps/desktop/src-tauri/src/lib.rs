@@ -1,3 +1,4 @@
+mod events;
 mod google;
 mod invite;
 mod session;
@@ -76,6 +77,7 @@ pub fn run() {
         })
         .manage(invite::PendingInvite::default())
         .manage(session::NativeSession::default())
+        .manage(events::ChatStream::default())
         .manage(updater::CallLive::default())
         .manage(updater::PendingUpdate::default())
         .setup(|app| {
@@ -102,6 +104,8 @@ pub fn run() {
             session::instance_call,
             session::instance_image,
             session::instance_sound,
+            events::instance_events_open,
+            events::instance_events_close,
             shell::shell_status,
             shell::shell_set_consent,
             shell::shell_set_autostart,

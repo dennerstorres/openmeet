@@ -10,7 +10,7 @@ Pedida pelo usuário em 2026-10-27, decisões revisadas no mesmo dia: SSE, reten
 | F13-02 | Migração 0011 e schema: `channel`, mensagens, DMs, menções, reações, anexos, emojis, bloqueios, leituras, preferências | F13-01 | IMPLEMENTED | G10 |
 | F13-03 | API de mensagens das salas: listar com cursor, enviar, responder, editar, remover, fixar, busca, limite de taxa | F13-02 | IMPLEMENTED | G4,G10 |
 | F13-04 | API SSE: emissor em memória, `/events` por usuário, `Last-Event-ID`, keep-alive, fecha no logout/saída | F13-03 | IMPLEMENTED | G4,G10 |
-| F13-05 | Ponte Rust do SSE: `instance_events_open/close` repassando eventos Tauri | F13-04 | PENDING | G4,G10 |
+| F13-05 | Ponte Rust do SSE: `instance_events_open/close` repassando eventos Tauri | F13-04 | IMPLEMENTED | G4,G10 |
 | F13-06 | UI base: tipo ao criar sala, `#` na lista, painel de mensagens, envio, histórico ao rolar, SSE na web e no desktop | F13-04,F13-05 | PENDING | G4 |
 | F13-07 | Markdown seguro, responder, editar, remover, reações, fixar, "digitando…", pular para mensagem, busca | F13-06 | PENDING | G4,G10 |
 | F13-08 | Menções: autocompletar `@`, `@everyone`/`@here` com permissão, destaque, contador | F13-06 | PENDING | G4,G10 |

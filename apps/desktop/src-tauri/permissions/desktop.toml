@@ -82,3 +82,13 @@ commands.allow = ["update_check"]
 identifier = "allow-update-install"
 description = "Enables the update_install command without any pre-configured scope."
 commands.allow = ["update_install"]
+
+[[permission]]
+identifier = "allow-instance-events-open"
+description = "Enables the instance_events_open command without any pre-configured scope."
+commands.allow = ["instance_events_open"]
+
+[[permission]]
+identifier = "allow-instance-events-close"
+description = "Enables the instance_events_close command without any pre-configured scope."
+commands.allow = ["instance_events_close"]

@@ -28,13 +28,13 @@ impl NativeSession {
         }
     }
 
-    fn forget(&self) {
+    pub(crate) fn forget(&self) {
         if let Ok(mut held) = self.0.lock() {
             *held = None;
         }
     }
 
-    fn access_for(&self, origin: &str) -> Option<String> {
+    pub(crate) fn access_for(&self, origin: &str) -> Option<String> {
         self.0.lock().ok()?.as_ref().filter(|(held, _)| held == origin).map(|(_, access)| access.clone())
     }
 }
@@ -175,9 +175,30 @@ fn is_id(value: &str) -> bool {
         })
 }
 
+fn is_message_id(value: &str) -> bool {
+    (1..=18).contains(&value.len()) && !value.starts_with('0') && value.chars().all(|char| char.is_ascii_digit())
+}
+
+/// ADR 0024: the only query a call may carry is the message cursor, `?before=` or `?after=` with a message id.
+fn split_query(path: &str) -> Option<(&str, bool)> {
+    match path.split_once('?') {
+        None => Some((path, false)),
+        Some((route, query)) => {
+            let (key, value) = query.split_once('=')?;
+            (matches!(key, "before" | "after") && is_message_id(value)).then_some((route, true))
+        }
+    }
+}
+
 /// S-06: the instance routes the page may call with the session. Auth, admin and password routes are not here.
 fn allowed_call(method: &str, path: &str) -> bool {
+    let Some((path, cursor)) = split_query(path) else {
+        return false;
+    };
     let parts: Vec<&str> = path.split('/').collect();
+    if cursor {
+        return method == "GET" && matches!(parts.as_slice(), ["", "api", "v1", "rooms", id, "messages"] if is_id(id));
+    }
     match (method, parts.as_slice()) {
         ("GET" | "POST", ["", "api", "v1", "rooms"]) => true,
         ("GET" | "POST", ["", "api", "v1", "servers"]) => true,
@@ -198,6 +219,12 @@ fn allowed_call(method: &str, path: &str) -> bool {
         ("POST", ["", "api", "v1", "servers", id, "sounds", sound, "import" | "remove"]) => is_id(id) && is_id(sound),
         ("GET", ["", "api", "v1", "sounds", "mine"]) => true,
         ("POST", ["", "api", "v1", "sounds", sound, "rename" | "delete"]) => is_id(sound),
+        // ADR 0024: text room messages. The live stream goes through instance_events_open.
+        ("GET" | "POST", ["", "api", "v1", "rooms", id, "messages"]) => is_id(id),
+        ("GET", ["", "api", "v1", "rooms", id, "pins"]) => is_id(id),
+        ("POST", ["", "api", "v1", "rooms", id, "messages", "search"]) => is_id(id),
+        ("POST", ["", "api", "v1", "rooms", id, "typing"]) => is_id(id),
+        ("POST", ["", "api", "v1", "messages", message, "edit" | "delete" | "pin"]) => is_message_id(message),
         _ => false,
     }
 }
@@ -432,6 +459,16 @@ mod tests {
             ("POST", format!("/api/v1/sounds/{id}/delete")),
             ("POST", format!("/api/v1/rooms/{id}/delete")),
             ("POST", format!("/api/v1/servers/{id}/delete")),
+            ("GET", format!("/api/v1/rooms/{id}/messages")),
+            ("GET", format!("/api/v1/rooms/{id}/messages?before=42")),
+            ("GET", format!("/api/v1/rooms/{id}/messages?after=1")),
+            ("POST", format!("/api/v1/rooms/{id}/messages")),
+            ("GET", format!("/api/v1/rooms/{id}/pins")),
+            ("POST", format!("/api/v1/rooms/{id}/messages/search")),
+            ("POST", format!("/api/v1/rooms/{id}/typing")),
+            ("POST", "/api/v1/messages/42/edit".to_string()),
+            ("POST", "/api/v1/messages/42/delete".to_string()),
+            ("POST", "/api/v1/messages/42/pin".to_string()),
         ] {
             assert!(allowed_call(method, &path), "{method} {path}");
         }
@@ -459,6 +496,15 @@ mod tests {
             ("POST", format!("/api/v1/servers/{id}/sounds/not-an-id/remove")),
             ("POST", "/api/v1/sounds/mine".to_string()),
             ("POST", format!("/api/v1/sounds/{id}/play")),
+            ("POST", format!("/api/v1/rooms/{id}/messages?after=1")),
+            ("GET", format!("/api/v1/rooms/{id}/messages?after=01")),
+            ("GET", format!("/api/v1/rooms/{id}/messages?after=1&before=2")),
+            ("GET", format!("/api/v1/rooms/{id}/messages?q=segredo")),
+            ("GET", format!("/api/v1/rooms/{id}/pins?after=1")),
+            ("POST", "/api/v1/messages/abc/edit".to_string()),
+            ("POST", format!("/api/v1/messages/{id}/edit")),
+            ("GET", "/api/v1/messages/42/edit".to_string()),
+            ("GET", "/api/v1/events".to_string()),
         ] {
             assert!(!allowed_call(method, &path), "{method} {path}");
         }

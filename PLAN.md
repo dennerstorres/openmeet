@@ -2,7 +2,7 @@
 
 Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, `VERIFIED`, `DONE`, `BLOCKED`.
 
-F13 — Salas de texto, DM e emoji próprio: ADR 0024 aceito em 2026-10-27, SPEC item 23. F13-02 a F13-04 IMPLEMENTED (branches `task/F13-02-schema-mensagens`, `task/F13-03-api-mensagens`, `task/F13-04-sse`): migração 0011, API de mensagens e fluxo SSE por conta; testes do servidor passaram, falta implantação real e proxy. Próxima: F13-05 (ponte Rust do SSE). Escopo em `plans/phase-13-salas-de-texto.md`.
+F13 — Salas de texto, DM e emoji próprio: ADR 0024 aceito em 2026-10-27, SPEC item 23. F13-02 a F13-05 IMPLEMENTED (branches `task/F13-02-schema-mensagens` a `task/F13-05-ponte-sse`): migração 0011, API de mensagens, fluxo SSE por conta e a ponte do `.exe` e da web com reconexão; testes passaram, falta implantação real, proxy e ver o fluxo no `.exe`. Próxima: F13-06 (UI base). Escopo em `plans/phase-13-salas-de-texto.md`.
 
 F04-13 — Remover salas e servidores: WAITING_VALIDATION. Pedida pelo usuário em 2026-10-27, branch `task/F04-13-remover-salas-servidores`. Remoção lógica (ADR 0023, proposto): dono ou moderador remove sala, só o dono remove servidor; a chamada fecha no SFU, os convites são revogados e o identificador da sala fica livre. Typecheck, lint, testes (TS e Rust) passaram; fluxo visto na web local com SFU falso; falta LiveKit real com gente na sala, o `.exe` e o aceite do ADR.
 
@@ -119,7 +119,7 @@ F09-08 — Presença dos membros do servidor: WAITING_VALIDATION. Implementada e
 | F13-02 | Chat | Migração 0011 e schema de mensagens | F13-01 | IMPLEMENTED | Claude | G10 |
 | F13-03 | Chat | API de mensagens das salas | F13-02 | IMPLEMENTED | Claude | G4,G10 |
 | F13-04 | Chat | API SSE por usuário | F13-03 | IMPLEMENTED | Claude | G4,G10 |
-| F13-05 | Chat | Ponte Rust do SSE | F13-04 | PENDING | Claude | G4,G10 |
+| F13-05 | Chat | Ponte Rust do SSE | F13-04 | IMPLEMENTED | Claude | G4,G10 |
 | F13-06 | Chat | UI base das salas de texto | F13-04,F13-05 | PENDING | Claude | G4 |
 | F13-07 | Chat | Markdown, resposta, edição, reações, fixar, busca | F13-06 | PENDING | Claude | G4,G10 |
 | F13-08 | Chat | Menções | F13-06 | PENDING | Claude | G4,G10 |
