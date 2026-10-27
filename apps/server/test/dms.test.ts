@@ -308,6 +308,8 @@ test("a block keeps the blocked one out and leaves an existing direct DM read on
       assert.deepEqual([refused.status, refused.body], [403, { error: "blocked" }]);
       assert.equal((await call(w, who, "POST", `/api/v1/dms/${dm.id}/typing`)).status, 403);
       assert.equal((await call(w, who, "POST", `/api/v1/messages/${message.id}/reactions`, { emoji: "👍", on: true })).status, 403);
+      // F13-14: a pin is a change too; the read-only DM keeps its pins as they were.
+      assert.deepEqual(await call(w, who, "POST", `/api/v1/messages/${message.id}/pin`, { pinned: true }), { status: 403, body: { error: "blocked" } });
     }
     assert.equal((await call(w, w.bia, "POST", `/api/v1/messages/${message.id}/edit`, { body: "editada" })).status, 403);
     // The existing DM still opens; a group with the blocker does not, either way round.
@@ -416,6 +418,24 @@ class Stream {
 async function settle(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 150));
 }
+
+// F13-14: every pin is a numbered event in the shared replay buffer, so toggling one is throttled like reactions.
+test("pinning and other chat changes are rate limited per person", async () => {
+  const w = await world();
+  try {
+    const { dm } = await open(w, w.ana, [w.bia.id]);
+    const message = (await call(w, w.ana, "POST", `/api/v1/dms/${dm.id}/messages`, { body: "fixa" })).body as Message;
+    for (let index = 0; index < 20; index += 1) {
+      assert.equal((await call(w, w.ana, "POST", `/api/v1/messages/${message.id}/pin`, { pinned: index % 2 === 0 })).status, 200);
+    }
+    assert.deepEqual(await call(w, w.ana, "POST", `/api/v1/messages/${message.id}/pin`, { pinned: true }), { status: 429, body: { error: "rate_limited" } });
+    // The same budget covers blocks and DM changes; someone else still has their own.
+    assert.equal((await call(w, w.ana, "POST", `/api/v1/users/${w.bia.id}/block`, { blocked: true })).status, 429);
+    assert.equal((await call(w, w.bia, "POST", `/api/v1/messages/${message.id}/pin`, { pinned: true })).status, 200);
+  } finally {
+    await w.app.close();
+  }
+});
 
 test("DM events reach only its active members, never the server owner or someone who left", async () => {
   const w = await world(true);

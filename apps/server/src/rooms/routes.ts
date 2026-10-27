@@ -787,6 +787,9 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
   const searching = createAttemptGate(10, 10_000);
   const typing = createAttemptGate(1, 2_000);
   const reacting = createAttemptGate(20, 10_000);
+  // Pins, DM changes, blocks and emoji edits: each one is a numbered event in the shared replay buffer, so an
+  // unthrottled toggle would push everyone else's missed events out of it.
+  const changing = createAttemptGate(20, 10_000);
   const events = db ? new ChatEvents(db) : undefined;
   // preClose: open streams would otherwise hold the shutdown until each client hangs up.
   app.addHook("preClose", async () => events?.closeAll());
@@ -889,6 +892,7 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
     try {
       const actor = await caller(request);
       if (!db) throw new AuthError("auth_unconfigured");
+      if (!changing.allow(actor.id, Date.now())) throw new AuthError("rate_limited");
       const emoji = await renameEmoji(db, actor, param(request, "id"), bodyField(request.body, "name"));
       await publishEmojis(request, emoji.serverId);
       return reply.code(200).header("cache-control", "no-store").send(emoji);
@@ -901,6 +905,7 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
     try {
       const actor = await caller(request);
       if (!db) throw new AuthError("auth_unconfigured");
+      if (!changing.allow(actor.id, Date.now())) throw new AuthError("rate_limited");
       const emoji = await deleteEmoji(db, actor, param(request, "id"));
       await publishEmojis(request, emoji.serverId);
       return reply.code(200).header("cache-control", "no-store").send({ deleted: true });
@@ -1118,6 +1123,7 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
     try {
       const actor = await caller(request);
       if (!db) throw new AuthError("auth_unconfigured");
+      if (!changing.allow(actor.id, Date.now())) throw new AuthError("rate_limited");
       const message = await pinMessage(db, actor, param(request, "id"), booleanField(request.body, "pinned"));
       await publishMessage(request, "message.updated", message);
       return reply.code(200).header("cache-control", "no-store").send(message);
@@ -1185,6 +1191,7 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
     try {
       const actor = await caller(request);
       if (!db) throw new AuthError("auth_unconfigured");
+      if (!changing.allow(actor.id, Date.now())) throw new AuthError("rate_limited");
       const dm = await addDmMember(db, actor, param(request, "id"), { userId: bodyField(request.body, "userId") });
       await publishDm(request, "dm.updated", dm);
       return reply.code(200).header("cache-control", "no-store").send(dm);
@@ -1197,6 +1204,7 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
     try {
       const actor = await caller(request);
       if (!db) throw new AuthError("auth_unconfigured");
+      if (!changing.allow(actor.id, Date.now())) throw new AuthError("rate_limited");
       const dm = await leaveDm(db, actor, param(request, "id"));
       await publishDm(request, "dm.updated", dm, [actor.id]);
       return reply.code(200).header("cache-control", "no-store").send(dm);
@@ -1209,6 +1217,7 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
     try {
       const actor = await caller(request);
       if (!db) throw new AuthError("auth_unconfigured");
+      if (!changing.allow(actor.id, Date.now())) throw new AuthError("rate_limited");
       const dm = await renameDm(db, actor, param(request, "id"), { name: bodyField(request.body, "name") });
       await publishDm(request, "dm.updated", dm);
       return reply.code(200).header("cache-control", "no-store").send(dm);
@@ -1349,6 +1358,7 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
     try {
       const actor = await caller(request);
       if (!db) throw new AuthError("auth_unconfigured");
+      if (!changing.allow(actor.id, Date.now())) throw new AuthError("rate_limited");
       const dm = await setBlock(db, actor, param(request, "id"), booleanField(request.body, "blocked"));
       if (dm) await publishDm(request, "dm.updated", dm);
       return reply.code(204).header("cache-control", "no-store").send();

@@ -486,6 +486,8 @@ export async function pinMessage(db: MigrationClient, actor: PublicUser, id: str
   const { chat, deleted } = await messageChat(db, actor, id);
   if (deleted) throw new RoomError("message_not_found");
   if (!chat.canPin) throw new RoomError("forbidden");
+  // A pin changes the chat for everyone: an ended room or a blocked DM stays as it is.
+  requireOpen(chat);
   if (pinned) {
     await db.query("update messages set pinned_at = coalesce(pinned_at, now()), pinned_by = coalesce(pinned_by, $2) where id = $1::bigint", [id, actor.id]);
   } else {

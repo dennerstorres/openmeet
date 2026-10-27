@@ -19,7 +19,7 @@ Pedida pelo usuário em 2026-10-27, decisões revisadas no mesmo dia: SSE, reten
 | F13-11 | DM na API: abrir 1:1, grupo até 10, adicionar/sair/renomear, bloqueio, mensagens reaproveitando F13-03 | F13-03 | IMPLEMENTED | G4,G10 |
 | F13-12 | DM na UI: entrada acima dos servidores, lista de conversas, abrir DM pelo membro, grupo, bloquear, aviso "sem E2EE" | F13-06,F13-11 | WAITING_VALIDATION | G4 |
 | F13-13 | Não lidas e notificação: leituras, níveis, Windows + bandeja, título/favicon e `Notification` opcional na web | F13-08,F13-12 | WAITING_VALIDATION | G4,G12 |
-| F13-14 | Docs (DEPLOYMENT, SECURITY, TROUBLESHOOTING, proxy SSE) e revisão independente | F13-09,F13-10,F13-13 | PENDING | G10,G12 |
+| F13-14 | Docs (DEPLOYMENT, SECURITY, TROUBLESHOOTING, proxy SSE) e revisão independente | F13-09,F13-10,F13-13 | WAITING_VALIDATION | G10,G12 |
 
 Uma branch por tarefa (`task/F13-XX-...`). Depois da F13-06, as F13-07, F13-08, F13-09 e F13-11 podem correr em paralelo, em sessões separadas.
 
@@ -36,6 +36,7 @@ Uma branch por tarefa (`task/F13-XX-...`). Depois da F13-06, as F13-07, F13-08, 
 - **F13-11:** DM só com quem divide servidor; segunda DM 1:1 com o mesmo par devolve a existente; grupo acima de 10 recusado; bloqueado não manda 403; quem saiu não lê; dono/moderador/admin não leem DM alheia.
 - **F13-12:** abrir DM pelo card do membro; bloqueio deixa só leitura.
 - **F13-13:** menção e DM notificam fora de foco, não notificam na conversa aberta, nível `none` silencia; contador do título zera ao ler.
+- **F13-14:** DM bloqueada não deixa fixar; fixar, mudar DM, bloquear e mudar emoji têm limite de 20 por 10 s por conta.
 
 ## Critério de saída
 
