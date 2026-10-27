@@ -66,7 +66,7 @@ export async function download(origin: string | null, attachment: ChatAttachment
   }
 }
 
-/** Room for the picture before it loads, so the list does not jump; capped like the CSS. */
+/** Room for the picture before it loads, so the list does not jump; on a narrow screen it shrinks keeping the shape. */
 function box(attachment: ChatAttachment): { width: number; height: number } {
   const width = attachment.width ?? 1;
   const height = attachment.height ?? 1;
@@ -81,7 +81,7 @@ function Picture(props: { origin: string | null; attachment: ChatAttachment; onO
     <button
       type="button"
       className="chat-picture"
-      style={{ width: size.width, height: size.height }}
+      style={{ width: size.width, aspectRatio: `${size.width} / ${size.height}` }}
       aria-label={`Abrir imagem ${props.attachment.name}`}
       disabled={url === null}
       onClick={() => url && props.onOpen(props.attachment, url)}
