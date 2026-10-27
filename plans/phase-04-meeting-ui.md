@@ -47,6 +47,11 @@ Testes automatizados: captura pede `deviceId` exato e desliga eco, ruído e ganh
 
 Prova humana antes de DONE: dois PCs no `.exe` e na web; VB-Audio Cable e mixagem estéreo listados; música estéreo ouvida do outro lado; volume e mute locais; sair encerra; LiveKit real aceita rádio e compartilhamento com áudio sem confundir faixas; rede ruim sem cortar a voz.
 
+## F04-12 — configurações globais
+READY → IN_PROGRESS → WAITING_VALIDATION em 2026-10-27, branch `task/F04-12-ajustes-globais`. Pedido do usuário: o painel de ajustes da chamada não cabia na tela. Ficam na chamada: entrada, volume do microfone, efeito de voz, "Ouvir minha voz" e rádio, mais um botão para Configurações. Vão para Configurações (desktop e web): saída, câmera, blur e intensidade, atualizar dispositivos, diagnóstico e exportação. A escolha de entrada, saída e câmera fica em `localStorage` (`openmeet.device.<tipo>`) e é aplicada uma vez por chamada, quando conecta, se o aparelho ainda existir. O blur continua começando desligado (ADR 0016). Sem mudança de mídia, servidor, grant ou CSP.
+
+Prova humana antes de DONE: escolher saída e câmera fora da chamada, entrar e ver os dois aplicados; trocar dentro da chamada pelas Configurações; dispositivo salvo desconectado cai no padrão sem erro; painel da chamada cabe em 768 px de altura; `.exe` e web.
+
 ## Execução
 Consultar as tarefas `F04-*` em `PLAN.md`, seus pré-requisitos e os quality gates. Dividir implementações em pequenos commits e evidenciar testes.
 
