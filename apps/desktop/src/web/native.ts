@@ -52,6 +52,18 @@ export const fetchImage: typeof Native.fetchImage = async (origin, id) => {
   return new Uint8Array(await response.arrayBuffer());
 };
 
+/** ADR 0024: same-origin read of a server emoji; the page checks the bytes before showing them. */
+export const fetchEmoji: typeof Native.fetchEmoji = async (origin, id) => {
+  const prepared = prepareInstanceRequest(origin, origin, "GET", `/api/v1/emojis/${id}`, null, null);
+  const response = await fetch(prepared.url, {
+    headers: { "x-openmeet-web": "1" },
+    credentials: "same-origin",
+    redirect: "error",
+  });
+  if (response.status !== 200) throw new Error("emoji_not_found");
+  return new Uint8Array(await response.arrayBuffer());
+};
+
 /** ADR 0021: same-origin sound read with the session cookie and the web header. */
 export const fetchSound: typeof Native.fetchSound = async (origin, id) => {
   const prepared = prepareInstanceRequest(origin, origin, "GET", `/api/v1/sounds/${id}`, null, null);

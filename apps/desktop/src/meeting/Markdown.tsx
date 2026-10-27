@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { parseMarkdown, type Block, type Inline } from "./chat-markdown";
+import { EmojiImage } from "./emojis";
 
 // ADR 0024: the parsed tree as React elements. Every piece of text goes through React as text; a link is a
 // button-like anchor whose click asks the room to confirm the address before anything opens.
@@ -63,6 +64,9 @@ function inline(nodes: Inline[], ctx: Context): ReactNode[] {
           </span>
         );
       }
+      case "emoji":
+        // The API already turned any emoji not usable here into `:name:`; this is only the picture.
+        return ctx.emojis?.has(node.id) === true ? <EmojiImage key={index} origin={ctx.emojis.origin} id={node.id} name={node.name} /> : `:${node.name}:`;
       case "everyone":
         return ctx.mentions?.everyone === true ? (
           <span key={index} className="md-mention self">
@@ -105,12 +109,29 @@ export interface MentionContext {
   label: (userId: string) => string;
 }
 
+/** The server emojis the API resolved for the message; any other `<:name:id>` reads `:name:`. */
+export interface EmojiContext {
+  origin: string | null;
+  has: (id: string) => boolean;
+}
+
 interface Context {
   onLink: (url: string) => void;
   mentions: MentionContext | undefined;
+  emojis: EmojiContext | undefined;
 }
 
-export function Markdown({ source, onLink, mentions }: { source: string; onLink: (url: string) => void; mentions?: MentionContext }) {
-  const ctx: Context = { onLink, mentions };
+export function Markdown({
+  source,
+  onLink,
+  mentions,
+  emojis,
+}: {
+  source: string;
+  onLink: (url: string) => void;
+  mentions?: MentionContext;
+  emojis?: EmojiContext;
+}) {
+  const ctx: Context = { onLink, mentions, emojis };
   return <>{parseMarkdown(source).map((node, index) => block(node, index, ctx))}</>;
 }

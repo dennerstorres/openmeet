@@ -135,3 +135,69 @@ export function sniffAttachmentImage(bytes: Uint8Array): AttachmentImageInfo | u
   if (info.width < 1 || info.height < 1 || info.width > ATTACHMENT_IMAGE_MAX_SIDE || info.height > ATTACHMENT_IMAGE_MAX_SIDE) return undefined;
   return info;
 }
+
+// ADR 0024: server emojis. PNG, GIF or WebP judged by the bytes, up to 256 KB. Static pictures are cut to
+// 128×128 by the client; an animated one goes as sent, so the side cap leaves it some room.
+export const EMOJI_MAX_BYTES = 256 * 1024;
+export const EMOJI_MAX_SIDE = 256;
+export const EMOJI_TYPES = ["image/png", "image/gif", "image/webp"] as const;
+
+export interface EmojiImageInfo {
+  type: (typeof EMOJI_TYPES)[number];
+  width: number;
+  height: number;
+  animated: boolean;
+}
+
+// A GIF moves when it holds more than one image descriptor; walking the blocks is the only honest count.
+function gifFrames(bytes: Uint8Array): number | undefined {
+  let offset = 13;
+  if (((bytes[10] ?? 0) & 0x80) !== 0) offset += 3 * (1 << (((bytes[10] ?? 0) & 0x07) + 1));
+  let frames = 0;
+  while (offset < bytes.length) {
+    const block = bytes[offset];
+    if (block === 0x3b) return frames;
+    if (block === 0x21) {
+      offset += 2;
+    } else if (block === 0x2c) {
+      frames += 1;
+      const flags = bytes[offset + 9] ?? 0;
+      offset += 10;
+      if ((flags & 0x80) !== 0) offset += 3 * (1 << ((flags & 0x07) + 1));
+      offset += 1;
+    } else {
+      return undefined;
+    }
+    while (offset < bytes.length) {
+      const size = bytes[offset] ?? 0;
+      offset += 1 + size;
+      if (size === 0) break;
+    }
+  }
+  return undefined;
+}
+
+function animatedWebp(bytes: Uint8Array): EmojiImageInfo | undefined {
+  if (bytes.length < 30 || ascii(bytes, 8, 4) !== "WEBP" || u32le(bytes, 4) + 8 !== bytes.length || ascii(bytes, 12, 4) !== "VP8X") return undefined;
+  if (((bytes[20] ?? 0) & 0x02) === 0) return undefined;
+  return { type: "image/webp", width: u24le(bytes, 24) + 1, height: u24le(bytes, 27) + 1, animated: true };
+}
+
+export function sniffEmoji(bytes: Uint8Array): EmojiImageInfo | undefined {
+  if (bytes.length === 0 || bytes.length > EMOJI_MAX_BYTES) return undefined;
+  let info: EmojiImageInfo | undefined;
+  if (startsWith(bytes, PNG_SIGNATURE)) {
+    const still = png(bytes);
+    if (still) info = { ...still, type: "image/png", animated: false };
+  } else if (ascii(bytes, 0, 4) === "RIFF") {
+    const still = webp(bytes);
+    info = still ? { ...still, type: "image/webp", animated: false } : animatedWebp(bytes);
+  } else if (ascii(bytes, 0, 6) === "GIF87a" || ascii(bytes, 0, 6) === "GIF89a") {
+    const frames = gifFrames(bytes);
+    const still = gif(bytes);
+    if (still && frames !== undefined && frames > 0) info = { type: "image/gif", width: still.width, height: still.height, animated: frames > 1 };
+  }
+  if (!info) return undefined;
+  if (info.width < 1 || info.height < 1 || info.width > EMOJI_MAX_SIDE || info.height > EMOJI_MAX_SIDE) return undefined;
+  return info;
+}

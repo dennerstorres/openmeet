@@ -15,6 +15,7 @@
     "allow-instance-call",
     "allow-instance-image",
     "allow-instance-sound",
+    "allow-instance-emoji",
     "allow-instance-attachment",
     "allow-instance-attachment-save",
     "allow-instance-events-open",

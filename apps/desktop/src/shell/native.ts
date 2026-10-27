@@ -108,6 +108,11 @@ export async function fetchImage(origin: string, id: string): Promise<Uint8Array
   return new Uint8Array(await invoke<ArrayBuffer>("instance_image", { origin, id }));
 }
 
+/** ADR 0024: one server emoji through the native session. The page checks the bytes again. */
+export async function fetchEmoji(origin: string, id: string): Promise<Uint8Array> {
+  return new Uint8Array(await invoke<ArrayBuffer>("instance_emoji", { origin, id }));
+}
+
 /** ADR 0024: one sent picture for the preview through the native session. The page checks the bytes again. */
 export async function fetchAttachment(origin: string, id: string): Promise<Uint8Array> {
   return new Uint8Array(await invoke<ArrayBuffer>("instance_attachment", { origin, id }));

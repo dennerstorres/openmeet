@@ -105,6 +105,7 @@ pub fn run() {
             session::instance_call,
             session::instance_image,
             session::instance_sound,
+            session::instance_emoji,
             attachments::instance_attachment,
             attachments::instance_attachment_save,
             events::instance_events_open,

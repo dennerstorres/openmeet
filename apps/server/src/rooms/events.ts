@@ -117,6 +117,16 @@ export class ChatEvents {
     return found.rows.map((row) => text(row.user_id)).filter((id): id is string => id !== undefined);
   }
 
+  /** Active members of a live server: who sees its emojis change. */
+  async serverAudience(serverId: string): Promise<string[]> {
+    const found = await this.db.query(
+      `select m.user_id from servers s join server_members m on m.server_id = s.id and m.removed_at is null
+       where s.id = $1 and s.deleted_at is null`,
+      [serverId],
+    );
+    return found.rows.map((row) => text(row.user_id)).filter((id): id is string => id !== undefined);
+  }
+
   /** Members of a DM who have not left it: nobody else, not even an admin, hears it. */
   async dmAudience(dmId: string): Promise<string[]> {
     const found = await this.db.query("select user_id from dm_members where dm_id = $1 and left_at is null", [dmId]);

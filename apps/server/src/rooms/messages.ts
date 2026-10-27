@@ -3,6 +3,7 @@ import type { PublicUser } from "../auth/service.js";
 import { ATTACHMENTS_SELECT, claimAttachments, readAttachments, type AttachmentView } from "./attachments.js";
 import { RoomError, canManage, loadRoomAccess, requireMember, roomId, text, type RoomRecord } from "./service.js";
 import { loadDm } from "./dms.js";
+import { requireUsableEmoji } from "./emojis.js";
 
 // ADR 0024: messages of text rooms. A removed message keeps its row with an empty body, so replies and
 // cursors stay whole. DMs (F13-11) reuse the same table and functions with dm_id.
@@ -53,8 +54,17 @@ export interface MessageView {
   mentionsEveryone: boolean;
   /** ADR 0024: files sent with the message, in upload order; gone with the message. */
   attachments: AttachmentView[];
+  /** Server emojis the body or the reactions name; the body already reads `:name:` for any not usable here. */
+  emojis: EmojiRef[];
   canEdit: boolean;
   canDelete: boolean;
+}
+
+export interface EmojiRef {
+  id: string;
+  name: string;
+  animated: boolean;
+  removed: boolean;
 }
 
 export interface MessagePage {
@@ -137,6 +147,7 @@ export function publicMessage(view: MessageView): Omit<MessageView, "canEdit" | 
     mentions: view.mentions,
     mentionsEveryone: view.mentionsEveryone,
     attachments: view.attachments,
+    emojis: view.emojis,
     id: view.id,
     roomId: view.roomId,
     dmId: view.dmId,
@@ -194,6 +205,7 @@ function readMessage(row: Record<string, unknown>, actor: PublicUser, chat: Chat
     mentions: deleted || !Array.isArray(row.mentions) ? [] : row.mentions.filter((user): user is string => typeof user === "string"),
     mentionsEveryone: !deleted && row.mentions_everyone === true,
     attachments: deleted ? [] : readAttachments(row.attachments),
+    emojis: [],
     canEdit: mine && !deleted,
     canDelete: !deleted && (mine || chat.moderator),
   };
@@ -208,6 +220,91 @@ function readReactions(value: unknown): MessageView["reactions"] {
     if (typeof emoji !== "string" || !Array.isArray(userIds)) return [];
     return [{ emoji, userIds: userIds.filter((user): user is string => typeof user === "string") }];
   });
+}
+
+const EMOJI_TOKEN = /<:([A-Za-z0-9_]{2,32}):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})>/gi;
+const CUSTOM_REACTION = /^custom:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
+/**
+ * ADR 0024: a `<:name:id>` shows the picture only with an emoji still in place and usable where the message is: of
+ * the room's server, or in a DM of a server its author belongs to. Anything else reads `:name:`, so another server's
+ * emoji never resolves in a room and a removed one turns back to text. A rename shows the current name.
+ */
+async function resolveEmojis(db: MigrationClient, chat: Chat, views: MessageView[]): Promise<MessageView[]> {
+  const ids = new Set<string>();
+  for (const view of views) {
+    for (const match of `${view.body} ${view.replyTo?.body ?? ""}`.matchAll(EMOJI_TOKEN)) ids.add((match[2] ?? "").toLowerCase());
+    for (const reaction of view.reactions) {
+      const custom = CUSTOM_REACTION.exec(reaction.emoji)?.[1];
+      if (custom) ids.add(custom.toLowerCase());
+    }
+  }
+  if (ids.size === 0) return views;
+  const found = await db.query(
+    "select id::text as id, server_id::text as server_id, name, animated, deleted_at is not null as removed from server_emojis where id = any($1::uuid[])",
+    [[...ids]],
+  );
+  const emojis = new Map(
+    found.rows.map((row) => [
+      text(row.id) ?? "",
+      { serverId: text(row.server_id) ?? "", name: text(row.name) ?? "", animated: row.animated === true, removed: row.removed === true },
+    ]),
+  );
+  // In a DM the author must belong to the emoji's server.
+  const members = new Set<string>();
+  if (chat.room === null && emojis.size > 0) {
+    const authors = [...new Set(views.flatMap((view) => [view.authorId, view.replyTo?.authorId ?? ""]).filter((id) => id !== ""))];
+    const servers = [...new Set([...emojis.values()].map((emoji) => emoji.serverId))];
+    const held = await db.query(
+      "select server_id::text as server_id, user_id::text as user_id from server_members where removed_at is null and server_id = any($1::uuid[]) and user_id = any($2::uuid[])",
+      [servers, authors],
+    );
+    for (const row of held.rows) members.add(`${text(row.server_id) ?? ""}:${text(row.user_id) ?? ""}`);
+  }
+  const usable = (id: string, authorId: string | null): boolean => {
+    const emoji = emojis.get(id);
+    if (!emoji || emoji.removed) return false;
+    if (chat.room !== null) return emoji.serverId === chat.room.serverId;
+    return authorId === null || members.has(`${emoji.serverId}:${authorId}`);
+  };
+  const rewrite = (body: string, authorId: string): string =>
+    body.replace(EMOJI_TOKEN, (_, name: string, raw: string) => {
+      const id = raw.toLowerCase();
+      const current = emojis.get(id)?.name ?? name;
+      return usable(id, authorId) ? `<:${current}:${id}>` : `:${current}:`;
+    });
+  return views.map((view) => {
+    const refs = new Map<string, EmojiRef>();
+    const note = (id: string, removed: boolean): void => {
+      const emoji = emojis.get(id);
+      if (!emoji) return;
+      const held = refs.get(id);
+      refs.set(id, { id, name: emoji.name, animated: emoji.animated, removed: removed && (held?.removed ?? true) });
+    };
+    for (const match of view.body.matchAll(EMOJI_TOKEN)) {
+      const id = (match[2] ?? "").toLowerCase();
+      if (usable(id, view.authorId)) note(id, false);
+    }
+    // Who may react with it was checked when the reaction went in; here only removal and the room's server count.
+    for (const reaction of view.reactions) {
+      const custom = CUSTOM_REACTION.exec(reaction.emoji)?.[1]?.toLowerCase();
+      if (custom) note(custom, !usable(custom, null));
+    }
+    return {
+      ...view,
+      body: rewrite(view.body, view.authorId),
+      replyTo: view.replyTo ? { ...view.replyTo, body: rewrite(view.replyTo.body, view.replyTo.authorId) } : null,
+      emojis: [...refs.values()],
+    };
+  });
+}
+
+function readMessages(db: MigrationClient, rows: Record<string, unknown>[], actor: PublicUser, chat: Chat): Promise<MessageView[]> {
+  return resolveEmojis(
+    db,
+    chat,
+    rows.map((row) => readMessage(row, actor, chat)),
+  );
 }
 
 /**
@@ -232,30 +329,21 @@ export async function listMessages(
     if (text(older.rows[0]?.id) !== around) throw new RoomError("message_not_found");
     const newer = await db.query(`${SELECT} where ${where} and m.id > $2::bigint order by m.id limit ${AROUND_SIDE + 1}`, [chat.target, around]);
     return {
-      messages: [
-        ...older.rows
-          .slice(0, AROUND_SIDE + 1)
-          .reverse()
-          .map((row) => readMessage(row, actor, chat)),
-        ...newer.rows.slice(0, AROUND_SIDE).map((row) => readMessage(row, actor, chat)),
-      ],
+      messages: await readMessages(db, [...older.rows.slice(0, AROUND_SIDE + 1).reverse(), ...newer.rows.slice(0, AROUND_SIDE)], actor, chat),
       hasMore: older.rows.length > AROUND_SIDE + 1,
       hasNewer: newer.rows.length > AROUND_SIDE,
     };
   }
   if (after !== undefined) {
     const rows = await db.query(`${SELECT} where ${where} and m.id > $2::bigint order by m.id limit ${AFTER_PAGE_SIZE + 1}`, [chat.target, after]);
-    const page = rows.rows.slice(0, AFTER_PAGE_SIZE).map((row) => readMessage(row, actor, chat));
+    const page = await readMessages(db, rows.rows.slice(0, AFTER_PAGE_SIZE), actor, chat);
     return { messages: page, hasMore: rows.rows.length > AFTER_PAGE_SIZE };
   }
   const rows =
     before === undefined
       ? await db.query(`${SELECT} where ${where} order by m.id desc limit ${PAGE_SIZE + 1}`, [chat.target])
       : await db.query(`${SELECT} where ${where} and m.id < $2::bigint order by m.id desc limit ${PAGE_SIZE + 1}`, [chat.target, before]);
-  const page = rows.rows
-    .slice(0, PAGE_SIZE)
-    .map((row) => readMessage(row, actor, chat))
-    .reverse();
+  const page = await readMessages(db, rows.rows.slice(0, PAGE_SIZE).reverse(), actor, chat);
   return { messages: page, hasMore: rows.rows.length > PAGE_SIZE };
 }
 
@@ -263,7 +351,9 @@ async function readOne(db: MigrationClient, actor: PublicUser, chat: Chat, id: s
   const found = await db.query(`${SELECT} where m.id = $1::bigint and m.${chat.column} = $2`, [id, chat.target]);
   const row = found.rows[0];
   if (!row) throw new RoomError("message_not_found");
-  return readMessage(row, actor, chat);
+  const [view] = await readMessages(db, [row], actor, chat);
+  if (!view) throw new RoomError("message_not_found");
+  return view;
 }
 
 interface Mentions {
@@ -404,12 +494,14 @@ export async function pinMessage(db: MigrationClient, actor: PublicUser, id: str
   return readOne(db, actor, chat, id);
 }
 
-/** One reaction per person and emoji; `on` adds it, otherwise it is taken back. Custom emojis come with F13-10. */
+/** One reaction per person and emoji; `on` adds it, otherwise it is taken back. A `custom:<id>` must be usable here. */
 export async function reactMessage(db: MigrationClient, actor: PublicUser, id: string, input: { emoji: unknown; on: boolean }): Promise<MessageView> {
   const emoji = parseEmoji(input.emoji);
   const { chat, deleted } = await messageChat(db, actor, id);
   if (deleted) throw new RoomError("message_not_found");
   requireOpen(chat);
+  const custom = CUSTOM_REACTION.exec(emoji)?.[1];
+  if (input.on && custom) await requireUsableEmoji(db, actor, custom, chat.room?.serverId ?? null);
   if (input.on) {
     await db.transaction(async (tx) => {
       // The lock keeps two people from both adding the 21st emoji.
@@ -427,8 +519,9 @@ export async function reactMessage(db: MigrationClient, actor: PublicUser, id: s
   return readOne(db, actor, chat, id);
 }
 
-/** A Unicode emoji as typed: up to 16 UTF-16 units, no letters, digits, spaces, controls or markup. */
+/** A Unicode emoji as typed (up to 16 UTF-16 units, no letters, digits, spaces, controls or markup) or `custom:<id>`. */
 export function parseEmoji(value: unknown): string {
+  if (typeof value === "string" && CUSTOM_REACTION.test(value)) return value.toLowerCase();
   if (
     typeof value !== "string" ||
     value.length === 0 ||
@@ -447,7 +540,7 @@ export async function listPinned(db: MigrationClient, actor: PublicUser, id: str
   const rows = await db.query(`${SELECT} where m.${chat.column} = $1 and m.pinned_at is not null order by m.pinned_at desc, m.id desc limit ${PAGE_SIZE}`, [
     chat.target,
   ]);
-  return rows.rows.map((row) => readMessage(row, actor, chat));
+  return readMessages(db, rows.rows, actor, chat);
 }
 
 /** Word search with the `simple` dictionary, newest first; `before` pages further back. */
@@ -470,7 +563,7 @@ export async function searchMessages(
     [chat.target, query, before ?? null],
   );
   return {
-    messages: rows.rows.slice(0, SEARCH_PAGE_SIZE).map((row) => readMessage(row, actor, chat)),
+    messages: await readMessages(db, rows.rows.slice(0, SEARCH_PAGE_SIZE), actor, chat),
     hasMore: rows.rows.length > SEARCH_PAGE_SIZE,
   };
 }

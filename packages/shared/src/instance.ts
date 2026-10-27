@@ -327,7 +327,8 @@ function instancePath(path: string): string {
     path === "/api/v1/auth/google/start" ||
     path === "/api/v1/auth/google/poll" ||
     path === "/api/v1/profile/avatar" ||
-    path === "/api/v1/sounds/mine"
+    path === "/api/v1/sounds/mine" ||
+    path === "/api/v1/emojis"
   ) {
     return path;
   }
@@ -344,6 +345,11 @@ function instancePath(path: string): string {
   if (library?.[1] !== undefined && UUID.test(library[1]) && (library[2] === undefined || UUID.test(library[2]))) return path;
   const sound = /^\/api\/v1\/sounds\/([0-9a-f-]{36})(?:\/(?:rename|delete))?$/i.exec(path);
   if (sound?.[1] !== undefined && UUID.test(sound[1])) return path;
+  // ADR 0024: a server's emojis and one emoji, its picture included.
+  const serverEmojis = /^\/api\/v1\/servers\/([0-9a-f-]{36})\/emojis$/i.exec(path);
+  if (serverEmojis?.[1] !== undefined && UUID.test(serverEmojis[1])) return path;
+  const emoji = /^\/api\/v1\/emojis\/([0-9a-f-]{36})(?:\/(?:rename|delete))?$/i.exec(path);
+  if (emoji?.[1] !== undefined && UUID.test(emoji[1])) return path;
   const image = /^\/api\/v1\/images\/([0-9a-f-]{36})$/i.exec(path);
   if (image?.[1] !== undefined && UUID.test(image[1])) return path;
   // ADR 0024: text room messages; the only query is the message cursor.

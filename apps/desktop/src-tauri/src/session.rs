@@ -236,6 +236,10 @@ fn allowed_call(method: &str, path: &str) -> bool {
         ("POST", ["", "api", "v1", "users", id, "block"]) => is_id(id),
         // A file goes up here as base64; it comes back through instance_attachment(_save).
         ("POST", ["", "api", "v1", "rooms" | "dms", id, "attachments"]) => is_id(id),
+        // ADR 0024: server emojis; the picture comes back through instance_emoji.
+        ("GET", ["", "api", "v1", "emojis"]) => true,
+        ("GET" | "POST", ["", "api", "v1", "servers", id, "emojis"]) => is_id(id),
+        ("POST", ["", "api", "v1", "emojis", id, "rename" | "delete"]) => is_id(id),
         _ => false,
     }
 }
@@ -336,6 +340,56 @@ pub async fn instance_image(held: tauri::State<'_, NativeSession>, origin: Strin
     Ok(tauri::ipc::Response::new(bytes.to_vec()))
 }
 
+/// ADR 0024: PNG, GIF or WebP by the first bytes, the types a server emoji may have.
+fn emoji_kind(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
+        Some("image/gif")
+    } else {
+        image_kind(bytes).filter(|kind| *kind != "image/jpeg")
+    }
+}
+
+/// The picture of one server emoji, `GET /api/v1/emojis/:id` and nothing else, with the same checks as instance_image.
+#[tauri::command]
+pub async fn instance_emoji(held: tauri::State<'_, NativeSession>, origin: String, id: String) -> Result<tauri::ipc::Response, String> {
+    if !is_id(&id) {
+        return Err("invalid_path".to_string());
+    }
+    let access = held.access_for(&origin).ok_or("unauthorized")?;
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(10))
+        .build()
+        .map_err(|_| "request_failed".to_string())?;
+    let response = client
+        .get(format!("{origin}/api/v1/emojis/{id}"))
+        .bearer_auth(access)
+        .send()
+        .await
+        .map_err(|_| "request_failed".to_string())?;
+    let status = response.status().as_u16();
+    if status == 401 {
+        held.forget();
+    }
+    if status != 200 {
+        return Err(if status == 404 { "emoji_not_found" } else { "request_failed" }.to_string());
+    }
+    let declared = response
+        .headers()
+        .get("content-type")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_string();
+    if response.content_length().is_some_and(|length| length > IMAGE_MAX_BYTES as u64) {
+        return Err("invalid_emoji".to_string());
+    }
+    let bytes = response.bytes().await.map_err(|_| "request_failed".to_string())?;
+    if bytes.len() > IMAGE_MAX_BYTES || emoji_kind(&bytes) != Some(declared.as_str()) {
+        return Err("invalid_emoji".to_string());
+    }
+    Ok(tauri::ipc::Response::new(bytes.to_vec()))
+}
+
 /// ADR 0021: the canonical WAV is never larger than 20 s of 24 kHz mono 16-bit plus its header.
 const SOUND_MAX_BYTES: usize = 44 + 24_000 * 2 * 20;
 
@@ -390,7 +444,7 @@ pub async fn instance_sound(held: tauri::State<'_, NativeSession>, origin: Strin
 
 #[cfg(test)]
 mod tests {
-    use super::{allowed_call, image_kind, is_sound, parse_json, take_access, take_refresh, NativeSession, Reply, ACCESS_MARKER};
+    use super::{allowed_call, emoji_kind, image_kind, is_sound, parse_json, take_access, take_refresh, NativeSession, Reply, ACCESS_MARKER};
     use serde_json::json;
 
     #[test]
@@ -587,6 +641,28 @@ mod tests {
         assert_eq!(image_kind(b"<svg xmlns=\"http://www.w3.org/2000/svg\"/>"), None);
         assert_eq!(image_kind(b"GIF89a"), None);
         assert_eq!(image_kind(b"RIFF"), None);
+    }
+
+    #[test]
+    fn only_png_gif_and_webp_bytes_pass_as_emojis() {
+        assert_eq!(emoji_kind(&[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]), Some("image/png"));
+        assert_eq!(emoji_kind(b"GIF89a"), Some("image/gif"));
+        assert_eq!(emoji_kind(b"RIFF\x10\0\0\0WEBPVP8L"), Some("image/webp"));
+        assert_eq!(emoji_kind(&[0xff, 0xd8, 0xff, 0xe0]), None);
+        assert_eq!(emoji_kind(b"<svg/>"), None);
+    }
+
+    #[test]
+    fn emoji_routes_are_allowed_and_nothing_around_them() {
+        let id = "0f8fad5b-d9cb-469f-a165-70867728950e";
+        assert!(allowed_call("GET", "/api/v1/emojis"));
+        assert!(allowed_call("GET", &format!("/api/v1/servers/{id}/emojis")));
+        assert!(allowed_call("POST", &format!("/api/v1/servers/{id}/emojis")));
+        assert!(allowed_call("POST", &format!("/api/v1/emojis/{id}/rename")));
+        assert!(allowed_call("POST", &format!("/api/v1/emojis/{id}/delete")));
+        assert!(!allowed_call("GET", &format!("/api/v1/emojis/{id}")));
+        assert!(!allowed_call("POST", "/api/v1/emojis/not-an-id/delete"));
+        assert!(!allowed_call("DELETE", &format!("/api/v1/servers/{id}/emojis")));
     }
 
     #[test]

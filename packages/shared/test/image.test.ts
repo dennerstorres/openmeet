@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { IMAGE_MAX_BYTES, sniffAttachmentImage, sniffImage } from "../src/image.js";
+import { EMOJI_MAX_BYTES, IMAGE_MAX_BYTES, sniffAttachmentImage, sniffEmoji, sniffImage } from "../src/image.js";
 
 function u32be(value: number): number[] {
   return [(value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff];
@@ -87,4 +87,16 @@ test("attachments also take GIF and large pictures, and still judge by the bytes
   assert.deepEqual(sniffAttachmentImage(png(4000, 3000)), { type: "image/png", width: 4000, height: 3000 });
   assert.equal(sniffAttachmentImage(new TextEncoder().encode("<svg xmlns='http://www.w3.org/2000/svg'/>")), undefined);
   assert.equal(sniffAttachmentImage(new TextEncoder().encode("<html>GIF89a</html>")), undefined);
+});
+
+test("emojis: PNG, GIF or WebP by the bytes, GIF frames counted, no JPEG and nothing past 256 KB", () => {
+  const frame = [0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0x02, 0x02, 0x44, 0x01, 0x00];
+  const head = [...Buffer.from("GIF89a"), 1, 0, 1, 0, 0x80, 0, 0, 0, 0, 0, 0xff, 0xff, 0xff];
+  const still = new Uint8Array([...head, ...frame, 0x3b]);
+  const moving = new Uint8Array([...head, 0x21, 0xf9, 0x04, 0, 0, 0, 0, 0, ...frame, ...frame, 0x3b]);
+  assert.deepEqual(sniffEmoji(still), { type: "image/gif", width: 1, height: 1, animated: false });
+  assert.deepEqual(sniffEmoji(moving), { type: "image/gif", width: 1, height: 1, animated: true });
+  assert.equal(sniffEmoji(moving.subarray(0, moving.length - 1)), undefined);
+  assert.equal(sniffEmoji(new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0xff, 0xd9])), undefined);
+  assert.equal(sniffEmoji(new Uint8Array(EMOJI_MAX_BYTES + 1)), undefined);
 });

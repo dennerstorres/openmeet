@@ -7,6 +7,7 @@ export type Inline =
   | { type: "code"; text: string }
   | { type: "link"; url: string; children: Inline[] }
   | { type: "mention"; userId: string }
+  | { type: "emoji"; name: string; id: string }
   | { type: "everyone"; name: "everyone" | "here" };
 
 export type Block = { type: "text"; children: Inline[] } | { type: "codeblock"; lang: string; text: string } | { type: "quote"; children: Block[] };
@@ -132,6 +133,12 @@ export function parseInline(source: string, depth: number): Inline[] {
       if (mention) {
         push({ type: "mention", userId: (mention[1] ?? "").toLowerCase() });
         index += mention[0].length;
+        continue;
+      }
+      const emoji = /^<:([A-Za-z0-9_]{2,32}):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})>/i.exec(rest);
+      if (emoji) {
+        push({ type: "emoji", name: emoji[1] ?? "", id: (emoji[2] ?? "").toLowerCase() });
+        index += emoji[0].length;
         continue;
       }
       const angled = /^<(https?:\/\/[^\s>]{1,2048})>/.exec(rest);

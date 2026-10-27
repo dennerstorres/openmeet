@@ -70,3 +70,10 @@ test("mentions parse outside code, @everyone only at a word edge", () => {
   ]);
   assert.deepEqual(parseInline("@everyoneX", 0), [t("@everyoneX")]);
 });
+
+test("a server emoji token is its own node, and stays text inside code", () => {
+  const id = "0f8fad5b-d9cb-469f-a165-70867728950e";
+  assert.deepEqual(parseInline(`oi <:festa:${id.toUpperCase()}>!`, 0), [t("oi "), { type: "emoji", name: "festa", id }, t("!")]);
+  assert.deepEqual(parseInline(`\`<:festa:${id}>\``, 0), [{ type: "code", text: `<:festa:${id}>` }]);
+  assert.deepEqual(parseInline("<:x:not-an-id>", 0), [t("<:x:not-an-id>")]);
+});
