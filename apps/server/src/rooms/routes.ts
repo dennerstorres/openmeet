@@ -46,6 +46,7 @@ import {
 } from "./service.js";
 import type { RoomMedia } from "./media.js";
 import { PlatformPresence } from "./platform-presence.js";
+import { deleteMessage, editMessage, listMessages, listPinned, pinMessage, searchMessages, sendMessage } from "./messages.js";
 import { deleteSound, importSound, listLibrary, listOwnSounds, readSound, removeFromLibrary, renameSound, uploadSound } from "./sounds.js";
 
 const AUTH_STATUS: Record<AuthErrorCode, number> = {
@@ -84,6 +85,10 @@ const ROOM_STATUS: Record<RoomErrorCode, number> = {
   image_not_found: 404,
   invalid_sound: 400,
   sound_not_found: 404,
+  text_room: 409,
+  voice_room: 409,
+  message_not_found: 404,
+  invalid_message: 400,
 };
 
 function configuredSecret(env: AppEnv): string | undefined {
@@ -134,11 +139,21 @@ function imageField(body: unknown, key: string): Uint8Array | null | undefined {
   return new Uint8Array(Buffer.from(value, "base64"));
 }
 
+function bodyField(body: unknown, key: string): unknown {
+  return typeof body === "object" && body !== null && !Array.isArray(body) ? (body as Record<string, unknown>)[key] : undefined;
+}
+
 function nullableText(body: unknown, key: string): string | null | undefined {
   if (typeof body !== "object" || body === null || Array.isArray(body) || !(key in body)) return undefined;
   const value = (body as Record<string, unknown>)[key];
   if (value === null || typeof value === "string") return value;
   throw new RoomError("invalid_body");
+}
+
+function queryText(request: FastifyRequest, key: string): string | undefined {
+  if (typeof request.query !== "object" || request.query === null) return undefined;
+  const value = (request.query as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : undefined;
 }
 
 function param(request: FastifyRequest, key: string): string {
@@ -230,6 +245,7 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
         name: requiredText(request.body, "name"),
         slug: requiredText(request.body, "slug"),
         kind: requiredText(request.body, "kind"),
+        channel: textField(request.body, "channel"),
       });
       return reply.code(201).header("cache-control", "no-store").send(room);
     } catch (error) {
@@ -307,6 +323,7 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
         name: requiredText(request.body, "name"),
         slug: requiredText(request.body, "slug"),
         kind: requiredText(request.body, "kind"),
+        channel: textField(request.body, "channel"),
       });
       return reply.code(201).header("cache-control", "no-store").send(room);
     } catch (error) {
@@ -722,6 +739,104 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
       if (!db) throw new AuthError("auth_unconfigured");
       await revokeInvite(db, actor, param(request, "id"), param(request, "inviteId"));
       return reply.code(204).header("cache-control", "no-store").send();
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  // ADR 0024: text room messages. The body only travels in POST bodies, never in a URL that reaches the logs.
+  const sending = createAttemptGate(10, 10_000);
+  const searching = createAttemptGate(10, 10_000);
+
+  app.get("/api/v1/rooms/:id/messages", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const page = await listMessages(db, actor, param(request, "id"), { before: queryText(request, "before"), after: queryText(request, "after") });
+      return reply.code(200).header("cache-control", "no-store").send(page);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/rooms/:id/messages", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      if (!sending.allow(actor.id, Date.now())) throw new AuthError("rate_limited");
+      const message = await sendMessage(db, actor, param(request, "id"), {
+        body: bodyField(request.body, "body"),
+        replyToId: textField(request.body, "replyToId"),
+      });
+      return reply.code(201).header("cache-control", "no-store").send(message);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.get("/api/v1/rooms/:id/pins", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send({ messages: await listPinned(db, actor, param(request, "id")) });
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/rooms/:id/messages/search", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      if (!searching.allow(actor.id, Date.now())) throw new AuthError("rate_limited");
+      const page = await searchMessages(db, actor, param(request, "id"), {
+        query: bodyField(request.body, "query"),
+        before: textField(request.body, "before"),
+      });
+      return reply.code(200).header("cache-control", "no-store").send(page);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/messages/:id/edit", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      if (!sending.allow(actor.id, Date.now())) throw new AuthError("rate_limited");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await editMessage(db, actor, param(request, "id"), { body: bodyField(request.body, "body") }));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/messages/:id/delete", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await deleteMessage(db, actor, param(request, "id")));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/messages/:id/pin", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await pinMessage(db, actor, param(request, "id"), booleanField(request.body, "pinned")));
     } catch (error) {
       return sendError(request, reply, error);
     }

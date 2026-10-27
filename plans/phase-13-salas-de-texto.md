@@ -8,7 +8,7 @@ Pedida pelo usuário em 2026-10-27, decisões revisadas no mesmo dia: SSE, reten
 | --- | --- | --- | --- | --- |
 | F13-01 | Aceite do ADR 0024; SPEC (item 23, out of scope, item 17) | — | DONE | — |
 | F13-02 | Migração 0011 e schema: `channel`, mensagens, DMs, menções, reações, anexos, emojis, bloqueios, leituras, preferências | F13-01 | IMPLEMENTED | G10 |
-| F13-03 | API de mensagens das salas: listar com cursor, enviar, responder, editar, remover, fixar, busca, limite de taxa | F13-02 | PENDING | G4,G10 |
+| F13-03 | API de mensagens das salas: listar com cursor, enviar, responder, editar, remover, fixar, busca, limite de taxa | F13-02 | IMPLEMENTED | G4,G10 |
 | F13-04 | API SSE: emissor em memória, `/events` por usuário, `Last-Event-ID`, keep-alive, fecha no logout/saída | F13-03 | PENDING | G4,G10 |
 | F13-05 | Ponte Rust do SSE: `instance_events_open/close` repassando eventos Tauri | F13-04 | PENDING | G4,G10 |
 | F13-06 | UI base: tipo ao criar sala, `#` na lista, painel de mensagens, envio, histórico ao rolar, SSE na web e no desktop | F13-04,F13-05 | PENDING | G4 |
@@ -26,7 +26,7 @@ Uma branch por tarefa (`task/F13-XX-...`). Depois da F13-06, as F13-07, F13-08, 
 ## Testes por tarefa
 
 - **F13-02:** migração sobe no PGlite; salas existentes ficam `voice`; check `room_id` xor `dm_id`.
-- **F13-03:** não membro 403, membro removido 403, sala/servidor removido 404, só o autor edita, moderador remove de outro, corpo vazio/acima de 4000 recusado, 429 no limite, cursor sem buraco nem duplicata, `join` em sala de texto 409, corpo fora dos logs.
+- **F13-03:** não membro 404, membro removido 404 (o código esconde a sala de quem não é membro), sala/servidor removido 404, só o autor edita, moderador remove de outro, corpo vazio/acima de 4000 recusado, 429 no limite, cursor sem buraco nem duplicata, `join` em sala de texto 409, corpo fora dos logs.
 - **F13-04:** evento chega só a quem pode ver (membro do servidor ou da DM), `Last-Event-ID` repõe o que faltou, fluxo fecha no logout e na remoção do membro, limite de 5 fluxos.
 - **F13-05:** `cargo test` do parser SSE; token nunca sai do Rust.
 - **F13-07:** markdown com `<script>`, `javascript:` e `onerror` aparece literal; spoiler e bloco de código corretos.

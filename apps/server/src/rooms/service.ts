@@ -29,7 +29,11 @@ export type RoomErrorCode =
   | "invalid_image"
   | "image_not_found"
   | "invalid_sound"
-  | "sound_not_found";
+  | "sound_not_found"
+  | "text_room"
+  | "voice_room"
+  | "message_not_found"
+  | "invalid_message";
 
 export class RoomError extends Error {
   readonly code: RoomErrorCode;
@@ -47,12 +51,13 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DEFAULT_SERVER_NAME = "Geral";
 const INVITE_CODE = /^[A-Za-z0-9_-]{43}$/;
 
-interface RoomRecord {
+export interface RoomRecord {
   id: string;
   serverId: string;
   name: string;
   slug: string;
   kind: string;
+  channel: string;
   ended: boolean;
 }
 
@@ -71,7 +76,7 @@ interface ServerMembership {
   removed: boolean;
 }
 
-interface ServerAccess {
+export interface ServerAccess {
   server: ServerRecord;
   membership: ServerMembership | undefined;
 }
@@ -371,7 +376,7 @@ export async function listServerRooms(db: MigrationClient, actor: PublicUser, id
   const access = await loadServerAccess(db, actor, serverId(id));
   if (!activeRole(access.membership)) throw new RoomError("server_not_found");
   const listed = await db.query(
-    "select id, server_id, name, slug, kind, ended_at is not null as ended from rooms where server_id = $1 and deleted_at is null order by created_at, id",
+    "select id, server_id, name, slug, kind, channel, ended_at is not null as ended from rooms where server_id = $1 and deleted_at is null order by created_at, id",
     [access.server.id],
   );
   return listed.rows.map(readRoom).filter((room): room is RoomRecord => room !== undefined);
@@ -555,28 +560,32 @@ export async function serverPresence(
 export async function createRoom(
   db: MigrationClient,
   actor: PublicUser,
-  input: { serverId: string | undefined; name: string; slug: string; kind: string },
+  input: { serverId: string | undefined; name: string; slug: string; kind: string; channel?: string | undefined },
 ): Promise<RoomRecord> {
   const name = parseName(input.name);
   if (!SLUG.test(input.slug)) throw new RoomError("invalid_body");
   if (input.kind !== "persistent" && input.kind !== "temporary") throw new RoomError("invalid_body");
+  // ADR 0024: a text room keeps its messages, so it is always persistent.
+  const channel = input.channel ?? "voice";
+  if (channel !== "voice" && (channel !== "text" || input.kind !== "persistent")) throw new RoomError("invalid_body");
   try {
     return await db.transaction(async (tx) => {
       const target = input.serverId === undefined ? await defaultServer(tx, actor) : serverId(input.serverId);
       const access = await loadServerAccess(tx, actor, target);
       requireMember(access);
       if (!canManage(access.membership)) throw new RoomError("forbidden");
-      const inserted = await tx.query("insert into rooms (server_id, name, slug, kind, created_by) values ($1, $2, $3, $4, $5) returning id", [
+      const inserted = await tx.query("insert into rooms (server_id, name, slug, kind, channel, created_by) values ($1, $2, $3, $4, $5, $6) returning id", [
         access.server.id,
         name,
         input.slug,
         input.kind,
+        channel,
         actor.id,
       ]);
       const id = text(inserted.rows[0]?.id);
       if (!id) throw new RoomError("conflict");
       await audit(tx, actor.id, "room_create", "room", id);
-      return { id, serverId: access.server.id, name, slug: input.slug, kind: input.kind, ended: false };
+      return { id, serverId: access.server.id, name, slug: input.slug, kind: input.kind, channel, ended: false };
     });
   } catch (error) {
     if (error instanceof RoomError) throw error;
@@ -605,7 +614,7 @@ async function defaultServer(tx: MigrationClient, actor: PublicUser): Promise<st
 
 export async function listRooms(db: MigrationClient, actor: PublicUser): Promise<RoomRecord[]> {
   const listed = await db.query(
-    `select r.id, r.server_id, r.name, r.slug, r.kind, r.ended_at is not null as ended
+    `select r.id, r.server_id, r.name, r.slug, r.kind, r.channel, r.ended_at is not null as ended
      from rooms r
      join servers s on s.id = r.server_id and s.deleted_at is null
      join server_members m on m.server_id = r.server_id and m.user_id = $1 and m.removed_at is null
@@ -795,7 +804,7 @@ export async function joinRoom(
     }
     if (isTrue(userRow.livekit_hold)) throw new RoomError("forbidden");
     const found = await tx.query(
-      "select id, server_id, name, slug, kind, ended_at is not null as ended from rooms where id = $1 and deleted_at is null for update",
+      "select id, server_id, name, slug, kind, channel, ended_at is not null as ended from rooms where id = $1 and deleted_at is null for update",
       [target],
     );
     const room = readRoom(found.rows[0]);
@@ -810,6 +819,7 @@ export async function joinRoom(
     if (!member && !code) throw new RoomError("forbidden");
     if (memberRow !== undefined && isTrue(memberRow.removed) && isTrue(memberRow.cut_pending)) throw new RoomError("forbidden");
     if (room.ended) throw new RoomError("room_ended");
+    if (room.channel === "text") throw new RoomError("text_room");
     if (!member && code) {
       await redeemInvite(tx, room.serverId, actor.id, code);
       await audit(tx, actor.id, "server_join", "server", room.serverId);
@@ -897,8 +907,11 @@ export async function loadServerAccess(db: MigrationClient, actor: PublicUser, i
 }
 
 // A missing room and a room in a server the caller is not part of look the same to the caller.
-async function loadRoomAccess(db: MigrationClient, actor: PublicUser, id: string): Promise<{ room: RoomRecord; access: ServerAccess }> {
-  const found = await db.query("select id, server_id, name, slug, kind, ended_at is not null as ended from rooms where id = $1 and deleted_at is null", [id]);
+export async function loadRoomAccess(db: MigrationClient, actor: PublicUser, id: string): Promise<{ room: RoomRecord; access: ServerAccess }> {
+  const found = await db.query(
+    "select id, server_id, name, slug, kind, channel, ended_at is not null as ended from rooms where id = $1 and deleted_at is null",
+    [id],
+  );
   const room = readRoom(found.rows[0]);
   if (!room) throw new RoomError("room_not_found");
   return { room, access: await loadServerAccess(db, actor, room.serverId) };
@@ -924,8 +937,9 @@ function readRoom(row: Record<string, unknown> | undefined): RoomRecord | undefi
   const name = text(row.name);
   const slug = text(row.slug);
   const kind = text(row.kind);
+  const channel = text(row.channel) ?? "voice";
   if (!id || !server || !name || !slug || !kind) return undefined;
-  return { id, serverId: server, name, slug, kind, ended: isTrue(row.ended) };
+  return { id, serverId: server, name, slug, kind, channel, ended: isTrue(row.ended) };
 }
 
 // Profiles (ADR 0019)
