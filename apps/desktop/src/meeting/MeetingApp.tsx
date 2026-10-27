@@ -181,6 +181,43 @@ function storedBlurRadius(): number {
   }
 }
 
+const DEVICE_KEY_PREFIX = "openmeet.device.";
+const DEVICE_KINDS: DeviceKind[] = ["audioinput", "audiooutput", "videoinput"];
+
+// F04-12: the device picked in Settings, applied when a call connects. Empty means the system default.
+function storedDevice(kind: DeviceKind): string {
+  try {
+    return localStorage.getItem(DEVICE_KEY_PREFIX + kind) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function storeDevice(kind: DeviceKind, deviceId: string): void {
+  try {
+    if (deviceId.length === 0) localStorage.removeItem(DEVICE_KEY_PREFIX + kind);
+    else localStorage.setItem(DEVICE_KEY_PREFIX + kind, deviceId);
+  } catch {
+    // The choice still holds for this call.
+  }
+}
+
+/** Outside a call the session has no list; ask the browser and mark the saved picks. */
+async function listIdleDevices(): Promise<DeviceOption[]> {
+  if (!navigator.mediaDevices?.enumerateDevices) return [];
+  const found = await navigator.mediaDevices.enumerateDevices();
+  const counts: Partial<Record<DeviceKind, number>> = {};
+  const options: DeviceOption[] = [];
+  for (const device of found) {
+    const kind = device.kind as DeviceKind;
+    if (!DEVICE_KINDS.includes(kind) || device.deviceId.length === 0 || device.deviceId === "default") continue;
+    const count = (counts[kind] ?? 0) + 1;
+    counts[kind] = count;
+    options.push({ deviceId: device.deviceId, label: device.label || `Dispositivo ${count}`, kind, active: device.deviceId === storedDevice(kind) });
+  }
+  return options;
+}
+
 // ADR 0014: the web build has one instance, the origin that served the page. `__WEB__` is replaced at
 // build time (vite.config.ts), so the branches of the other target leave the bundle.
 function platform(): { api: InstanceApi; broker: SessionBroker | undefined } {
@@ -237,6 +274,8 @@ export function MeetingApp() {
   const [nickname, setNickname] = useState("");
   const [membersOpen, setMembersOpen] = useState(() => !__WEB__ || window.innerWidth > 900);
   const [exportConsent, setExportConsent] = useState(false);
+  const [idleDevices, setIdleDevices] = useState<DeviceOption[]>([]);
+  const devicesApplied = useRef(false);
   const [activity, setActivity] = useState<"online" | "away">("online");
   const mediaRef = useRef(media);
   mediaRef.current = media;
@@ -481,6 +520,34 @@ export function MeetingApp() {
     if (pinnedId !== null && pin === null) setPinnedId(null);
   }, [pinnedId, pin]);
   useEffect(() => {
+    if (!settingsOpen || inCall) return;
+    let live = true;
+    listIdleDevices()
+      .then((options) => live && setIdleDevices(options))
+      .catch(() => live && setIdleDevices([]));
+    return () => {
+      live = false;
+    };
+  }, [settingsOpen, inCall]);
+  useEffect(() => {
+    // F04-12: once per call, switch to the devices saved in Settings that this PC still has.
+    if (!inCall) {
+      devicesApplied.current = false;
+      return;
+    }
+    if (devicesApplied.current || media.phase !== "connected" || media.devices.length === 0) return;
+    devicesApplied.current = true;
+    for (const kind of DEVICE_KINDS) {
+      const saved = storedDevice(kind);
+      if (kind === "audiooutput" && !session().browser.outputSelection) continue;
+      if (media.devices.some((device) => device.kind === kind && device.deviceId === saved && !device.active)) {
+        void session()
+          .selectDevice(kind, saved)
+          .catch(() => setMediaError("Não foi possível usar o dispositivo salvo nas configurações."));
+      }
+    }
+  }, [inCall, media.phase, media.devices]);
+  useEffect(() => {
     if (!inCall) {
       setFullscreen(false);
       setPinnedId(null);
@@ -530,6 +597,11 @@ export function MeetingApp() {
   }
 
   function onDevice(kind: DeviceKind, deviceId: string): void {
+    storeDevice(kind, deviceId);
+    if (!inCall) {
+      setIdleDevices((current) => current.map((device) => (device.kind === kind ? { ...device, active: device.deviceId === deviceId } : device)));
+      return;
+    }
     if (deviceId.length === 0) return;
     void runControl("device", () => session().selectDevice(kind, deviceId));
   }
@@ -537,7 +609,8 @@ export function MeetingApp() {
   async function refreshDevices(): Promise<void> {
     setMediaError(null);
     try {
-      await session().refreshDevices();
+      if (inCall) await session().refreshDevices();
+      else setIdleDevices(await listIdleDevices());
     } catch (caught) {
       setMediaError(describeMediaError(caught));
     }
@@ -936,22 +1009,20 @@ export function MeetingApp() {
               <button type="button" className="ghost" onClick={() => void model.reloadRooms()} disabled={state.pending}>
                 Atualizar
               </button>
+              <button
+                type="button"
+                className="ghost"
+                onClick={(event) => {
+                  event.currentTarget.closest("details")?.removeAttribute("open");
+                  setSettingsOpen(true);
+                }}
+              >
+                Configurações
+              </button>
               {__WEB__ ? null : (
-                <>
-                  <button
-                    type="button"
-                    className="ghost"
-                    onClick={(event) => {
-                      event.currentTarget.closest("details")?.removeAttribute("open");
-                      setSettingsOpen(true);
-                    }}
-                  >
-                    Configurações
-                  </button>
-                  <button type="button" className="ghost" onClick={() => void model.changeInstance()}>
-                    Trocar instância
-                  </button>
-                </>
+                <button type="button" className="ghost" onClick={() => void model.changeInstance()}>
+                  Trocar instância
+                </button>
               )}
               <button type="button" className="ghost danger-text" onClick={() => void model.signOut()} disabled={state.pending}>
                 Sair da conta
@@ -1027,7 +1098,7 @@ export function MeetingApp() {
         {notice ? <p className="error">{notice}</p> : null}
         {invitePanel}
         {mediaError ? <p className="error">{mediaError}</p> : null}
-        {!__WEB__ && settingsOpen ? (
+        {settingsOpen ? (
           <section className="settings-page" aria-labelledby="settings-title">
             <header>
               <div>
@@ -1040,10 +1111,112 @@ export function MeetingApp() {
             </header>
             <div className="settings-content">
               <div>
-                <h2>Atalhos</h2>
-                <p className="hint">Controle os atalhos globais usados pelo OpenMeet neste computador.</p>
+                <h2>Áudio e vídeo</h2>
+                <p className="hint">Valem para todas as salas e ficam salvos neste aparelho. Microfone, efeito e rádio ficam nos ajustes da chamada.</p>
               </div>
-              {consent}
+              <div className="settings-group">
+                {session().browser.outputSelection ? (
+                  <DeviceSelect
+                    label="Saída"
+                    kind="audiooutput"
+                    devices={inCall ? media.devices : idleDevices}
+                    disabled={inCall && (!controlsEnabled || controlPending)}
+                    onChange={onDevice}
+                  />
+                ) : null}
+                <DeviceSelect
+                  label="Câmera"
+                  kind="videoinput"
+                  devices={inCall ? media.devices : idleDevices}
+                  disabled={inCall && (!controlsEnabled || controlPending)}
+                  onChange={onDevice}
+                />
+                <label className="effect-toggle">
+                  <input
+                    type="checkbox"
+                    checked={media.backgroundBlur}
+                    disabled={!media.backgroundBlurSupported || controlPending}
+                    onChange={(event) => {
+                      const enabled = event.currentTarget.checked;
+                      void runControl("blur de fundo", () => session().setBackgroundBlur(enabled));
+                    }}
+                  />
+                  Desfocar fundo da câmera
+                </label>
+                {media.backgroundBlurSupported ? (
+                  <label>
+                    Intensidade do desfoque: {blurRadius}
+                    <input
+                      type="range"
+                      min={BLUR_RADIUS_MIN}
+                      max={BLUR_RADIUS_MAX}
+                      step={1}
+                      value={blurRadius}
+                      aria-valuetext={`raio ${blurRadius} px`}
+                      onChange={(event) => {
+                        const value = clampBlurRadius(Number(event.currentTarget.value));
+                        setBlurRadius(value);
+                        try {
+                          localStorage.setItem(BLUR_RADIUS_KEY, String(value));
+                        } catch {
+                          // The choice still holds for this window.
+                        }
+                        session()
+                          .setBackgroundBlurRadius(value)
+                          .catch(() => setMediaError("Não foi possível ajustar o desfoque."));
+                      }}
+                    />
+                  </label>
+                ) : null}
+                {media.backgroundBlurSupported ? (
+                  <p className="hint">O efeito é processado neste aparelho e pode aumentar o uso de bateria.</p>
+                ) : (
+                  <p className="hint">Este navegador não oferece o processamento necessário para o blur.</p>
+                )}
+                <button type="button" disabled={inCall && !controlsEnabled} onClick={() => void refreshDevices()}>
+                  Atualizar dispositivos
+                </button>
+              </div>
+              {consent ? (
+                <>
+                  <div>
+                    <h2>Atalhos</h2>
+                    <p className="hint">Controle os atalhos globais usados pelo OpenMeet neste computador.</p>
+                  </div>
+                  {consent}
+                </>
+              ) : null}
+              <div>
+                <h2>Diagnóstico</h2>
+                <p className="hint">Versão e qualidade da conexão, para relatar um problema.</p>
+              </div>
+              <div className="settings-group">
+                <p className="metrics">
+                  {browserLabel(session().browser)} · {media.stats.userAgent ?? "user agent indisponível"} · app {media.stats.appVersion ?? "—"}
+                </p>
+                {inCall && media.stats.available ? (
+                  <p className="metrics">
+                    perda {media.stats.packetsLost ?? "—"} · jitter {media.stats.jitterMs ?? "—"} ms · RTT {media.stats.rttMs ?? "—"} ms · candidato{" "}
+                    {media.stats.candidateType ?? "—"} · saída {media.stats.outboundWidth ?? "—"}x{media.stats.outboundHeight ?? "—"} @{" "}
+                    {media.stats.outboundFps ?? "—"} fps · superfície {media.stats.displaySurface ?? "—"}
+                  </p>
+                ) : (
+                  <p className="metrics">{inCall ? "Métricas ainda não disponíveis." : "As métricas aparecem durante uma chamada."}</p>
+                )}
+                <label className="export">
+                  <input
+                    type="checkbox"
+                    checked={exportConsent}
+                    onChange={(event) => {
+                      setExportConsent(event.currentTarget.checked);
+                    }}
+                  />
+                  Autorizar exportação do diagnóstico
+                </label>
+                <button type="button" disabled={!exportConsent} onClick={() => exportDiagnostic()}>
+                  Exportar diagnóstico
+                </button>
+              </div>
             </div>
           </section>
         ) : null}
@@ -1597,85 +1770,14 @@ export function MeetingApp() {
                         </fieldset>
                       );
                     })()}
-                    {session().browser.outputSelection ? (
-                      <DeviceSelect
-                        label="Saída"
-                        kind="audiooutput"
-                        devices={media.devices}
-                        disabled={!controlsEnabled || controlPending}
-                        onChange={onDevice}
-                      />
-                    ) : null}
-                    <DeviceSelect label="Câmera" kind="videoinput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
-                    <label className="effect-toggle">
-                      <input
-                        type="checkbox"
-                        checked={media.backgroundBlur}
-                        disabled={!media.backgroundBlurSupported || controlPending}
-                        onChange={(event) => {
-                          const enabled = event.currentTarget.checked;
-                          void runControl("blur de fundo", () => session().setBackgroundBlur(enabled));
-                        }}
-                      />
-                      Desfocar fundo da câmera
-                    </label>
-                    {media.backgroundBlurSupported ? (
-                      <label>
-                        Intensidade do desfoque: {blurRadius}
-                        <input
-                          type="range"
-                          min={BLUR_RADIUS_MIN}
-                          max={BLUR_RADIUS_MAX}
-                          step={1}
-                          value={blurRadius}
-                          aria-valuetext={`raio ${blurRadius} px`}
-                          onChange={(event) => {
-                            const value = clampBlurRadius(Number(event.currentTarget.value));
-                            setBlurRadius(value);
-                            try {
-                              localStorage.setItem(BLUR_RADIUS_KEY, String(value));
-                            } catch {
-                              // The choice still holds for this window.
-                            }
-                            session()
-                              .setBackgroundBlurRadius(value)
-                              .catch(() => setMediaError("Não foi possível ajustar o desfoque."));
-                          }}
-                        />
-                      </label>
-                    ) : null}
-                    {media.backgroundBlurSupported ? (
-                      <p className="hint">O efeito é processado neste aparelho e pode aumentar o uso de bateria.</p>
-                    ) : (
-                      <p className="hint">Este navegador não oferece o processamento necessário para o blur.</p>
-                    )}
-                    <button type="button" disabled={!controlsEnabled} onClick={() => void refreshDevices()}>
-                      Atualizar dispositivos
-                    </button>
-                    <p className="metrics">
-                      {browserLabel(session().browser)} · {media.stats.userAgent ?? "user agent indisponível"} · app {media.stats.appVersion ?? "—"}
-                    </p>
-                    {media.stats.available ? (
-                      <p className="metrics">
-                        perda {media.stats.packetsLost ?? "—"} · jitter {media.stats.jitterMs ?? "—"} ms · RTT {media.stats.rttMs ?? "—"} ms · candidato{" "}
-                        {media.stats.candidateType ?? "—"} · saída {media.stats.outboundWidth ?? "—"}x{media.stats.outboundHeight ?? "—"} @{" "}
-                        {media.stats.outboundFps ?? "—"} fps · superfície {media.stats.displaySurface ?? "—"}
-                      </p>
-                    ) : (
-                      <p className="metrics">Métricas ainda não disponíveis.</p>
-                    )}
-                    <label className="export">
-                      <input
-                        type="checkbox"
-                        checked={exportConsent}
-                        onChange={(event) => {
-                          setExportConsent(event.currentTarget.checked);
-                        }}
-                      />
-                      Autorizar exportação do diagnóstico
-                    </label>
-                    <button type="button" disabled={!exportConsent} onClick={() => exportDiagnostic()}>
-                      Exportar diagnóstico
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.currentTarget.closest("details")?.removeAttribute("open");
+                        setSettingsOpen(true);
+                      }}
+                    >
+                      Saída, câmera e diagnóstico
                     </button>
                   </div>
                 </details>

@@ -1,5 +1,9 @@
 # HISTORY — registro cronológico
 
+### 2026-10-27 — F04-12, configurações globais — Claude
+Branch `task/F04-12-ajustes-globais`, a partir da `main` 5e17aa5. Pedido do usuário: ajustes da chamada grandes demais. Saída, câmera, blur, atualizar dispositivos e diagnóstico foram para Configurações, que passa a existir também na web; a página quebra em uma coluna pela própria largura (container query). Escolha de dispositivo salva no aparelho e aplicada ao conectar; fora da chamada a lista vem de `enumerateDevices`.
+Windows 11: `pnpm typecheck`, `pnpm lint`, testes (shared 53, media 77, server 82, desktop 22), builds desktop e web e prettier nos arquivos tocados passaram. Um teste do servidor falhou na primeira rodada paralela e passou ao repetir, sem mudança no servidor. Configurações vista no navegador com API local, sem erro no console; o navegador do teste não listou aparelhos (sem permissão). Não vista numa chamada nem no `.exe`.
+
 ### 2026-10-26 — F07-09, release 0.2.5 — Claude
 Branch `main`, após o merge da F04-11. Versão 0.2.4 → 0.2.5 nos quatro arquivos, por pedido do usuário, com o rádio da sala. Push da `main` e tag `v0.2.5` para o workflow de release.
 

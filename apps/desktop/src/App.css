@@ -942,6 +942,36 @@ a {
   padding-top: 28px;
 }
 
+/* The page sits beside the room list, so its own width decides the columns, not the window's. */
+.settings-page {
+  container-type: inline-size;
+}
+
+@container (max-width: 560px) {
+  .settings-content {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .settings-content > div:not(.settings-group) + .settings-group {
+    margin-bottom: 12px;
+  }
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 20px;
+  border-radius: 8px;
+  background: var(--bg-panel);
+}
+
+.settings-group .metrics {
+  overflow-wrap: anywhere;
+}
+
 .settings-content .shortcuts {
   padding: 20px;
   border-radius: 8px;
