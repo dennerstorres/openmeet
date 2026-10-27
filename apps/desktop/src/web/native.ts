@@ -19,6 +19,8 @@ export const shellStatus: typeof Native.shellStatus = () => Promise.reject(new E
 
 export const setShortcutConsent: typeof Native.setShortcutConsent = () => Promise.reject(new Error("no shell in the browser"));
 
+export const setAutostart: typeof Native.setAutostart = () => Promise.reject(new Error("no shell in the browser"));
+
 export const shellTracks: typeof Native.shellTracks = async () => undefined;
 
 export const checkUpdate: typeof Native.checkUpdate = async () => null;

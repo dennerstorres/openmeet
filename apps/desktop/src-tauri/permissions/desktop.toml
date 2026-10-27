@@ -49,6 +49,11 @@ description = "Enables the shell_set_consent command without any pre-configured 
 commands.allow = ["shell_set_consent"]
 
 [[permission]]
+identifier = "allow-shell-set-autostart"
+description = "Enables the shell_set_autostart command without any pre-configured scope."
+commands.allow = ["shell_set_autostart"]
+
+[[permission]]
 identifier = "allow-shell-tracks"
 description = "Enables the shell_tracks command without any pre-configured scope."
 commands.allow = ["shell_tracks"]

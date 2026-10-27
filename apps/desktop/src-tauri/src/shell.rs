@@ -3,13 +3,25 @@ use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 use tauri::menu::{Menu, MenuItem};
-use tauri::tray::{TrayIcon, TrayIconBuilder};
+use tauri::tray::{MouseButton, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::Wry;
 use tauri::{AppHandle, Emitter, Manager, WindowEvent};
+use tauri_plugin_autostart::ManagerExt as _;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutEvent, ShortcutState};
 use tauri_plugin_notification::NotificationExt;
 
 const SERVICE: &str = "OpenMeet";
+
+/// The login entry starts the app with this argument, and then the window stays in the tray.
+const AUTOSTART_ARG: &str = "--autostart";
+
+pub fn autostart_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
+    tauri_plugin_autostart::Builder::new().arg(AUTOSTART_ARG).build()
+}
+
+pub fn started_at_login() -> bool {
+    std::env::args().any(|arg| arg == AUTOSTART_ARG)
+}
 
 struct Binding {
     id: &'static str,
@@ -54,6 +66,7 @@ pub(crate) struct ShortcutView {
 pub(crate) struct ShellStatus {
     shortcut_consent: bool,
     shortcuts: Vec<ShortcutView>,
+    autostart: bool,
 }
 
 #[derive(Default, serde::Serialize, serde::Deserialize)]
@@ -97,6 +110,13 @@ pub fn install(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         .icon(icon)
         .tooltip("OpenMeet")
         .menu(&menu)
+        // The menu stays on the right button; a double click with the left one opens the window.
+        .show_menu_on_left_click(false)
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::DoubleClick { button: MouseButton::Left, .. } = event {
+                show_main(tray.app_handle());
+            }
+        })
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => show_main(app),
             "toggle-microphone" | "toggle-camera" => {
@@ -209,6 +229,7 @@ fn current_status(app: &AppHandle) -> Result<ShellStatus, String> {
     Ok(ShellStatus {
         shortcut_consent: consent,
         shortcuts,
+        autostart: app.autolaunch().is_enabled().unwrap_or(false),
     })
 }
 
@@ -406,6 +427,15 @@ pub fn shell_status(app: AppHandle) -> Result<ShellStatus, String> {
 #[tauri::command]
 pub fn shell_set_consent(app: AppHandle, consent: bool) -> Result<ShellStatus, String> {
     apply_shortcuts(&app, consent, true)?;
+    current_status(&app)
+}
+
+/// The login entry lives in the system (HKCU Run on Windows), not in preferences.json.
+#[tauri::command]
+pub fn shell_set_autostart(app: AppHandle, enabled: bool) -> Result<ShellStatus, String> {
+    let launcher = app.autolaunch();
+    let changed = if enabled { launcher.enable() } else { launcher.disable() };
+    changed.map_err(|_| "autostart_failed".to_string())?;
     current_status(&app)
 }
 

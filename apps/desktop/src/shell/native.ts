@@ -15,6 +15,7 @@ export interface ShortcutView {
 export interface ShellStatus {
   shortcutConsent: boolean;
   shortcuts: ShortcutView[];
+  autostart: boolean;
 }
 
 // The broker's refresh and the 401 renewal of instance calls share one flight.
@@ -67,6 +68,10 @@ export function shellStatus(): Promise<ShellStatus> {
 
 export function setShortcutConsent(consent: boolean): Promise<ShellStatus> {
   return invoke<ShellStatus>("shell_set_consent", { consent });
+}
+
+export function setAutostart(enabled: boolean): Promise<ShellStatus> {
+  return invoke<ShellStatus>("shell_set_autostart", { enabled });
 }
 
 export function shellTracks(live: boolean, microphone: boolean, camera: boolean, announce: "microphone" | "camera" | null): Promise<void> {

@@ -66,6 +66,7 @@ import {
   listenInvite,
   listenShell,
   openGoogleLogin,
+  setAutostart,
   setShortcutConsent,
   shellStatus,
   shellTracks,
@@ -639,6 +640,17 @@ export function MeetingApp() {
             .then(setShell)
             .catch(() => {
               setMediaError("Não foi possível gravar a preferência de atalhos.");
+            })
+            .finally(() => {
+              setShellPending(false);
+            });
+        }}
+        onAutostart={(enabled) => {
+          setShellPending(true);
+          void setAutostart(enabled)
+            .then(setShell)
+            .catch(() => {
+              setMediaError("Não foi possível alterar o início com o Windows.");
             })
             .finally(() => {
               setShellPending(false);

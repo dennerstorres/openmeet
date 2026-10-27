@@ -38,6 +38,7 @@ test("the web bundle has no native shell, no instance picker and no media proof"
     "shell_tracks",
     "shell_status",
     "shell_set_consent",
+    "shell_set_autostart",
     "shell-action",
     "invite_take",
     "invite-link",

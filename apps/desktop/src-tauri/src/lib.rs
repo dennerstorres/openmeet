@@ -45,6 +45,8 @@ fn create_main_window<R: tauri::Runtime, M: tauri::Manager<R>>(manager: &M) -> t
     tauri::WebviewWindowBuilder::new(manager, "main", tauri::WebviewUrl::default())
         .title("OpenMeet")
         .inner_size(800.0, 600.0)
+        // Started by the Windows login entry: the app waits in the tray.
+        .visible(!shell::started_at_login())
         .on_navigation(move |url| is_app_page(url, debug))
         .on_new_window(|_url, _features| tauri::webview::NewWindowResponse::Deny)
         .build()
@@ -59,6 +61,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(shell::shortcut_plugin())
+        .plugin(shell::autostart_plugin())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .on_permission_request(|webview, kind| {
             use tauri::webview::PermissionResponse;
@@ -101,6 +104,7 @@ pub fn run() {
             session::instance_sound,
             shell::shell_status,
             shell::shell_set_consent,
+            shell::shell_set_autostart,
             shell::shell_tracks,
             shell::shell_show,
             invite::invite_take,
