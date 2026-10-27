@@ -60,6 +60,7 @@ import {
   typingRoom,
   type MessageView,
 } from "./messages.js";
+import { addDmMember, getDm, leaveDm, listBlocks, listDms, openDm, renameDm, setBlock, type DmView } from "./dms.js";
 import { deleteSound, importSound, listLibrary, listOwnSounds, readSound, removeFromLibrary, renameSound, uploadSound } from "./sounds.js";
 
 const AUTH_STATUS: Record<AuthErrorCode, number> = {
@@ -102,6 +103,9 @@ const ROOM_STATUS: Record<RoomErrorCode, number> = {
   voice_room: 409,
   message_not_found: 404,
   invalid_message: 400,
+  dm_not_found: 404,
+  dm_full: 409,
+  blocked: 403,
 };
 
 function configuredSecret(env: AppEnv): string | undefined {
@@ -770,7 +774,8 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
   async function publishMessage(request: FastifyRequest, name: ChatEventName, message: MessageView): Promise<void> {
     if (!events) return;
     try {
-      events.publish(await events.roomAudience(message.roomId), name, publicMessage(message));
+      const audience = message.dmId ? await events.dmAudience(message.dmId) : await events.roomAudience(message.roomId ?? "");
+      events.publish(audience, name, publicMessage(message));
     } catch (error) {
       const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "error";
       request.log.error({ code }, "chat event failed");
@@ -926,6 +931,190 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
       const message = await pinMessage(db, actor, param(request, "id"), booleanField(request.body, "pinned"));
       await publishMessage(request, "message.updated", message);
       return reply.code(200).header("cache-control", "no-store").send(message);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  // ADR 0024: DMs. Their messages use the same functions as the rooms; edit, delete, pin and reactions go
+  // through /api/v1/messages/:id like any other message.
+  // Everyone in `extra` hears it too: whoever just left still learns that the DM is gone.
+  async function publishDm(request: FastifyRequest, name: ChatEventName, dm: DmView, extra: string[] = []): Promise<void> {
+    if (!events) return;
+    try {
+      events.publish(new Set([...dm.memberIds, ...extra]), name, dm);
+    } catch (error) {
+      const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "error";
+      request.log.error({ code }, "chat event failed");
+    }
+  }
+
+  app.get("/api/v1/dms", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send({ dms: await listDms(db, actor) });
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/dms", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      if (!sending.allow(actor.id, Date.now())) throw new AuthError("rate_limited");
+      const opened = await openDm(db, actor, { userIds: bodyField(request.body, "userIds"), name: bodyField(request.body, "name") });
+      if (opened.created) await publishDm(request, "dm.created", opened.dm);
+      return reply
+        .code(opened.created ? 201 : 200)
+        .header("cache-control", "no-store")
+        .send(opened.dm);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.get("/api/v1/dms/:id", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await getDm(db, actor, param(request, "id")));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/dms/:id/members", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const dm = await addDmMember(db, actor, param(request, "id"), { userId: bodyField(request.body, "userId") });
+      await publishDm(request, "dm.updated", dm);
+      return reply.code(200).header("cache-control", "no-store").send(dm);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/dms/:id/leave", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const dm = await leaveDm(db, actor, param(request, "id"));
+      await publishDm(request, "dm.updated", dm, [actor.id]);
+      return reply.code(200).header("cache-control", "no-store").send(dm);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/dms/:id/rename", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const dm = await renameDm(db, actor, param(request, "id"), { name: bodyField(request.body, "name") });
+      await publishDm(request, "dm.updated", dm);
+      return reply.code(200).header("cache-control", "no-store").send(dm);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.get("/api/v1/dms/:id/messages", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const query = { before: queryText(request, "before"), after: queryText(request, "after"), around: queryText(request, "around") };
+      const page = await listMessages(db, actor, param(request, "id"), query, "dm");
+      return reply.code(200).header("cache-control", "no-store").send(page);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/dms/:id/messages", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      if (!sending.allow(actor.id, Date.now())) throw new AuthError("rate_limited");
+      const input = { body: bodyField(request.body, "body"), replyToId: textField(request.body, "replyToId") };
+      const message = await sendMessage(db, actor, param(request, "id"), input, "dm");
+      await publishMessage(request, "message.created", message);
+      return reply.code(201).header("cache-control", "no-store").send(message);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.get("/api/v1/dms/:id/pins", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send({ messages: await listPinned(db, actor, param(request, "id"), "dm") });
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/dms/:id/messages/search", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      if (!searching.allow(actor.id, Date.now())) throw new AuthError("rate_limited");
+      const input = { query: bodyField(request.body, "query"), before: textField(request.body, "before") };
+      const page = await searchMessages(db, actor, param(request, "id"), input, "dm");
+      return reply.code(200).header("cache-control", "no-store").send(page);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/dms/:id/typing", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const dm = await typingRoom(db, actor, param(request, "id"), "dm");
+      if (events && typing.allow(`${actor.id}:${dm}`, Date.now())) {
+        const audience = (await events.dmAudience(dm)).filter((id) => id !== actor.id);
+        events.signal(audience, "typing", { dmId: dm, userId: actor.id });
+      }
+      return reply.code(204).header("cache-control", "no-store").send();
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.get("/api/v1/blocks", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send({ userIds: await listBlocks(db, actor) });
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  // The direct DM with that person, if any, turns read only (or back) for both of them.
+  app.post("/api/v1/users/:id/block", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const dm = await setBlock(db, actor, param(request, "id"), booleanField(request.body, "blocked"));
+      if (dm) await publishDm(request, "dm.updated", dm);
+      return reply.code(204).header("cache-control", "no-store").send();
     } catch (error) {
       return sendError(request, reply, error);
     }

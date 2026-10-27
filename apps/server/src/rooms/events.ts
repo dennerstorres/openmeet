@@ -11,7 +11,7 @@ const KEEPALIVE_MS = 25_000;
 const REPLAY_SIZE = 2_000;
 
 export type ChatEventName =
-  "message.created" | "message.updated" | "message.deleted" | "reaction" | "typing" | "read" | "mention" | "dm.created" | "emoji.updated";
+  "message.created" | "message.updated" | "message.deleted" | "reaction" | "typing" | "read" | "mention" | "dm.created" | "dm.updated" | "emoji.updated";
 
 export interface StreamSink {
   write(chunk: string): void;
@@ -114,6 +114,12 @@ export class ChatEvents {
        where r.id = $1 and r.deleted_at is null`,
       [roomId],
     );
+    return found.rows.map((row) => text(row.user_id)).filter((id): id is string => id !== undefined);
+  }
+
+  /** Members of a DM who have not left it: nobody else, not even an admin, hears it. */
+  async dmAudience(dmId: string): Promise<string[]> {
+    const found = await this.db.query("select user_id from dm_members where dm_id = $1 and left_at is null", [dmId]);
     return found.rows.map((row) => text(row.user_id)).filter((id): id is string => id !== undefined);
   }
 

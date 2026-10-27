@@ -197,7 +197,7 @@ fn allowed_call(method: &str, path: &str) -> bool {
     };
     let parts: Vec<&str> = path.split('/').collect();
     if cursor {
-        return method == "GET" && matches!(parts.as_slice(), ["", "api", "v1", "rooms", id, "messages"] if is_id(id));
+        return method == "GET" && matches!(parts.as_slice(), ["", "api", "v1", "rooms" | "dms", id, "messages"] if is_id(id));
     }
     match (method, parts.as_slice()) {
         ("GET" | "POST", ["", "api", "v1", "rooms"]) => true,
@@ -225,6 +225,15 @@ fn allowed_call(method: &str, path: &str) -> bool {
         ("POST", ["", "api", "v1", "rooms", id, "messages", "search"]) => is_id(id),
         ("POST", ["", "api", "v1", "rooms", id, "typing"]) => is_id(id),
         ("POST", ["", "api", "v1", "messages", message, "edit" | "delete" | "pin" | "reactions"]) => is_message_id(message),
+        // ADR 0024: DMs and blocks; their messages use the same message routes.
+        ("GET" | "POST", ["", "api", "v1", "dms"]) => true,
+        ("GET", ["", "api", "v1", "dms", id]) => is_id(id),
+        ("POST", ["", "api", "v1", "dms", id, "members" | "leave" | "rename" | "typing"]) => is_id(id),
+        ("GET" | "POST", ["", "api", "v1", "dms", id, "messages"]) => is_id(id),
+        ("GET", ["", "api", "v1", "dms", id, "pins"]) => is_id(id),
+        ("POST", ["", "api", "v1", "dms", id, "messages", "search"]) => is_id(id),
+        ("GET", ["", "api", "v1", "blocks"]) => true,
+        ("POST", ["", "api", "v1", "users", id, "block"]) => is_id(id),
         _ => false,
     }
 }
@@ -471,6 +480,20 @@ mod tests {
             ("POST", "/api/v1/messages/42/pin".to_string()),
             ("POST", "/api/v1/messages/42/reactions".to_string()),
             ("GET", format!("/api/v1/rooms/{id}/messages?around=7")),
+            ("GET", "/api/v1/dms".to_string()),
+            ("POST", "/api/v1/dms".to_string()),
+            ("GET", format!("/api/v1/dms/{id}")),
+            ("POST", format!("/api/v1/dms/{id}/members")),
+            ("POST", format!("/api/v1/dms/{id}/leave")),
+            ("POST", format!("/api/v1/dms/{id}/rename")),
+            ("POST", format!("/api/v1/dms/{id}/typing")),
+            ("GET", format!("/api/v1/dms/{id}/messages")),
+            ("GET", format!("/api/v1/dms/{id}/messages?before=42")),
+            ("POST", format!("/api/v1/dms/{id}/messages")),
+            ("GET", format!("/api/v1/dms/{id}/pins")),
+            ("POST", format!("/api/v1/dms/{id}/messages/search")),
+            ("GET", "/api/v1/blocks".to_string()),
+            ("POST", format!("/api/v1/users/{id}/block")),
         ] {
             assert!(allowed_call(method, &path), "{method} {path}");
         }
@@ -505,6 +528,13 @@ mod tests {
             ("GET", format!("/api/v1/rooms/{id}/pins?after=1")),
             ("POST", "/api/v1/messages/abc/edit".to_string()),
             ("POST", format!("/api/v1/messages/{id}/edit")),
+            ("DELETE", format!("/api/v1/dms/{id}")),
+            ("POST", format!("/api/v1/dms/{id}")),
+            ("POST", "/api/v1/dms/not-an-id/leave".to_string()),
+            ("GET", format!("/api/v1/dms/{id}/messages?q=segredo")),
+            ("POST", format!("/api/v1/dms/{id}/members/{id}")),
+            ("GET", format!("/api/v1/users/{id}/block")),
+            ("POST", "/api/v1/blocks".to_string()),
             ("GET", "/api/v1/messages/42/edit".to_string()),
             ("GET", "/api/v1/events".to_string()),
         ] {

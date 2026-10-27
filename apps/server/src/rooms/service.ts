@@ -33,7 +33,10 @@ export type RoomErrorCode =
   | "text_room"
   | "voice_room"
   | "message_not_found"
-  | "invalid_message";
+  | "invalid_message"
+  | "dm_not_found"
+  | "dm_full"
+  | "blocked";
 
 export class RoomError extends Error {
   readonly code: RoomErrorCode;

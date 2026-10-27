@@ -350,6 +350,13 @@ function instancePath(path: string): string {
   const roomChat = /^\/api\/v1\/rooms\/([0-9a-f-]{36})\/(?:messages(?:\?(?:before|after|around)=[1-9][0-9]{0,17}|\/search)?|pins|typing)$/i.exec(path);
   if (roomChat?.[1] !== undefined && UUID.test(roomChat[1])) return path;
   if (/^\/api\/v1\/messages\/[1-9][0-9]{0,17}\/(?:edit|delete|pin|reactions)$/.test(path)) return path;
+  // ADR 0024: DMs and blocks; DM messages share the message routes above.
+  if (path === "/api/v1/dms" || path === "/api/v1/blocks") return path;
+  const dm =
+    /^\/api\/v1\/dms\/([0-9a-f-]{36})(?:\/(?:messages(?:\?(?:before|after|around)=[1-9][0-9]{0,17}|\/search)?|pins|typing|members|leave|rename))?$/i.exec(path);
+  if (dm?.[1] !== undefined && UUID.test(dm[1])) return path;
+  const block = /^\/api\/v1\/users\/([0-9a-f-]{36})\/block$/i.exec(path);
+  if (block?.[1] !== undefined && UUID.test(block[1])) return path;
   throw new PocInputError("invalid_api_base", "Request path is not part of the instance API");
 }
 

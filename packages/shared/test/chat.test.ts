@@ -115,6 +115,18 @@ test("the message routes pass the instance path check, with only the cursor as q
     "/api/v1/messages/42/pin",
     "/api/v1/messages/42/reactions",
     `/api/v1/rooms/${roomId}/messages?around=9`,
+    "/api/v1/dms",
+    `/api/v1/dms/${roomId}`,
+    `/api/v1/dms/${roomId}/messages`,
+    `/api/v1/dms/${roomId}/messages?before=42`,
+    `/api/v1/dms/${roomId}/messages/search`,
+    `/api/v1/dms/${roomId}/pins`,
+    `/api/v1/dms/${roomId}/typing`,
+    `/api/v1/dms/${roomId}/members`,
+    `/api/v1/dms/${roomId}/leave`,
+    `/api/v1/dms/${roomId}/rename`,
+    "/api/v1/blocks",
+    `/api/v1/users/${roomId}/block`,
   ]) {
     assert.equal(prepareInstanceRequest(origin, origin, "GET", path, undefined, null).url, `${origin}${path}`);
   }
@@ -124,6 +136,10 @@ test("the message routes pass the instance path check, with only the cursor as q
     `/api/v1/rooms/${roomId}/messages?after=1&before=2`,
     "/api/v1/messages/abc/edit",
     `/api/v1/messages/${roomId}/edit`,
+    `/api/v1/dms/${roomId}/messages?q=segredo`,
+    "/api/v1/dms/not-an-id/leave",
+    `/api/v1/dms/${roomId}/members/${roomId}`,
+    "/api/v1/users/not-an-id/block",
   ]) {
     assert.throws(() => prepareInstanceRequest(origin, origin, "GET", path, undefined, null));
   }

@@ -1,9 +1,10 @@
 import type { MigrationClient } from "../db/migrate.js";
 import type { PublicUser } from "../auth/service.js";
 import { RoomError, canManage, loadRoomAccess, requireMember, roomId, text, type RoomRecord } from "./service.js";
+import { loadDm } from "./dms.js";
 
 // ADR 0024: messages of text rooms. A removed message keeps its row with an empty body, so replies and
-// cursors stay whole. DMs (F13-11) reuse the same table with dm_id.
+// cursors stay whole. DMs (F13-11) reuse the same table and functions with dm_id.
 
 export const MESSAGE_MAX_CHARS = 4000;
 export const PAGE_SIZE = 50;
@@ -33,7 +34,9 @@ function hidden(value: string): boolean {
 
 export interface MessageView {
   id: string;
-  roomId: string;
+  /** Exactly one of roomId and dmId is set. */
+  roomId: string | null;
+  dmId: string | null;
   authorId: string;
   body: string;
   replyTo: { id: string; authorId: string; body: string; deleted: boolean } | null;
@@ -58,9 +61,21 @@ export interface MessagePage {
   hasNewer?: boolean;
 }
 
+export type ChatKind = "room" | "dm";
+
+// Where the messages hang from: a text room of a server, or a DM. The column is one of two fixed names, so it
+// is safe to place in the SQL text.
 interface Chat {
-  room: RoomRecord;
+  column: "room_id" | "dm_id";
+  target: string;
+  /** Null in a DM. */
+  room: RoomRecord | null;
+  /** Removes anyone's message. Nobody does in a DM: there only the author removes. */
   moderator: boolean;
+  /** Room moderators pin; in a DM every member does. */
+  canPin: boolean;
+  /** Why nothing new may be written: an ended room, or a direct DM with a block. */
+  closed: "room_ended" | "blocked" | undefined;
 }
 
 export function messageId(value: string): string {
@@ -87,14 +102,28 @@ async function textRoom(db: MigrationClient, actor: PublicUser, id: string): Pro
   const { room, access } = await loadRoomAccess(db, actor, roomId(id));
   requireMember(access);
   if (room.channel !== "text") throw new RoomError("voice_room");
-  return { room, moderator: canManage(access.membership) };
+  const moderator = canManage(access.membership);
+  return { column: "room_id", target: room.id, room, moderator, canPin: moderator, closed: room.ended ? "room_ended" : undefined };
 }
 
-/** Typing is only signalled into a text room the caller may write in. */
-export async function typingRoom(db: MigrationClient, actor: PublicUser, id: string): Promise<string> {
-  const chat = await textRoom(db, actor, id);
-  if (chat.room.ended) throw new RoomError("room_ended");
-  return chat.room.id;
+async function dmChat(db: MigrationClient, actor: PublicUser, id: string): Promise<Chat> {
+  const dm = await loadDm(db, actor, id);
+  return { column: "dm_id", target: dm.id, room: null, moderator: false, canPin: true, closed: dm.readOnly ? "blocked" : undefined };
+}
+
+function loadChat(db: MigrationClient, actor: PublicUser, id: string, kind: ChatKind): Promise<Chat> {
+  return kind === "dm" ? dmChat(db, actor, id) : textRoom(db, actor, id);
+}
+
+function requireOpen(chat: Chat): void {
+  if (chat.closed !== undefined) throw new RoomError(chat.closed);
+}
+
+/** Typing is only signalled into a text room or DM the caller may write in. */
+export async function typingRoom(db: MigrationClient, actor: PublicUser, id: string, kind: ChatKind = "room"): Promise<string> {
+  const chat = await loadChat(db, actor, id, kind);
+  requireOpen(chat);
+  return chat.target;
 }
 
 /** What every member receives: the flags that depend on the viewer are left to each client. */
@@ -105,6 +134,7 @@ export function publicMessage(view: MessageView): Omit<MessageView, "canEdit" | 
     mentionsEveryone: view.mentionsEveryone,
     id: view.id,
     roomId: view.roomId,
+    dmId: view.dmId,
     authorId: view.authorId,
     body: view.body,
     replyTo: view.replyTo,
@@ -116,7 +146,7 @@ export function publicMessage(view: MessageView): Omit<MessageView, "canEdit" | 
 }
 
 const SELECT = `
-  select m.id::text as id, m.room_id, m.author_id, m.body, m.pinned_at is not null as pinned, m.edited_at is not null as edited,
+  select m.id::text as id, m.room_id, m.dm_id, m.author_id, m.body, m.pinned_at is not null as pinned, m.edited_at is not null as edited,
          m.deleted_at is not null as deleted, m.created_at, m.mentions_everyone,
          array(select x.user_id::text from message_mentions x where x.message_id = m.id order by x.user_id) as mentions,
          r.id::text as reply_id, r.author_id as reply_author, left(r.body, ${REPLY_PREVIEW_CHARS}) as reply_body, r.deleted_at is not null as reply_deleted,
@@ -138,7 +168,8 @@ function readMessage(row: Record<string, unknown>, actor: PublicUser, chat: Chat
   const mine = authorId === actor.id;
   return {
     id,
-    roomId: text(row.room_id) ?? chat.room.id,
+    roomId: text(row.room_id) ?? null,
+    dmId: text(row.dm_id) ?? null,
     authorId,
     body: deleted ? "" : typeof row.body === "string" ? row.body : "",
     replyTo: replyId
@@ -181,16 +212,18 @@ export async function listMessages(
   actor: PublicUser,
   id: string,
   query: { before?: string | undefined; after?: string | undefined; around?: string | undefined },
+  kind: ChatKind = "room",
 ): Promise<MessagePage> {
   const before = cursor(query.before);
   const after = cursor(query.after);
   const around = cursor(query.around);
   if ([before, after, around].filter((value) => value !== undefined).length > 1) throw new RoomError("invalid_body");
-  const chat = await textRoom(db, actor, id);
+  const chat = await loadChat(db, actor, id, kind);
+  const where = `m.${chat.column} = $1`;
   if (around !== undefined) {
-    const older = await db.query(`${SELECT} where m.room_id = $1 and m.id <= $2::bigint order by m.id desc limit ${AROUND_SIDE + 2}`, [chat.room.id, around]);
+    const older = await db.query(`${SELECT} where ${where} and m.id <= $2::bigint order by m.id desc limit ${AROUND_SIDE + 2}`, [chat.target, around]);
     if (text(older.rows[0]?.id) !== around) throw new RoomError("message_not_found");
-    const newer = await db.query(`${SELECT} where m.room_id = $1 and m.id > $2::bigint order by m.id limit ${AROUND_SIDE + 1}`, [chat.room.id, around]);
+    const newer = await db.query(`${SELECT} where ${where} and m.id > $2::bigint order by m.id limit ${AROUND_SIDE + 1}`, [chat.target, around]);
     return {
       messages: [
         ...older.rows
@@ -204,14 +237,14 @@ export async function listMessages(
     };
   }
   if (after !== undefined) {
-    const rows = await db.query(`${SELECT} where m.room_id = $1 and m.id > $2::bigint order by m.id limit ${AFTER_PAGE_SIZE + 1}`, [chat.room.id, after]);
+    const rows = await db.query(`${SELECT} where ${where} and m.id > $2::bigint order by m.id limit ${AFTER_PAGE_SIZE + 1}`, [chat.target, after]);
     const page = rows.rows.slice(0, AFTER_PAGE_SIZE).map((row) => readMessage(row, actor, chat));
     return { messages: page, hasMore: rows.rows.length > AFTER_PAGE_SIZE };
   }
   const rows =
     before === undefined
-      ? await db.query(`${SELECT} where m.room_id = $1 order by m.id desc limit ${PAGE_SIZE + 1}`, [chat.room.id])
-      : await db.query(`${SELECT} where m.room_id = $1 and m.id < $2::bigint order by m.id desc limit ${PAGE_SIZE + 1}`, [chat.room.id, before]);
+      ? await db.query(`${SELECT} where ${where} order by m.id desc limit ${PAGE_SIZE + 1}`, [chat.target])
+      : await db.query(`${SELECT} where ${where} and m.id < $2::bigint order by m.id desc limit ${PAGE_SIZE + 1}`, [chat.target, before]);
   const page = rows.rows
     .slice(0, PAGE_SIZE)
     .map((row) => readMessage(row, actor, chat))
@@ -220,7 +253,7 @@ export async function listMessages(
 }
 
 async function readOne(db: MigrationClient, actor: PublicUser, chat: Chat, id: string): Promise<MessageView> {
-  const found = await db.query(`${SELECT} where m.id = $1::bigint and m.room_id = $2`, [id, chat.room.id]);
+  const found = await db.query(`${SELECT} where m.id = $1::bigint and m.${chat.column} = $2`, [id, chat.target]);
   const row = found.rows[0];
   if (!row) throw new RoomError("message_not_found");
   return readMessage(row, actor, chat);
@@ -235,14 +268,23 @@ interface Mentions {
 export async function resolveMentions(db: MigrationClient, chat: Chat, body: string): Promise<Mentions> {
   const prose = body.replace(CODE, " ");
   const named = [...new Set([...prose.matchAll(MENTION)].map((match) => (match[1] ?? "").toLowerCase()))].slice(0, MENTIONS_PER_MESSAGE);
-  const everyone = chat.moderator && EVERYONE.test(prose);
+  // A DM has no @everyone: its members are already the whole audience.
+  const everyone = chat.room !== null && chat.moderator && EVERYONE.test(prose);
   if (named.length === 0) return { users: [], everyone };
-  const found = await db.query(
-    `select m.user_id::text as id
-     from server_members m join users u on u.id = m.user_id
-     where m.server_id = $1 and m.removed_at is null and u.disabled_at is null and m.user_id = any($2::uuid[])`,
-    [chat.room.serverId, named],
-  );
+  const found =
+    chat.room === null
+      ? await db.query(
+          `select d.user_id::text as id
+           from dm_members d join users u on u.id = d.user_id
+           where d.dm_id = $1 and d.left_at is null and u.disabled_at is null and d.user_id = any($2::uuid[])`,
+          [chat.target, named],
+        )
+      : await db.query(
+          `select m.user_id::text as id
+           from server_members m join users u on u.id = m.user_id
+           where m.server_id = $1 and m.removed_at is null and u.disabled_at is null and m.user_id = any($2::uuid[])`,
+          [chat.room.serverId, named],
+        );
   return { users: found.rows.map((row) => text(row.id) ?? "").filter((user) => user !== ""), everyone };
 }
 
@@ -258,20 +300,21 @@ export async function sendMessage(
   actor: PublicUser,
   id: string,
   input: { body: unknown; replyToId: string | undefined },
+  kind: ChatKind = "room",
 ): Promise<MessageView> {
   const body = parseBody(input.body);
   const replyTo = input.replyToId === undefined ? undefined : messageId(input.replyToId);
-  const chat = await textRoom(db, actor, id);
-  if (chat.room.ended) throw new RoomError("room_ended");
+  const chat = await loadChat(db, actor, id, kind);
+  requireOpen(chat);
   if (replyTo !== undefined) {
-    const target = await db.query("select 1 from messages where id = $1::bigint and room_id = $2", [replyTo, chat.room.id]);
+    const target = await db.query(`select 1 from messages where id = $1::bigint and ${chat.column} = $2`, [replyTo, chat.target]);
     if (!target.rows[0]) throw new RoomError("message_not_found");
   }
   const mentions = await resolveMentions(db, chat, body);
   const created = await db.transaction(async (tx) => {
     const inserted = await tx.query(
-      "insert into messages (room_id, author_id, body, reply_to_id, mentions_everyone) values ($1, $2, $3, $4::bigint, $5) returning id::text as id",
-      [chat.room.id, actor.id, body, replyTo ?? null, mentions.everyone],
+      `insert into messages (${chat.column}, author_id, body, reply_to_id, mentions_everyone) values ($1, $2, $3, $4::bigint, $5) returning id::text as id`,
+      [chat.target, actor.id, body, replyTo ?? null, mentions.everyone],
     );
     const id = text(inserted.rows[0]?.id);
     if (!id) throw new RoomError("conflict");
@@ -281,15 +324,16 @@ export async function sendMessage(
   return readOne(db, actor, chat, created);
 }
 
-// The room a message lives in decides who sees it; a message elsewhere is simply not found.
+// The room or DM a message lives in decides who sees it; a message elsewhere is simply not found.
 async function messageChat(db: MigrationClient, actor: PublicUser, id: string): Promise<{ chat: Chat; authorId: string; deleted: boolean }> {
-  const found = await db.query("select room_id, author_id, deleted_at is not null as deleted from messages where id = $1::bigint", [messageId(id)]);
+  const found = await db.query("select room_id, dm_id, author_id, deleted_at is not null as deleted from messages where id = $1::bigint", [messageId(id)]);
   const row = found.rows[0];
   const room = text(row?.room_id);
-  if (!row || !room) throw new RoomError("message_not_found");
+  const dm = text(row?.dm_id);
+  if (!row || (!room && !dm)) throw new RoomError("message_not_found");
   let chat: Chat;
   try {
-    chat = await textRoom(db, actor, room);
+    chat = room ? await textRoom(db, actor, room) : await dmChat(db, actor, dm ?? "");
   } catch (error) {
     if (error instanceof RoomError) throw new RoomError("message_not_found");
     throw error;
@@ -302,7 +346,7 @@ export async function editMessage(db: MigrationClient, actor: PublicUser, id: st
   const { chat, authorId, deleted } = await messageChat(db, actor, id);
   if (deleted) throw new RoomError("message_not_found");
   if (authorId !== actor.id) throw new RoomError("forbidden");
-  if (chat.room.ended) throw new RoomError("room_ended");
+  requireOpen(chat);
   const mentions = await resolveMentions(db, chat, body);
   await db.transaction(async (tx) => {
     await tx.query("update messages set body = $2, mentions_everyone = $3, edited_at = now() where id = $1::bigint and deleted_at is null", [
@@ -335,7 +379,7 @@ export async function deleteMessage(db: MigrationClient, actor: PublicUser, id: 
 export async function pinMessage(db: MigrationClient, actor: PublicUser, id: string, pinned: boolean): Promise<MessageView> {
   const { chat, deleted } = await messageChat(db, actor, id);
   if (deleted) throw new RoomError("message_not_found");
-  if (!chat.moderator) throw new RoomError("forbidden");
+  if (!chat.canPin) throw new RoomError("forbidden");
   if (pinned) {
     await db.query("update messages set pinned_at = coalesce(pinned_at, now()), pinned_by = coalesce(pinned_by, $2) where id = $1::bigint", [id, actor.id]);
   } else {
@@ -349,7 +393,7 @@ export async function reactMessage(db: MigrationClient, actor: PublicUser, id: s
   const emoji = parseEmoji(input.emoji);
   const { chat, deleted } = await messageChat(db, actor, id);
   if (deleted) throw new RoomError("message_not_found");
-  if (chat.room.ended) throw new RoomError("room_ended");
+  requireOpen(chat);
   if (input.on) {
     await db.transaction(async (tx) => {
       // The lock keeps two people from both adding the 21st emoji.
@@ -382,10 +426,10 @@ export function parseEmoji(value: unknown): string {
   return value;
 }
 
-export async function listPinned(db: MigrationClient, actor: PublicUser, id: string): Promise<MessageView[]> {
-  const chat = await textRoom(db, actor, id);
-  const rows = await db.query(`${SELECT} where m.room_id = $1 and m.pinned_at is not null order by m.pinned_at desc, m.id desc limit ${PAGE_SIZE}`, [
-    chat.room.id,
+export async function listPinned(db: MigrationClient, actor: PublicUser, id: string, kind: ChatKind = "room"): Promise<MessageView[]> {
+  const chat = await loadChat(db, actor, id, kind);
+  const rows = await db.query(`${SELECT} where m.${chat.column} = $1 and m.pinned_at is not null order by m.pinned_at desc, m.id desc limit ${PAGE_SIZE}`, [
+    chat.target,
   ]);
   return rows.rows.map((row) => readMessage(row, actor, chat));
 }
@@ -396,17 +440,18 @@ export async function searchMessages(
   actor: PublicUser,
   id: string,
   input: { query: unknown; before: string | undefined },
+  kind: ChatKind = "room",
 ): Promise<MessagePage> {
   const query = typeof input.query === "string" ? input.query.trim() : "";
   if (query.length === 0 || [...query].length > SEARCH_MAX_CHARS || hidden(query)) throw new RoomError("invalid_body");
   const before = cursor(input.before);
-  const chat = await textRoom(db, actor, id);
+  const chat = await loadChat(db, actor, id, kind);
   const rows = await db.query(
     `${SELECT}
-     where m.room_id = $1 and m.deleted_at is null and ($3::bigint is null or m.id < $3::bigint)
+     where m.${chat.column} = $1 and m.deleted_at is null and ($3::bigint is null or m.id < $3::bigint)
        and to_tsvector('simple', m.body) @@ plainto_tsquery('simple', $2)
      order by m.id desc limit ${SEARCH_PAGE_SIZE + 1}`,
-    [chat.room.id, query, before ?? null],
+    [chat.target, query, before ?? null],
   );
   return {
     messages: rows.rows.slice(0, SEARCH_PAGE_SIZE).map((row) => readMessage(row, actor, chat)),
