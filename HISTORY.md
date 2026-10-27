@@ -1,5 +1,9 @@
 # HISTORY — registro cronológico
 
+### 2026-10-27 — F07-10, atualização baixada sem perguntar — Claude
+Branch `task/F07-10-atualizacao-silenciosa`, a partir da `main` 875629e. Pedida pelo usuário: baixar sozinho e só avisar que falta reiniciar. ADR 0025 (proposto) substitui o "Comportamento" do ADR 0018. `updater.rs`: `update_check` baixa o pacote (`Update::download`, assinatura conferida pelo plugin) antes de responder e guarda versão + bytes só no Rust; mesma versão não baixa de novo; em chamada recusa com `update_in_call`. `update_install` instala os bytes já baixados (`Update::install`), ainda recusando em chamada. Front: aviso "Versão X pronta" com "Reiniciar agora"/"Depois"; checagem recusada ou com falha tenta de novo em 10 min (`UPDATE_RETRY_MS`), com teste novo em `apps/desktop/test/update.test.mjs`.
+Windows 11, 2026-10-27: `pnpm --filter ./apps/desktop test` (36), `pnpm typecheck`, `pnpm lint` e `cargo test` (37, `CARGO_INCREMENTAL=0`) passaram; `cargo fmt` indisponível (rustfmt não instalado). Sem teste manual: falta a prova do ADR 0025 com release N → N+1 no `.exe`. Estado: WAITING_VALIDATION.
+
 ### 2026-10-27 — F13-14, docs e revisão independente da fase 13 — Claude
 Branch `task/F13-14-docs`, a partir da `main` 16ae998. Revisão do `git diff 7593247 main` (F13-01 a F13-13), lendo `rooms/{routes,messages,dms,events,attachments,emojis,unread}.ts`, `instance.ts` (`instancePath`), `session.rs` (`allowed_call`), `events.rs`, `attachments.rs`, `chat-markdown.ts`, `Markdown.tsx` e `MeetingApp.tsx` (notificação). Nenhum achado alto.
 

@@ -1,6 +1,6 @@
 # ADR 0018 — atualização automática do app Windows
 
-Data: 2026-10-24. Estado: aceito pelo usuário em 2026-10-24, aguardando implementação (F07-05).
+Data: 2026-10-24. Estado: aceito pelo usuário em 2026-10-24, aguardando implementação (F07-05). O item "Comportamento" foi substituído pelo ADR 0025.
 
 ## Contexto
 

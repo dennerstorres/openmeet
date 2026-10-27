@@ -1,6 +1,6 @@
-//! ADR 0018: the update check and install run here. The page gets these two commands, never the
-//! plugin permissions. The plugin itself refuses a package without the pinned signature and a
-//! version not above the installed one.
+//! ADR 0018 and 0025: the update check, download and install run here. The page gets these two
+//! commands, never the plugin permissions or the package. The plugin itself refuses a package
+//! without the pinned signature and a version not above the installed one.
 
 use serde::Serialize;
 use std::sync::Mutex;
@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, State};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
-/// Set by `shell_tracks`: a live meeting refuses the install.
+/// Set by `shell_tracks`: a live meeting refuses the download and the install.
 #[derive(Default)]
 pub struct CallLive(AtomicBool);
 
@@ -22,9 +22,15 @@ impl CallLive {
     }
 }
 
-/// The update found by the last check; install takes this one, never a version the page names.
+/// An update already downloaded and checked against the signature.
+struct Ready {
+    update: Update,
+    bytes: Vec<u8>,
+}
+
+/// The package from the last check; install takes this one, never a version the page names.
 #[derive(Default)]
-pub struct PendingUpdate(Mutex<Option<Update>>);
+pub struct PendingUpdate(Mutex<Option<Ready>>);
 
 #[derive(Serialize)]
 pub struct UpdateView {
@@ -49,23 +55,35 @@ fn install_gate(live: bool, pending: bool) -> Result<(), &'static str> {
     Ok(())
 }
 
+/// Finds a newer version and downloads it before answering, so the page only hears of a package
+/// that is ready. The same version already downloaded is not fetched again.
 #[tauri::command]
-pub async fn update_check(app: AppHandle, pending: State<'_, PendingUpdate>) -> Result<Option<UpdateView>, String> {
+pub async fn update_check(app: AppHandle, live: State<'_, CallLive>, pending: State<'_, PendingUpdate>) -> Result<Option<UpdateView>, String> {
     let updater = app.updater().map_err(|_| "update_unavailable")?;
-    let found = updater.check().await.map_err(|_| "update_check_failed")?;
-    let result = found.as_ref().map(|update| view(&update.version, update.body.as_deref()));
-    *pending.0.lock().map_err(|_| "update_unavailable")? = found;
-    Ok(result)
+    let Some(update) = updater.check().await.map_err(|_| "update_check_failed")? else {
+        return Ok(None);
+    };
+    let result = view(&update.version, update.body.as_deref());
+    let held = pending.0.lock().map_err(|_| "update_unavailable")?.as_ref().is_some_and(|ready| ready.update.version == update.version);
+    if held {
+        return Ok(Some(result));
+    }
+    if live.get() {
+        return Err("update_in_call".into());
+    }
+    let bytes = update.download(|_, _| {}, || {}).await.map_err(|_| "update_download_failed")?;
+    *pending.0.lock().map_err(|_| "update_unavailable")? = Some(Ready { update, bytes });
+    Ok(Some(result))
 }
 
 #[tauri::command]
 pub async fn update_install(app: AppHandle, live: State<'_, CallLive>, pending: State<'_, PendingUpdate>) -> Result<(), String> {
-    let update = {
+    let ready = {
         let mut slot = pending.0.lock().map_err(|_| "update_unavailable")?;
         install_gate(live.get(), slot.is_some())?;
         slot.take().ok_or("update_missing")?
     };
-    update.download_and_install(|_, _| {}, || {}).await.map_err(|_| "update_install_failed")?;
+    ready.update.install(&ready.bytes).map_err(|_| "update_install_failed")?;
     // NSIS in passive mode closes the app on Windows; this restart only runs where it does not.
     app.restart();
 }

@@ -73,6 +73,7 @@ F09-08 — Presença dos membros do servidor: WAITING_VALIDATION. Implementada e
 | F07-07 | Distribuição | Release 0.2.3 com updater | F07-06 | WAITING_VALIDATION | Claude | G7 |
 | F07-08 | Distribuição | Release 0.2.4 com efeitos de voz e sons | F04-09,F04-10 | WAITING_VALIDATION | Claude | G7 |
 | F07-09 | Distribuição | Release 0.2.5 com o rádio da sala | F04-11 | WAITING_VALIDATION | Claude | G7 |
+| F07-10 | Distribuição | Atualização baixada sem perguntar (ADR 0025) | F07-05 | WAITING_VALIDATION | Claude | G7,G10 |
 | F02-02 | POC | Conectar dois clientes Windows ao mesmo room | F02-01 | WAITING_VALIDATION | Grok | G2 |
 | F02-03 | POC | Áudio bidirecional, mic/câmera e devices | F02-02 | WAITING_VALIDATION | Grok | G2 |
 | F02-04 | POC | Captura de monitor e janela | F02-02 | WAITING_VALIDATION | Grok | G2 |

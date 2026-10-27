@@ -1,5 +1,7 @@
-/** ADR 0018: checked at start and every six hours; installed only when the person confirms. */
+/** ADR 0018 and 0025: checked at start and every six hours; the check answers once the package is downloaded. */
 export const UPDATE_EVERY_MS = 6 * 60 * 60 * 1000;
+/** A check refused in a call, or failed, tries again this soon. */
+export const UPDATE_RETRY_MS = 10 * 60 * 1000;
 
 export interface UpdateView {
   version: string;
@@ -7,20 +9,29 @@ export interface UpdateView {
 }
 
 export function updateFailure(error: unknown): string {
-  if (error === "update_in_call") return "Saia da chamada para instalar a atualização.";
+  if (error === "update_in_call") return "Saia da chamada para reiniciar e atualizar.";
   if (error === "update_missing") return "A atualização não está mais disponível. Tente de novo mais tarde.";
   return "Não foi possível instalar a atualização agora.";
 }
 
-/** Runs `check` now and on every interval; a failed check stays silent and waits for the next one. */
-export function watchUpdates(check: () => Promise<UpdateView | null>, found: (update: UpdateView) => void, every = UPDATE_EVERY_MS): () => void {
+/** Runs `check` now and on every interval; a failed check stays silent and tries again after `retry`. */
+export function watchUpdates(
+  check: () => Promise<UpdateView | null>,
+  found: (update: UpdateView) => void,
+  every = UPDATE_EVERY_MS,
+  retry = UPDATE_RETRY_MS,
+): () => void {
   let stopped = false;
+  let again: ReturnType<typeof setTimeout> | undefined;
   const run = () => {
+    clearTimeout(again);
     check().then(
       (update) => {
         if (update && !stopped) found(update);
       },
-      () => undefined,
+      () => {
+        if (!stopped) again = setTimeout(run, retry);
+      },
     );
   };
   run();
@@ -28,5 +39,6 @@ export function watchUpdates(check: () => Promise<UpdateView | null>, found: (up
   return () => {
     stopped = true;
     clearInterval(timer);
+    clearTimeout(again);
   };
 }

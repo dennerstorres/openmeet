@@ -38,8 +38,27 @@ test("a failed check stays silent", async () => {
   assert.deepEqual(seen, []);
 });
 
+test("a failed check tries again after the retry delay, not the interval", async () => {
+  let checks = 0;
+  const seen = [];
+  const stop = watchUpdates(
+    async () => {
+      checks += 1;
+      if (checks === 1) throw "update_in_call";
+      return { version: "0.3.0", notes: null };
+    },
+    (update) => seen.push(update.version),
+    1000,
+    5,
+  );
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  stop();
+  assert.equal(checks, 2);
+  assert.deepEqual(seen, ["0.3.0"]);
+});
+
 test("install failures read as short messages, in a call first", () => {
-  assert.match(updateFailure("update_in_call"), /Saia da chamada/);
+  assert.match(updateFailure("update_in_call"), /Saia da chamada para reiniciar/);
   assert.match(updateFailure("update_missing"), /não está mais disponível/);
   assert.match(updateFailure("update_install_failed"), /Não foi possível/);
 });

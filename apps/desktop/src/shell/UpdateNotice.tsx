@@ -28,7 +28,8 @@ export function UpdateNotice() {
 
   return (
     <aside className="update-notice" role="status" aria-live="polite">
-      <strong>Versão {update.version} disponível</strong>
+      <strong>Versão {update.version} pronta</strong>
+      <p>Reinicie o OpenMeet para aplicar a atualização.</p>
       {update.notes ? <p className="update-notes">{update.notes}</p> : null}
       {error ? <p className="update-error">{error}</p> : null}
       <div className="update-actions">
@@ -36,7 +37,7 @@ export function UpdateNotice() {
           Depois
         </button>
         <button type="button" className="primary" onClick={() => void install()} disabled={installing}>
-          {installing ? "Instalando…" : "Instalar e reiniciar"}
+          {installing ? "Reiniciando…" : "Reiniciar agora"}
         </button>
       </div>
     </aside>
