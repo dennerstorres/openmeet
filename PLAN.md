@@ -2,7 +2,7 @@
 
 Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, `VERIFIED`, `DONE`, `BLOCKED`.
 
-F13 — Salas de texto, DM e emoji próprio: ADR 0024 aceito em 2026-10-27, SPEC item 23. F13-02 a F13-05 IMPLEMENTED e F13-06 a F13-07 WAITING_VALIDATION (branches `task/F13-02-schema-mensagens` a `task/F13-07-mensagens-ricas`): migração 0011, API de mensagens, SSE por conta, ponte do `.exe` e da web, e a tela da sala de texto, vista na web local com mensagem ao vivo; falta o `.exe`, implantação real e proxy. Próximas: F13-08, F13-09, F13-10 e F13-11; estado em `HANDOFF.md`. Escopo em `plans/phase-13-salas-de-texto.md`.
+F13 — Salas de texto, DM e emoji próprio: ADR 0024 aceito em 2026-10-27, SPEC item 23. F13-02 a F13-05 IMPLEMENTED e F13-06 a F13-07 WAITING_VALIDATION (branches `task/F13-02-schema-mensagens` a `task/F13-07-mensagens-ricas`): migração 0011, API de mensagens, SSE por conta, ponte do `.exe` e da web, e a tela da sala de texto, vista na web local com mensagem ao vivo; falta o `.exe`, implantação real e proxy. F13-11 (DM na API) IMPLEMENTED na `task/F13-11-dm-api`. Próximas: F13-08, F13-09, F13-10 e F13-12; estado em `HANDOFF.md`. Escopo em `plans/phase-13-salas-de-texto.md`.
 
 F04-13 — Remover salas e servidores: WAITING_VALIDATION. Pedida pelo usuário em 2026-10-27, branch `task/F04-13-remover-salas-servidores`. Remoção lógica (ADR 0023, proposto): dono ou moderador remove sala, só o dono remove servidor; a chamada fecha no SFU, os convites são revogados e o identificador da sala fica livre. Typecheck, lint, testes (TS e Rust) passaram; fluxo visto na web local com SFU falso; falta LiveKit real com gente na sala, o `.exe` e o aceite do ADR.
 
@@ -125,7 +125,7 @@ F09-08 — Presença dos membros do servidor: WAITING_VALIDATION. Implementada e
 | F13-08 | Chat | Menções | F13-06 | PENDING | Claude | G4,G10 |
 | F13-09 | Chat | Anexos | F13-06 | PENDING | Claude | G4,G10 |
 | F13-10 | Chat | Emoji próprio do servidor | F13-07 | PENDING | Claude | G4,G10 |
-| F13-11 | Chat | DM na API | F13-03 | PENDING | Claude | G4,G10 |
+| F13-11 | Chat | DM na API | F13-03 | IMPLEMENTED | Claude | G4,G10 |
 | F13-12 | Chat | DM na UI | F13-06,F13-11 | PENDING | Claude | G4 |
 | F13-13 | Chat | Não lidas e notificação | F13-08,F13-12 | PENDING | Claude | G4,G12 |
 | F13-14 | Chat | Docs e revisão independente | F13-09,F13-10,F13-13 | PENDING | Claude | G10,G12 |
