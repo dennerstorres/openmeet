@@ -28,7 +28,8 @@ Hoje `rooms.kind` (`persistent`/`temporary`) é tempo de vida, não tipo de cana
 - Distribuição por emissor em memória da API (um nó, como a presença no ADR 0017). Múltiplos nós pediriam Postgres `LISTEN/NOTIFY` ou Redis; fica fora.
 - Web: `EventSource` na mesma origem, cookie `HttpOnly` (ADR 0014), sem mexer na CSP.
 - Desktop: comando Rust `instance_events_open/close` abre o fluxo com o token e repassa cada evento por evento Tauri. O token não vai para o JavaScript.
-- Keep-alive a cada 25 s; o fluxo fecha no logout, na revogação da sessão e na saída do membro.
+- Keep-alive a cada 25 s. A cada keep-alive a API confere a sessão de cada fluxo: logout, sessão revogada ou expirada e conta desativada fecham o fluxo em até 25 s. O público de cada evento é calculado na hora, então quem saiu do servidor deixa de receber no evento seguinte.
+- Até 5 fluxos por conta; o sexto recebe 429. "Digitando…" é sinal sem número, não entra na reposição.
 
 ### Funções da v1
 

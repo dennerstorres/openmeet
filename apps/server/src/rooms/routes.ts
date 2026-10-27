@@ -46,7 +46,19 @@ import {
 } from "./service.js";
 import type { RoomMedia } from "./media.js";
 import { PlatformPresence } from "./platform-presence.js";
-import { deleteMessage, editMessage, listMessages, listPinned, pinMessage, searchMessages, sendMessage } from "./messages.js";
+import { ChatEvents, type ChatEventName } from "./events.js";
+import {
+  deleteMessage,
+  editMessage,
+  listMessages,
+  listPinned,
+  pinMessage,
+  publicMessage,
+  searchMessages,
+  sendMessage,
+  typingRoom,
+  type MessageView,
+} from "./messages.js";
 import { deleteSound, importSound, listLibrary, listOwnSounds, readSound, removeFromLibrary, renameSound, uploadSound } from "./sounds.js";
 
 const AUTH_STATUS: Record<AuthErrorCode, number> = {
@@ -747,6 +759,66 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
   // ADR 0024: text room messages. The body only travels in POST bodies, never in a URL that reaches the logs.
   const sending = createAttemptGate(10, 10_000);
   const searching = createAttemptGate(10, 10_000);
+  const typing = createAttemptGate(1, 2_000);
+  const events = db ? new ChatEvents(db) : undefined;
+  // preClose: open streams would otherwise hold the shutdown until each client hangs up.
+  app.addHook("preClose", async () => events?.closeAll());
+
+  // A failed fan-out never fails the request: the clients catch up with ?after= on the next reconnect.
+  async function publishMessage(request: FastifyRequest, name: ChatEventName, message: MessageView): Promise<void> {
+    if (!events) return;
+    try {
+      events.publish(await events.roomAudience(message.roomId), name, publicMessage(message));
+    } catch (error) {
+      const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "error";
+      request.log.error({ code }, "chat event failed");
+    }
+  }
+
+  app.get("/api/v1/events", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      const secret = configuredSecret(env);
+      const sessionId = secret ? readAccessToken(secret, requireAccessToken(request, env))?.sessionId : undefined;
+      if (!events || !sessionId) throw new AuthError("unauthorized");
+      if (events.full(actor.id)) throw new AuthError("rate_limited");
+      const last = request.headers["last-event-id"];
+      reply.hijack();
+      const raw = reply.raw;
+      raw.writeHead(200, {
+        "content-type": "text/event-stream; charset=utf-8",
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+        "x-accel-buffering": "no",
+        connection: "keep-alive",
+      });
+      const close = events.open(
+        actor.id,
+        sessionId,
+        { write: (chunk) => void raw.write(chunk), end: () => raw.end() },
+        typeof last === "string" ? last : undefined,
+      );
+      request.raw.on("close", () => close?.());
+      return reply;
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/rooms/:id/typing", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const room = await typingRoom(db, actor, param(request, "id"));
+      if (events && typing.allow(`${actor.id}:${room}`, Date.now())) {
+        const audience = (await events.roomAudience(room)).filter((id) => id !== actor.id);
+        events.signal(audience, "typing", { roomId: room, userId: actor.id });
+      }
+      return reply.code(204).header("cache-control", "no-store").send();
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
 
   app.get("/api/v1/rooms/:id/messages", async (request, reply) => {
     try {
@@ -768,6 +840,7 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
         body: bodyField(request.body, "body"),
         replyToId: textField(request.body, "replyToId"),
       });
+      await publishMessage(request, "message.created", message);
       return reply.code(201).header("cache-control", "no-store").send(message);
     } catch (error) {
       return sendError(request, reply, error);
@@ -807,10 +880,9 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
       const actor = await caller(request);
       if (!db) throw new AuthError("auth_unconfigured");
       if (!sending.allow(actor.id, Date.now())) throw new AuthError("rate_limited");
-      return reply
-        .code(200)
-        .header("cache-control", "no-store")
-        .send(await editMessage(db, actor, param(request, "id"), { body: bodyField(request.body, "body") }));
+      const message = await editMessage(db, actor, param(request, "id"), { body: bodyField(request.body, "body") });
+      await publishMessage(request, "message.updated", message);
+      return reply.code(200).header("cache-control", "no-store").send(message);
     } catch (error) {
       return sendError(request, reply, error);
     }
@@ -820,10 +892,9 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
     try {
       const actor = await caller(request);
       if (!db) throw new AuthError("auth_unconfigured");
-      return reply
-        .code(200)
-        .header("cache-control", "no-store")
-        .send(await deleteMessage(db, actor, param(request, "id")));
+      const message = await deleteMessage(db, actor, param(request, "id"));
+      await publishMessage(request, "message.deleted", message);
+      return reply.code(200).header("cache-control", "no-store").send(message);
     } catch (error) {
       return sendError(request, reply, error);
     }
@@ -833,10 +904,9 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
     try {
       const actor = await caller(request);
       if (!db) throw new AuthError("auth_unconfigured");
-      return reply
-        .code(200)
-        .header("cache-control", "no-store")
-        .send(await pinMessage(db, actor, param(request, "id"), booleanField(request.body, "pinned")));
+      const message = await pinMessage(db, actor, param(request, "id"), booleanField(request.body, "pinned"));
+      await publishMessage(request, "message.updated", message);
+      return reply.code(200).header("cache-control", "no-store").send(message);
     } catch (error) {
       return sendError(request, reply, error);
     }

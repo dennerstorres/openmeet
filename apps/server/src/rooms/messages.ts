@@ -72,6 +72,28 @@ async function textRoom(db: MigrationClient, actor: PublicUser, id: string): Pro
   return { room, moderator: canManage(access.membership) };
 }
 
+/** Typing is only signalled into a text room the caller may write in. */
+export async function typingRoom(db: MigrationClient, actor: PublicUser, id: string): Promise<string> {
+  const chat = await textRoom(db, actor, id);
+  if (chat.room.ended) throw new RoomError("room_ended");
+  return chat.room.id;
+}
+
+/** What every member receives: the flags that depend on the viewer are left to each client. */
+export function publicMessage(view: MessageView): Omit<MessageView, "canEdit" | "canDelete"> {
+  return {
+    id: view.id,
+    roomId: view.roomId,
+    authorId: view.authorId,
+    body: view.body,
+    replyTo: view.replyTo,
+    pinned: view.pinned,
+    edited: view.edited,
+    deleted: view.deleted,
+    createdAt: view.createdAt,
+  };
+}
+
 const SELECT = `
   select m.id::text as id, m.room_id, m.author_id, m.body, m.pinned_at is not null as pinned, m.edited_at is not null as edited,
          m.deleted_at is not null as deleted, m.created_at,

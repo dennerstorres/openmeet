@@ -1,5 +1,10 @@
 # HISTORY — registro cronológico
 
+### 2026-10-27 — F13-04, fluxo SSE — Claude
+Branch `task/F13-04-sse`, a partir da `task/F13-03-api-mensagens` 3f63b24. `rooms/events.ts`: hub em memória com id `<época>-<seq>`, reposição dos últimos 2000 eventos por `Last-Event-ID` (época diferente ou buraco grande manda `reset`), público calculado na hora a partir dos membros ativos do servidor, 5 fluxos por conta, keep-alive de 25 s que também confere sessão e conta e fecha o que morreu. `GET /api/v1/events` (hijack, `text/event-stream`, `x-accel-buffering: no`), `POST /rooms/:id/typing` (sinal sem número, 1 a cada 2 s, não vai para quem digita). Criar, editar, remover e fixar publicam o evento sem as flags que dependem de quem vê. Os fluxos fecham no `preClose`.
+Windows 11: `pnpm typecheck`, `pnpm lint` e testes do servidor (94, novo `test/events.test.ts` com conexão HTTP real: público, membro removido, reposição, reset, 401, 429, digitando e sessão revogada) passaram.
+Riscos: logout só fecha o fluxo no keep-alive seguinte (até 25 s); não testado atrás do Traefik/Coolify, que pode bufferizar; um nó só. Próximo passo: F13-05, ponte Rust.
+
 ### 2026-10-27 — F13-03, API de mensagens das salas — Claude
 Branch `task/F13-03-api-mensagens`, a partir da `task/F13-02-schema-mensagens` 0524f0f. Sala ganha `channel` na criação e nas listas (texto só `persistent`); `join` em sala de texto responde 409. `rooms/messages.ts`: listar com cursor (`before`, `after`, 50/100 por página), enviar com resposta, editar (só o autor), remover (autor, dono ou moderador; apaga corpo, anexos, reações e menções), fixar e listar fixadas (dono e moderador), busca `simple` por `POST .../messages/search` para o texto não ir parar na URL nem no log. Corpo: até 4000 caracteres, CRLF vira LF, controles e bidi recusados. Limite de 10 envios/edições e 10 buscas por 10 s por conta.
 Windows 11: `pnpm typecheck`, `pnpm lint`, testes do servidor (90, novo `test/messages.test.ts` com permissão, sala de voz, sala removida, membro removido, validação, cursor, edição, remoção, fixar, busca, 429 e corpo fora dos logs) e testes do desktop (22) passaram.
