@@ -1,5 +1,6 @@
 import { PocInputError } from "./poc.js";
 import { inviteHost, inviteLink, parseInvite, type InviteLink } from "./invite.js";
+import { parseOwnSounds, parseSoundLibrary, type OwnSound, type SoundSummary } from "./sound.js";
 import {
   canonicalInstanceUrl,
   hasControlCharacter,
@@ -594,6 +595,57 @@ export class MeetingModel {
     const done = await this.profileCall(`/api/v1/servers/${serverId}/profile`, change);
     if (done) await this.refreshServerPresence("online");
     return done;
+  }
+
+  /** ADR 0021: the library of the selected server, or null when it could not be read. */
+  async listSounds(): Promise<SoundSummary[] | null> {
+    const serverId = this.selectedServerId;
+    if (serverId === null) return null;
+    const body = await this.soundCall("GET", `/api/v1/servers/${serverId}/sounds`, null);
+    return body === null ? null : parseSoundLibrary(body);
+  }
+
+  /** `sound` is base64 of the canonical WAV; the API judges it again. */
+  async uploadSound(name: string, sound: string): Promise<boolean> {
+    const serverId = this.selectedServerId;
+    if (serverId === null) return false;
+    return (await this.soundCall("POST", `/api/v1/servers/${serverId}/sounds`, { name, sound }, 201)) !== null;
+  }
+
+  async removeSound(soundId: string): Promise<boolean> {
+    const serverId = this.selectedServerId;
+    if (serverId === null) return false;
+    return (await this.soundCall("POST", `/api/v1/servers/${serverId}/sounds/${soundId}/remove`, {})) !== null;
+  }
+
+  async importSound(serverId: string, soundId: string): Promise<boolean> {
+    return (await this.soundCall("POST", `/api/v1/servers/${serverId}/sounds/${soundId}/import`, {})) !== null;
+  }
+
+  async listOwnSounds(): Promise<OwnSound[] | null> {
+    const body = await this.soundCall("GET", "/api/v1/sounds/mine", null);
+    return body === null ? null : parseOwnSounds(body);
+  }
+
+  async renameSound(soundId: string, name: string): Promise<boolean> {
+    return (await this.soundCall("POST", `/api/v1/sounds/${soundId}/rename`, { name })) !== null;
+  }
+
+  async deleteSound(soundId: string): Promise<boolean> {
+    return (await this.soundCall("POST", `/api/v1/sounds/${soundId}/delete`, {})) !== null;
+  }
+
+  private async soundCall(method: "GET" | "POST", path: string, body: unknown, ok = 200): Promise<unknown> {
+    const origin = this.origin;
+    const accessToken = this.accessToken;
+    if (origin === null || accessToken === null) return null;
+    const result = await this.api.request(origin, method, path, body, accessToken);
+    if (result.status !== ok) {
+      this.error = readErrorCode(result.body);
+      this.publish();
+      return null;
+    }
+    return result.body ?? {};
   }
 
   private async profileCall(path: string, body: unknown): Promise<boolean> {

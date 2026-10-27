@@ -14,6 +14,7 @@
     "allow-session-logout",
     "allow-instance-call",
     "allow-instance-image",
+    "allow-instance-sound",
     "allow-shell-status",
     "allow-shell-set-consent",
     "allow-shell-tracks",

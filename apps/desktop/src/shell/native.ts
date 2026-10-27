@@ -56,6 +56,11 @@ export async function fetchImage(origin: string, id: string): Promise<Uint8Array
   return new Uint8Array(await invoke<ArrayBuffer>("instance_image", { origin, id }));
 }
 
+/** ADR 0021: one library sound through the native session. The page checks the WAV again. */
+export async function fetchSound(origin: string, id: string): Promise<Uint8Array> {
+  return new Uint8Array(await invoke<ArrayBuffer>("instance_sound", { origin, id }));
+}
+
 export function shellStatus(): Promise<ShellStatus> {
   return invoke<ShellStatus>("shell_status");
 }

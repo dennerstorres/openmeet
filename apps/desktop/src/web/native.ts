@@ -49,3 +49,15 @@ export const fetchImage: typeof Native.fetchImage = async (origin, id) => {
   if (response.status !== 200) throw new Error("image_not_found");
   return new Uint8Array(await response.arrayBuffer());
 };
+
+/** ADR 0021: same-origin sound read with the session cookie and the web header. */
+export const fetchSound: typeof Native.fetchSound = async (origin, id) => {
+  const prepared = prepareInstanceRequest(origin, origin, "GET", `/api/v1/sounds/${id}`, null, null);
+  const response = await fetch(prepared.url, {
+    headers: { "x-openmeet-web": "1" },
+    credentials: "same-origin",
+    redirect: "error",
+  });
+  if (response.status !== 200) throw new Error("sound_not_found");
+  return new Uint8Array(await response.arrayBuffer());
+};
