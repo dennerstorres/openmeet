@@ -92,10 +92,21 @@ function CardView(props: {
 }) {
   const { card } = props;
   const live = props.video !== undefined && shouldShowLiveVideo(props.video);
-  const hearable = card.kind === "person" && !card.local && card.audioIds.length > 0;
-  const name = card.kind === "share" ? `Tela de ${card.label}` : card.local ? `${card.label} (você)` : card.label;
+  const hearable = (card.kind === "person" || card.kind === "radio") && !card.local && card.audioIds.length > 0;
+  const name =
+    card.kind === "share"
+      ? `Tela de ${card.label}`
+      : card.kind === "radio"
+        ? card.local
+          ? "Seu rádio"
+          : `Rádio de ${card.label}`
+        : card.local
+          ? `${card.label} (você)`
+          : card.label;
   return (
-    <article className={`card ${props.size}${props.pinned ? " pinned" : ""}${props.speaking ? " speaking" : ""}${card.kind === "share" ? " share" : ""}`}>
+    <article
+      className={`card ${props.size}${props.pinned ? " pinned" : ""}${props.speaking ? " speaking" : ""}${card.kind === "share" ? " share" : ""}${card.kind === "radio" ? " radio" : ""}`}
+    >
       {live && props.video ? (
         <VideoSink tile={props.video} />
       ) : (
@@ -128,7 +139,7 @@ function CardView(props: {
               max={100}
               step={1}
               value={Math.round(props.playback.volume * 100)}
-              aria-label={`Volume de ${card.label} neste PC`}
+              aria-label={`Volume de ${name} neste PC`}
               onChange={(event) => props.onLevel({ volume: Number(event.currentTarget.value) / 100 })}
             />
           </label>

@@ -25,6 +25,7 @@ export { LiveKitPocSession, participantLabel, shouldAttachPlayback, shouldShowLi
 export { BLUR_RADIUS_DEFAULT, BLUR_RADIUS_MAX, BLUR_RADIUS_MIN, VideoBackground, clampBlurRadius } from "./video-background.js";
 export type { VideoBackgroundOptions } from "./video-background.js";
 export { VOICE_EFFECTS, isVoiceEffect, voiceEffectsFor } from "./voice-effects.js";
+export { RADIO_TRACK_NAME } from "./radio.js";
 export type { VoiceEffect } from "./voice-effects.js";
 export { emptyStats, summarizeRtcStats } from "./stats.js";
 export { nextPhase } from "./phase.js";

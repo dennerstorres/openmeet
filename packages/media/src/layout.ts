@@ -50,7 +50,7 @@ export function screenCaption(surface: string | null, sharing: boolean): string 
   return `Compartilhando ${screenSourceLabel(surface)}`;
 }
 
-// ADR 0009: one card per person, one card per screen share.
+// ADR 0009: one card per person, one card per screen share. ADR 0022: one card per radio.
 
 export interface CardPerson {
   identity: string;
@@ -65,13 +65,13 @@ export interface CardTile extends LayoutTile {
 
 export interface MeetingCard {
   id: string;
-  kind: "person" | "share";
+  kind: "person" | "share" | "radio";
   identity: string;
   label: string;
   local: boolean;
   /** Camera for a person, screen for a share. */
   videoId: string | null;
-  /** Microphone for a person, screen audio for a share. */
+  /** Microphone for a person, screen audio for a share, the radio track for a radio. */
   audioIds: string[];
 }
 
@@ -95,7 +95,12 @@ export function buildCards(people: readonly CardPerson[], tiles: readonly CardTi
   };
   for (const person of people) personFor(person.identity, person.label, person.local === true);
   const shares: MeetingCard[] = [];
+  const radios: MeetingCard[] = [];
   for (const tile of tiles) {
+    if (tile.source === "radio") {
+      radios.push({ id: `radio:${tile.id}`, kind: "radio", identity: tile.identity, label: tile.label, local: tile.local, videoId: null, audioIds: [tile.id] });
+      continue;
+    }
     if (tile.source === "screen" && tile.media === "video") {
       shares.push({ id: `share:${tile.id}`, kind: "share", identity: tile.identity, label: tile.label, local: tile.local, videoId: tile.id, audioIds: [] });
       continue;
@@ -112,7 +117,7 @@ export function buildCards(people: readonly CardPerson[], tiles: readonly CardTi
     if (share) share.audioIds.push(tile.id);
     else personFor(tile.identity, tile.label, tile.local).audioIds.push(tile.id);
   }
-  return [...shares, ...persons.values()];
+  return [...shares, ...persons.values(), ...radios];
 }
 
 /** The pinned card wins while it exists. Then another person's share, then another person's camera, then your own share, then another person, then yourself. */
@@ -125,12 +130,18 @@ export function featuredCard(cards: readonly MeetingCard[], pinnedId: string | n
   if (camera) return camera.id;
   const ownShare = cards.find((card) => card.kind === "share");
   if (ownShare) return ownShare.id;
-  const other = cards.find((card) => !card.local);
-  return other?.id ?? cards[0]?.id ?? null;
+  // A radio has nothing to show: it is featured only when pinned.
+  const people = cards.filter((card) => card.kind !== "radio");
+  const other = people.find((card) => !card.local);
+  return other?.id ?? people[0]?.id ?? null;
 }
 
 export function placeCards(cards: readonly MeetingCard[], layout: CardLayout, pinnedId: string | null): CardPlacement {
-  const ordered = [...cards.filter((card) => card.kind === "share"), ...cards.filter((card) => card.kind === "person")].map((card) => card.id);
+  const ordered = [
+    ...cards.filter((card) => card.kind === "share"),
+    ...cards.filter((card) => card.kind === "person"),
+    ...cards.filter((card) => card.kind === "radio"),
+  ].map((card) => card.id);
   if (layout === "grid") return { featuredId: null, others: ordered };
   const featuredId = featuredCard(cards, pinnedId);
   return { featuredId, others: ordered.filter((id) => id !== featuredId) };

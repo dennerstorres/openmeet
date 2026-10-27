@@ -1,5 +1,9 @@
 # HISTORY — registro cronológico
 
+### 2026-10-26 — F04-11, rádio da sala — Claude
+Branch `task/F04-11-radio`, a partir da `main` 41b70e5 (ADR 0022 aceito pelo usuário). `radio.ts` captura a entrada pelo `deviceId` exato, sem eco, ruído nem ganho automático, estéreo, e publica como `screen_share_audio` com nome `openmeet-radio`, preset `musicHighQualityStereo`, sem DTX nem RED. A sessão separa rádio e áudio do PC pelo nome, desliga um ao ligar o outro, republica o rádio quando parar a tela o derruba e esquece o rádio ao desconectar. Card `radio` com volume e mute locais; ensurdecer também o cala.
+Windows 11: `pnpm test` (shared 53, media 77, server 82, desktop 22), `pnpm typecheck`, `pnpm lint`, builds desktop e web passaram. `pnpm format:check` acusa só `apps/desktop/.impeccable/hook.cache.json`, preexistente. Nenhum rádio foi ouvido; o LiveKit real ainda precisa aceitar a faixa nomeada ao lado de um compartilhamento.
+
 ### 2026-10-26 — F04-11, desenho do rádio — Claude
 Branch `main`, só documentação. Pedido do usuário: bot de música na sala. Spotify (DRM, sem API de áudio) e retransmissão do YouTube (termos) ficaram fora; o usuário trocou por transmitir um canal de áudio do próprio PC. ADR 0022 proposto, item 22 e RF-26 na SPEC, F04-11 `PENDING` no PLAN e escopo/testes em `plans/phase-04-meeting-ui.md`. Faixa `screen_share_audio` com nome `openmeet-radio`, já coberta pelo grant; falta provar no LiveKit real. Nenhum código nem teste executado.
 Release 0.2.4: run 40443440366 concluída com sucesso; GitHub Release `v0.2.4` com `OpenMeet_0.2.4_x64-setup.exe`, `.sig`, `latest.json` e `SHA256SUMS`.

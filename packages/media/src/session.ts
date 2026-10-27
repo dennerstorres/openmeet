@@ -5,6 +5,7 @@ import {
   Room,
   RoomEvent,
   Track,
+  type LocalTrack,
   type LocalTrackPublication,
   type RemoteParticipant,
   type RemoteTrack,
@@ -14,6 +15,7 @@ import {
 import { describeMediaError, mediaActionError, sanitizeDiagnostic, type DiagnosticEvent } from "./diagnostics.js";
 import { HANDS_FREE_HINT, isHandsFree, playbackOutput, type AudioDevice } from "./bluetooth-output.js";
 import { InputGain } from "./input-gain.js";
+import { isRadio, radioCapture, radioPublish } from "./radio.js";
 import { readAudioWorkletSupport, voiceEffectsFor, type VoiceEffect } from "./voice-effects.js";
 import { VideoBackground, type VideoBackgroundOptions } from "./video-background.js";
 import { browserLabel, readBrowserMedia, type BrowserMedia } from "./browser.js";
@@ -71,7 +73,7 @@ export interface TrackTile {
   id: string;
   identity: string;
   label: string;
-  source: "microphone" | "camera" | "screen" | "screen-audio" | "unknown";
+  source: "microphone" | "camera" | "screen" | "screen-audio" | "radio" | "unknown";
   media: "audio" | "video";
   local: boolean;
   muted: boolean;
@@ -107,6 +109,9 @@ export interface PocSnapshot {
   /** ADR 0021: id of the library sound playing now, and the panel volume (0–1). */
   soundPlaying: string | null;
   soundVolume: number;
+  /** ADR 0022: this participant's radio is on, and the input it takes (never sent anywhere). */
+  radio: boolean;
+  radioDevice: string | null;
 }
 
 type Listener = (snapshot: PocSnapshot) => void;
@@ -161,6 +166,9 @@ export class LiveKitPocSession {
   private speakers: string[] = [];
   private screenAudioRequested = false;
   private soundId: string | null = null;
+  /** The input the radio was turned on with; it stays set while a screen share stop takes the track away. */
+  private radioDevice: string | null = null;
+  private readonly createRadioTrack: (options: ReturnType<typeof radioCapture>) => Promise<LocalTrack>;
   /** The microphone was muted and only opened for the sound; it closes again when the sound ends. */
   private soundOpenedMic = false;
   private stats: RtcSnapshot;
@@ -173,6 +181,7 @@ export class LiveKitPocSession {
     browser?: BrowserMedia;
     videoBackground?: VideoBackgroundOptions;
     audioWorklet?: boolean;
+    createRadioTrack?: (options: ReturnType<typeof radioCapture>) => Promise<LocalTrack>;
   }) {
     this.room = options?.room ?? new Room();
     this.videoBackground = new VideoBackground(options?.videoBackground);
@@ -180,6 +189,13 @@ export class LiveKitPocSession {
     this.client = options?.client ?? null;
     this.browser = options?.browser ?? readBrowserMedia();
     this.audioWorklet = options?.audioWorklet ?? readAudioWorkletSupport();
+    this.createRadioTrack =
+      options?.createRadioTrack ??
+      (async (capture) => {
+        const [track] = await this.room.localParticipant.createTracks({ audio: capture, video: false });
+        if (!track) throw new Error("Radio input unavailable");
+        return track;
+      });
     this.stats = { ...emptyStats(), userAgent: readUserAgent(), appVersion: this.appVersion };
     this.room.on(RoomEvent.Reconnecting, () => {
       this.phase = nextPhase(this.phase, "reconnecting");
@@ -205,6 +221,7 @@ export class LiveKitPocSession {
       this.phase = nextPhase(this.phase, outcome.event);
       this.disconnectReason = outcome.reason;
       this.tiles.clear();
+      this.radioDevice = null;
       this.speakers = [];
       // ADR 0020: every room entry starts with the plain voice.
       this.inputGain.setMonitor(false);
@@ -219,7 +236,14 @@ export class LiveKitPocSession {
       this.note("error", describeMediaError(error));
     });
     this.room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
-      this.rememberTrack(track, publication.trackSid, participant.identity, participantLabel(participant.name || participant.identity, false), false);
+      this.rememberTrack(
+        track,
+        publication.trackSid,
+        participant.identity,
+        participantLabel(participant.name || participant.identity, false),
+        false,
+        publication.trackName,
+      );
     });
     this.room.on(RoomEvent.TrackUnsubscribed, (_track: RemoteTrack, publication: RemoteTrackPublication) => {
       this.tiles.delete(publication.trackSid);
@@ -239,6 +263,7 @@ export class LiveKitPocSession {
           this.room.localParticipant.identity,
           participantLabel(this.room.localParticipant.name || this.room.localParticipant.identity, true),
           true,
+          publication.trackName,
         );
       }
     });
@@ -295,11 +320,7 @@ export class LiveKitPocSession {
       microphone: local.isMicrophoneEnabled,
       camera: local.isCameraEnabled,
       screen: local.isScreenShareEnabled,
-      screenAudio: screenAudioState(
-        local.isScreenShareEnabled,
-        this.screenAudioRequested,
-        local.getTrackPublication(Track.Source.ScreenShareAudio) !== undefined,
-      ),
+      screenAudio: screenAudioState(local.isScreenShareEnabled, this.screenAudioRequested, this.screenAudioPublication() !== undefined),
       audioPlayback: this.audioPlayback,
       speakers: [...this.speakers],
       backgroundBlurSupported: this.videoBackground.isSupported,
@@ -310,6 +331,8 @@ export class LiveKitPocSession {
       voiceMonitor: this.inputGain.monitor,
       soundPlaying: this.soundId,
       soundVolume: this.inputGain.soundVolume,
+      radio: this.radioPublication() !== undefined,
+      radioDevice: this.radioDevice,
     };
   }
 
@@ -414,6 +437,48 @@ export class LiveKitPocSession {
   }
 
   /**
+   * ADR 0022: publishes the chosen input as the radio, or turns it off with `null`. Changing the input
+   * republishes. Turning it on drops the PC audio of a running share.
+   */
+  async setRadio(deviceId: string | null): Promise<void> {
+    const local = this.room.localParticipant;
+    const current = this.radioPublication();
+    if (current?.track) await local.unpublishTrack(current.track, true);
+    this.radioDevice = null;
+    if (deviceId === null) {
+      if (current) this.note("info", "radio off");
+      else this.emit();
+      return;
+    }
+    const shared = this.screenAudioPublication();
+    if (shared?.track) {
+      await local.unpublishTrack(shared.track, true);
+      this.screenAudioRequested = false;
+      this.note("info", "screen audio off: radio on");
+    }
+    const track = await this.createRadioTrack(radioCapture(deviceId));
+    try {
+      await local.publishTrack(track, radioPublish());
+    } catch (error) {
+      track.stop();
+      this.emit();
+      throw error;
+    }
+    this.radioDevice = deviceId;
+    this.note("info", "radio on");
+  }
+
+  private radioPublication(): LocalTrackPublication | undefined {
+    return [...this.room.localParticipant.audioTrackPublications.values()].find((publication) => isRadio(publication));
+  }
+
+  private screenAudioPublication(): LocalTrackPublication | undefined {
+    return [...this.room.localParticipant.audioTrackPublications.values()].find(
+      (publication) => publication.source === Track.Source.ScreenShareAudio && !isRadio(publication),
+    );
+  }
+
+  /**
    * ADR 0021: plays a library sound to the room through the microphone track. With the microphone muted,
    * the track opens only for the sound, with the voice at zero, and mutes again when it ends or stops.
    */
@@ -487,9 +552,22 @@ export class LiveKitPocSession {
     const withAudio = requestAudio && this.browser.screenAudio;
     this.screenAudioRequested = enabled && withAudio;
     const options = enabled && withAudio ? { audio: true, systemAudio: "include" as const } : { audio: false };
+    // ADR 0022: the radio and the PC audio of a share are never on together.
+    const radio = this.radioDevice;
+    if (enabled && withAudio && radio !== null) {
+      await this.setRadio(null);
+      this.note("info", "radio off: screen audio on");
+    }
     await this.toggle(() => this.room.localParticipant.setScreenShareEnabled(enabled, options), "screen");
-    if (enabled && withAudio && this.room.localParticipant.getTrackPublication(Track.Source.ScreenShareAudio) === undefined) {
+    if (enabled && withAudio && this.screenAudioPublication() === undefined) {
       this.note("error", "screen audio missing: the source gave no PC audio");
+    }
+    // Stopping a share unpublishes the first screen-audio track, which can be the radio. Bring it back.
+    const kept = this.radioDevice;
+    if (!enabled && kept !== null && this.radioPublication() === undefined) {
+      await this.setRadio(kept).catch((error: unknown) => {
+        this.note("error", `radio lost: ${describeMediaError(error)}`);
+      });
     }
   }
 
@@ -610,7 +688,7 @@ export class LiveKitPocSession {
     this.emit();
   }
 
-  private rememberTrack(track: Track, id: string, identity: string, label: string, local: boolean): void {
+  private rememberTrack(track: Track, id: string, identity: string, label: string, local: boolean, name = ""): void {
     if (track.kind !== Track.Kind.Audio && track.kind !== Track.Kind.Video) {
       return;
     }
@@ -619,7 +697,7 @@ export class LiveKitPocSession {
       id,
       identity,
       label,
-      source: sourceName(track.source),
+      source: isRadio({ source: track.source, trackName: name }) ? "radio" : sourceName(track.source),
       media,
       local,
       muted: track.isMuted,

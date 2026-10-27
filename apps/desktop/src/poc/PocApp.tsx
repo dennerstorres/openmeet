@@ -34,6 +34,8 @@ const idleSnapshot: PocSnapshot = {
   voiceEffects: ["off"],
   voiceEffect: "off",
   voiceMonitor: false,
+  radio: false,
+  radioDevice: null,
   soundPlaying: null,
   soundVolume: 1,
 };
