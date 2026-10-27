@@ -7,9 +7,28 @@ export const ATTACHMENTS_PER_MESSAGE = 10;
 /** The API's default for ATTACHMENT_MAX_BYTES; the composer warns early, the API has the last word. */
 export const ATTACHMENT_DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
 
+/** Where messages live: a text room of a server or a DM. Same message routes under /rooms or /dms. */
+export type ChatKind = "room" | "dm";
+
+export interface ChatRef {
+  kind: ChatKind;
+  id: string;
+}
+
+export function chatPath(chat: ChatRef): string {
+  return `/api/v1/${chat.kind === "dm" ? "dms" : "rooms"}/${chat.id}`;
+}
+
+/** True when the message (or a typing signal) belongs to that room or DM. */
+export function inChat(item: { roomId?: unknown; dmId?: unknown }, chat: ChatRef): boolean {
+  return (chat.kind === "dm" ? item.dmId : item.roomId) === chat.id;
+}
+
 export interface ChatMessage {
   id: string;
-  roomId: string;
+  /** Exactly one of roomId and dmId is set. */
+  roomId: string | null;
+  dmId: string | null;
   authorId: string;
   body: string;
   replyTo: { id: string; authorId: string; body: string; deleted: boolean } | null;
@@ -133,7 +152,11 @@ function parseAttachments(value: unknown): ChatAttachment[] | undefined {
 export function parseChatMessage(value: unknown): ChatMessage | undefined {
   const item = record(value);
   if (!item) return undefined;
-  const { id, roomId, authorId, body, pinned, edited, deleted, createdAt } = item;
+  const { id, authorId, body, pinned, edited, deleted, createdAt } = item;
+  const roomId = item.roomId ?? null;
+  const dmId = item.dmId ?? null;
+  const inRoom = typeof roomId === "string" && UUID.test(roomId) && dmId === null;
+  const inDm = typeof dmId === "string" && UUID.test(dmId) && roomId === null;
   const replyTo = parseReply(item.replyTo ?? null);
   const reactions = parseReactions(item.reactions);
   const mentions = parseMentions(item.mentions);
@@ -141,8 +164,7 @@ export function parseChatMessage(value: unknown): ChatMessage | undefined {
   if (
     typeof id !== "string" ||
     !MESSAGE_ID.test(id) ||
-    typeof roomId !== "string" ||
-    !UUID.test(roomId) ||
+    !(inRoom || inDm) ||
     typeof authorId !== "string" ||
     !UUID.test(authorId) ||
     typeof body !== "string" ||
@@ -161,7 +183,8 @@ export function parseChatMessage(value: unknown): ChatMessage | undefined {
   }
   return {
     id,
-    roomId,
+    roomId: typeof roomId === "string" ? roomId : null,
+    dmId: typeof dmId === "string" ? dmId : null,
     authorId,
     body: deleted ? "" : body,
     replyTo,
@@ -301,4 +324,71 @@ export function mentionCandidates(
       ].filter((item) => item.label.startsWith(needle))
     : [];
   return [...people, ...loud].slice(0, limit);
+}
+
+// ADR 0024: a DM as its member sees it. `readOnly` is a direct DM with a block either way.
+export interface DmMember {
+  id: string;
+  label: string;
+  avatarId: string | null;
+}
+
+export interface DmSummary {
+  id: string;
+  kind: "direct" | "group";
+  name: string | null;
+  createdBy: string;
+  members: DmMember[];
+  readOnly: boolean;
+}
+
+/** People in a group, counting whoever created it. */
+export const DM_GROUP_MAX = 10;
+
+export function parseDm(value: unknown): DmSummary | undefined {
+  const item = record(value);
+  if (!item || !Array.isArray(item.members) || item.members.length > DM_GROUP_MAX) return undefined;
+  const { id, kind, name, createdBy } = item;
+  if (typeof id !== "string" || !UUID.test(id) || (kind !== "direct" && kind !== "group") || typeof createdBy !== "string") return undefined;
+  if (name !== null && name !== undefined && (typeof name !== "string" || name.length > 80)) return undefined;
+  const members: DmMember[] = [];
+  for (const raw of item.members) {
+    const member = record(raw);
+    if (!member || typeof member.id !== "string" || !UUID.test(member.id) || typeof member.label !== "string") return undefined;
+    const avatarId = typeof member.avatarId === "string" && UUID.test(member.avatarId) ? member.avatarId : null;
+    members.push({ id: member.id, label: member.label, avatarId });
+  }
+  return { id, kind, name: typeof name === "string" ? name : null, createdBy, members, readOnly: item.readOnly === true };
+}
+
+export function parseDmList(value: unknown): DmSummary[] | undefined {
+  const list = record(value)?.dms;
+  if (!Array.isArray(list)) return undefined;
+  return list.map(parseDm).filter((dm): dm is DmSummary => dm !== undefined);
+}
+
+/** The other person in a direct DM; the group name, or its people, in a group. */
+export function dmTitle(dm: DmSummary, selfId: string | null): string {
+  if (dm.kind === "group" && dm.name) return dm.name;
+  const others = dm.members.filter((member) => member.id !== selfId);
+  if (others.length === 0) return dm.kind === "group" ? "Grupo vazio" : "Conversa";
+  return others.map((member) => member.label).join(", ");
+}
+
+/** The DM moved to the top, or dropped when the caller is no longer in it. */
+export function upsertDm(held: readonly DmSummary[], dm: DmSummary, selfId: string | null): DmSummary[] {
+  const rest = held.filter((item) => item.id !== dm.id);
+  if (selfId !== null && !dm.members.some((member) => member.id === selfId)) return rest;
+  const at = held.findIndex((item) => item.id === dm.id);
+  if (at < 0) return [dm, ...rest];
+  const next = [...held];
+  next[at] = dm;
+  return next;
+}
+
+/** A new message lifts its DM to the top of the list. */
+export function bumpDm(held: readonly DmSummary[], dmId: string): DmSummary[] {
+  const found = held.find((item) => item.id === dmId);
+  if (!found || held[0]?.id === dmId) return [...held];
+  return [found, ...held.filter((item) => item.id !== dmId)];
 }

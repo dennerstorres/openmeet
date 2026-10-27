@@ -138,6 +138,14 @@ export function IconUsers({ size }: { size?: number }) {
   );
 }
 
+export function IconChat({ size }: { size?: number }) {
+  return (
+    <Icon size={size}>
+      <path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12Z" />
+    </Icon>
+  );
+}
+
 export function IconExpand({ size }: { size?: number }) {
   return (
     <Icon size={size}>

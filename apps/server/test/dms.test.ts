@@ -72,6 +72,7 @@ interface Dm {
   name: string | null;
   createdBy: string;
   memberIds: string[];
+  members: { id: string; label: string; avatarId: string | null }[];
   readOnly: boolean;
 }
 
@@ -147,6 +148,15 @@ test("a direct DM is one per pair and only opens with someone who shares a serve
     assert.equal(first.status, 201);
     assert.equal(first.dm.kind, "direct");
     assert.deepEqual([...first.dm.memberIds].sort(), [w.ana.id, w.bia.id].sort());
+    // The account names travel with the DM, so the client shows them outside any server.
+    assert.deepEqual(
+      first.dm.members.map((member) => member.id),
+      first.dm.memberIds,
+    );
+    assert.equal(
+      first.dm.members.every((member) => member.label.length > 0 && member.avatarId === null),
+      true,
+    );
     const again = await open(w, w.ana, [w.bia.id]);
     assert.deepEqual([again.status, again.dm.id], [200, first.dm.id]);
     const back = await open(w, w.bia, [w.ana.id]);

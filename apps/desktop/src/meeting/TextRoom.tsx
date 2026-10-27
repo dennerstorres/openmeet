@@ -5,6 +5,7 @@ import {
   attachmentIsImage,
   canDeleteMessage,
   canEditMessage,
+  inChat,
   mentionCandidates,
   mentionDisplay,
   mentionQuery,
@@ -17,19 +18,19 @@ import {
   type MentionCandidate,
   type ChatAttachment,
   type ChatMessage,
+  type ChatRef,
   type MeetingModel,
-  type RoomSummary,
 } from "@openmeet/shared";
-import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
 import { isTauri, openChatLink } from "../shell/native";
 import type { ChatListener } from "./chat-events";
 import { MessageFiles, PictureViewer, fileSize } from "./ChatFiles";
-import { IconHash, IconPaperclip, IconPencil, IconPin, IconReply, IconSearch, IconSmile, IconTrash } from "./Icons";
+import { IconHash, IconPaperclip, IconPencil, IconPin, IconReply, IconSearch, IconSmile, IconTrash, IconUsers } from "./Icons";
 import { Face, base64 } from "./images";
 import { Markdown } from "./Markdown";
 
-// ADR 0024: one text room on screen. History comes in pages, live changes through the session feed; the
-// text is always rendered as text (markdown arrives in F13-07).
+// ADR 0024: one text room or DM on screen. History comes in pages, live changes through the session feed; the
+// body is rendered by the safe markdown of F13-07. Rooms and DMs share every message route but the base path.
 
 const TYPING_SEND_MS = 3_000;
 const TYPING_SHOW_MS = 6_000;
@@ -50,17 +51,31 @@ export interface ChatPerson {
   avatarId: string | null;
 }
 
+/** A text room of a server or a DM: the same screen serves both. */
+export interface ChatTarget extends ChatRef {
+  name: string;
+  /** Why nobody writes here (room ended, DM blocked), or null while the composer is open. */
+  closed: string | null;
+  /** Moderators pin in a room; any member pins in a DM. */
+  canPin: boolean;
+}
+
 interface Props {
   model: MeetingModel;
-  room: RoomSummary;
+  chat: ChatTarget;
   origin: string | null;
   userId: string | null;
+  /** Removes anyone's message and may call `@everyone`: a room's moderator, never anyone in a DM. */
   manager: boolean;
   person: (id: string) => ChatPerson;
-  /** Who `@` can name: the members of the room's server. */
+  /** Who `@` can name: the members of the room's server, or the DM's people. */
   members: readonly { id: string; label: string; globalName: string }[];
   subscribe: (listener: ChatListener) => () => void;
   onClose: () => void;
+  /** Extra buttons in the header (the DM's people, block). */
+  actions?: ReactNode;
+  /** Shown above the messages (the DM's "no end-to-end encryption" notice). */
+  banner?: ReactNode;
 }
 
 const timeFormat = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -89,7 +104,10 @@ function typingLine(names: string[]): string {
   return "Várias pessoas estão digitando…";
 }
 
-export function TextRoom({ model, room, origin, userId, manager, person, members, subscribe, onClose }: Props) {
+export function TextRoom({ model, chat, origin, userId, manager, person, members, subscribe, onClose, actions, banner }: Props) {
+  // Effects follow the room or DM, not every new object a parent render makes for it.
+  const where = useMemo<ChatRef>(() => ({ kind: chat.kind, id: chat.id }), [chat.kind, chat.id]);
+  const chatLabel = chat.kind === "room" ? `#${chat.name}` : chat.name;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -141,7 +159,7 @@ export function TextRoom({ model, room, origin, userId, manager, person, members
     detachedRef.current = false;
     stickRef.current = true;
     const load = async () => {
-      const page = await model.listMessages(room.id);
+      const page = await model.listMessages(where);
       if (!live) return;
       setLoading(false);
       if (page === null) return;
@@ -153,8 +171,8 @@ export function TextRoom({ model, room, origin, userId, manager, person, members
     const unsubscribe = subscribe({
       event(name, data) {
         if (name === "typing") {
-          const signal = data as { roomId?: unknown; userId?: unknown };
-          if (signal.roomId === room.id && typeof signal.userId === "string") {
+          const signal = data as { roomId?: unknown; dmId?: unknown; userId?: unknown };
+          if (inChat(signal, where) && typeof signal.userId === "string") {
             const who = signal.userId;
             setTyping((held) => ({ ...held, [who]: Date.now() + TYPING_SHOW_MS }));
           }
@@ -162,7 +180,7 @@ export function TextRoom({ model, room, origin, userId, manager, person, members
         }
         if (name !== "message.created" && name !== "message.updated" && name !== "message.deleted") return;
         const message = parseChatMessage(data);
-        if (!message || message.roomId !== room.id) return;
+        if (!message || !inChat(message, where)) return;
         setMessages((held) => (detachedRef.current && !held.some((item) => item.id === message.id) ? held : mergeMessages(held, [message])));
         setPins((held) => (held === null ? held : message.pinned ? mergeMessages(held, [message]).reverse() : held.filter((item) => item.id !== message.id)));
         if (name === "message.created") {
@@ -183,7 +201,7 @@ export function TextRoom({ model, room, origin, userId, manager, person, members
       live = false;
       unsubscribe();
     };
-  }, [model, room.id, subscribe]);
+  }, [model, where, subscribe]);
 
   useEffect(() => {
     if (Object.keys(typing).length === 0) return;
@@ -223,7 +241,7 @@ export function TextRoom({ model, room, origin, userId, manager, person, members
     const held = messages.some((message) => message.id === id);
     if (!held) {
       setLoading(true);
-      const page = await model.listMessages(room.id, { around: id });
+      const page = await model.listMessages(where, { around: id });
       setLoading(false);
       if (page === null) return;
       stickRef.current = false;
@@ -238,7 +256,7 @@ export function TextRoom({ model, room, origin, userId, manager, person, members
 
   async function backToLatest(): Promise<void> {
     setLoading(true);
-    const page = await model.listMessages(room.id);
+    const page = await model.listMessages(where);
     setLoading(false);
     if (page === null) return;
     stickRef.current = true;
@@ -252,7 +270,7 @@ export function TextRoom({ model, room, origin, userId, manager, person, members
     const last = messages[messages.length - 1];
     if (!last || loading) return;
     setLoading(true);
-    const page = await model.listMessages(room.id, { after: last.id });
+    const page = await model.listMessages(where, { after: last.id });
     setLoading(false);
     if (page === null) return;
     apply(page.messages);
@@ -281,14 +299,14 @@ export function TextRoom({ model, room, origin, userId, manager, person, members
       return;
     }
     setPanel(next);
-    if (next === "pins") setPins(await model.listPins(room.id));
+    if (next === "pins") setPins(await model.listPins(where));
   }
 
   async function search(more: boolean): Promise<void> {
     const words = query.trim();
     if (words === "") return;
     const before = more ? results?.messages[results.messages.length - 1]?.id : undefined;
-    const page = await model.searchMessages(room.id, words, before);
+    const page = await model.searchMessages(where, words, before);
     if (page === null) return;
     setResults({ messages: more ? [...(results?.messages ?? []), ...page.messages] : page.messages, hasMore: page.hasMore });
   }
@@ -298,7 +316,7 @@ export function TextRoom({ model, room, origin, userId, manager, person, members
     const list = listRef.current;
     if (!first || loading) return;
     setLoading(true);
-    const page = await model.listMessages(room.id, { before: first.id });
+    const page = await model.listMessages(where, { before: first.id });
     setLoading(false);
     if (page === null) return;
     if (list) keepRef.current = { height: list.scrollHeight, top: list.scrollTop };
@@ -318,8 +336,8 @@ export function TextRoom({ model, room, origin, userId, manager, person, members
   }
 
   function addFiles(picked: readonly File[]): void {
-    if (picked.length === 0 || room.ended) return;
-    const target = room.id;
+    if (picked.length === 0 || chat.closed !== null) return;
+    const target = where;
     const free = ATTACHMENTS_PER_MESSAGE - filesRef.current.length;
     if (picked.length > free) setNotice(`Até ${ATTACHMENTS_PER_MESSAGE} arquivos por mensagem.`);
     for (const file of picked.slice(0, Math.max(0, free))) {
@@ -374,7 +392,7 @@ export function TextRoom({ model, room, origin, userId, manager, person, members
     if (body === undefined || sending || files.some((file) => file.state === "uploading")) return;
     setSending(true);
     const sent = await model.sendMessage(
-      room.id,
+      where,
       body,
       replyTo?.id,
       ready.map((file) => file.attachment?.id ?? ""),
@@ -469,11 +487,11 @@ export function TextRoom({ model, room, origin, userId, manager, person, members
     const now = Date.now();
     if (value.trim() !== "" && now - typedAt.current > TYPING_SEND_MS) {
       typedAt.current = now;
-      void model.signalTyping(room.id);
+      void model.signalTyping(where);
     }
   }
 
-  const readOnly = room.ended;
+  const readOnly = chat.closed !== null;
   const typingNames = Object.keys(typing)
     .filter((id) => id !== userId)
     .map((id) => person(id).label);
@@ -495,8 +513,9 @@ export function TextRoom({ model, room, origin, userId, manager, person, members
     >
       {viewer ? <PictureViewer origin={origin} attachment={viewer.attachment} url={viewer.url} onSaved={onSaved} onClose={() => setViewer(null)} /> : null}
       <header className="text-room-head">
-        <IconHash size={20} />
-        <h1 id="text-room-title">{room.name}</h1>
+        {chat.kind === "room" ? <IconHash size={20} /> : <IconUsers size={20} />}
+        <h1 id="text-room-title">{chat.name}</h1>
+        {actions}
         <button
           type="button"
           className="icon-btn"
@@ -510,8 +529,8 @@ export function TextRoom({ model, room, origin, userId, manager, person, members
         <button
           type="button"
           className="icon-btn"
-          aria-label="Buscar nesta sala"
-          title="Buscar nesta sala"
+          aria-label={chat.kind === "room" ? "Buscar nesta sala" : "Buscar nesta conversa"}
+          title={chat.kind === "room" ? "Buscar nesta sala" : "Buscar nesta conversa"}
           aria-pressed={panel === "search"}
           onClick={() => void openPanel("search")}
         >
@@ -544,11 +563,12 @@ export function TextRoom({ model, room, origin, userId, manager, person, members
           </div>
         </div>
       ) : null}
+      {banner}
       <div className={`text-room-body${panel ? " with-panel" : ""}`}>
         <ol
           ref={listRef}
           className="message-list"
-          aria-label={`Mensagens de ${room.name}`}
+          aria-label={`Mensagens de ${chatLabel}`}
           aria-busy={loading}
           onScroll={(event) => {
             const list = event.currentTarget;
@@ -565,8 +585,8 @@ export function TextRoom({ model, room, origin, userId, manager, person, members
             </li>
           ) : !loading ? (
             <li className="message-start">
-              <IconHash size={28} />
-              <p>Este é o começo de #{room.name}.</p>
+              {chat.kind === "room" ? <IconHash size={28} /> : <IconUsers size={28} />}
+              <p>{chat.kind === "room" ? `Este é o começo de ${chatLabel}.` : `Este é o começo da conversa com ${chatLabel}.`}</p>
             </li>
           ) : null}
           {messages.map((message, index) => {
@@ -721,7 +741,7 @@ export function TextRoom({ model, room, origin, userId, manager, person, members
                     >
                       <IconSmile size={16} />
                     </button>
-                    {manager ? (
+                    {chat.canPin ? (
                       <button
                         type="button"
                         className="icon-btn"
@@ -819,7 +839,7 @@ export function TextRoom({ model, room, origin, userId, manager, person, members
         {typingNames.length > 0 ? typingLine(typingNames) : ""}
       </p>
       {readOnly ? (
-        <p className="hint text-room-closed">Esta sala foi encerrada. As mensagens ficam só para leitura.</p>
+        <p className="hint text-room-closed">{chat.closed}</p>
       ) : (
         <form
           className="composer"
@@ -909,8 +929,8 @@ export function TextRoom({ model, room, origin, userId, manager, person, members
             onPaste={onPaste}
             value={draft}
             rows={1}
-            placeholder={`Conversar em #${room.name}`}
-            aria-label={`Mensagem para #${room.name}`}
+            placeholder={chat.kind === "room" ? `Conversar em ${chatLabel}` : `Conversar com ${chatLabel}`}
+            aria-label={`Mensagem para ${chatLabel}`}
             onChange={(event) => onDraft(event.currentTarget.value, event.currentTarget.selectionStart)}
             onBlur={() => setSuggest(null)}
             onKeyDown={onComposerKey}

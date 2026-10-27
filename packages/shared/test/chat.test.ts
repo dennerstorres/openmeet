@@ -2,6 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   attachmentIsImage,
+  bumpDm,
+  chatPath,
+  dmTitle,
+  inChat,
+  parseDm,
+  upsertDm,
   canDeleteMessage,
   canEditMessage,
   mentionCandidates,
@@ -26,6 +32,7 @@ function message(id: string, body = `m${id}`, extra: Partial<ChatMessage> = {}):
   return {
     id,
     roomId,
+    dmId: null,
     authorId: ana,
     body,
     replyTo: null,
@@ -212,4 +219,57 @@ test("attachments parse as the API writes them and only a measured picture gets 
   // A message with files may go without text.
   assert.equal(sendableBody("   "), undefined);
   assert.equal(sendableBody("", true), "");
+});
+
+test("a DM message carries dmId instead of roomId, never both", () => {
+  const dmId = "44444444-4444-4444-8444-444444444444";
+  const wire = { ...message("8"), roomId: null, dmId };
+  assert.deepEqual(parseChatMessage(wire), { ...message("8"), roomId: null, dmId });
+  assert.equal(parseChatMessage({ ...wire, roomId }), undefined);
+  assert.equal(parseChatMessage({ ...wire, dmId: null }), undefined);
+  assert.equal(inChat(wire, { kind: "dm", id: dmId }), true);
+  assert.equal(inChat(wire, { kind: "room", id: dmId }), false);
+  assert.equal(inChat(message("9"), { kind: "room", id: roomId }), true);
+  assert.equal(chatPath({ kind: "dm", id: dmId }), `/api/v1/dms/${dmId}`);
+  assert.equal(chatPath({ kind: "room", id: roomId }), `/api/v1/rooms/${roomId}`);
+});
+
+test("the DM list keeps the API shape, names the other people and drops a DM the caller left", () => {
+  const first = "55555555-5555-4555-8555-555555555555";
+  const second = "66666666-6666-4666-8666-666666666666";
+  const direct = parseDm({
+    id: first,
+    kind: "direct",
+    name: null,
+    createdBy: ana,
+    memberIds: [ana, bia],
+    members: [
+      { id: ana, label: "Ana", avatarId: null },
+      { id: bia, label: "Bia", avatarId: "nada" },
+    ],
+    readOnly: true,
+  });
+  assert.ok(direct);
+  assert.equal(direct.readOnly, true);
+  assert.equal(direct.members[1]?.avatarId, null);
+  assert.equal(dmTitle(direct, ana), "Bia");
+  assert.equal(parseDm({ ...direct, kind: "canal" }), undefined);
+  assert.equal(parseDm({ ...direct, members: [{ id: "x", label: "X" }] }), undefined);
+  const group = { ...direct, id: second, kind: "group" as const, name: null, readOnly: false };
+  assert.equal(dmTitle(group, bia), "Ana");
+  assert.equal(dmTitle({ ...group, name: "Turma" }, bia), "Turma");
+  const list = upsertDm([direct], group, ana);
+  assert.deepEqual(
+    list.map((dm) => dm.id),
+    [second, first],
+  );
+  assert.deepEqual(
+    bumpDm(list, first).map((dm) => dm.id),
+    [first, second],
+  );
+  const left = { ...group, members: group.members.filter((member) => member.id !== ana) };
+  assert.deepEqual(
+    upsertDm(list, left, ana).map((dm) => dm.id),
+    [first],
+  );
 });

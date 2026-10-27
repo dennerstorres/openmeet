@@ -16,6 +16,8 @@ export interface DmView {
   name: string | null;
   createdBy: string;
   memberIds: string[];
+  /** The same people with the account name and avatar, so the DM shows them outside any server. */
+  members: { id: string; label: string; avatarId: string | null }[];
   /** A direct DM with a block either way: the history stays, nobody writes. */
   readOnly: boolean;
   createdAt: string;
@@ -94,6 +96,9 @@ export async function loadDm(db: MigrationClient, actor: PublicUser, id: string)
 const VIEW = `
   select c.id, c.kind, c.name, c.created_by, c.created_at,
          array(select user_id::text from dm_members where dm_id = c.id and left_at is null order by joined_at, user_id) as members,
+         array(select json_build_object('id', m.user_id::text, 'label', u.display_name, 'avatarId', u.avatar_image_id::text)::text
+               from dm_members m join users u on u.id = m.user_id
+               where m.dm_id = c.id and m.left_at is null order by m.joined_at, m.user_id) as people,
          c.kind = 'direct' and exists (
            select 1 from dm_members x join dm_members y on y.dm_id = x.dm_id and y.user_id <> x.user_id
            join user_blocks b on b.user_id = x.user_id and b.blocked_id = y.user_id
@@ -101,6 +106,16 @@ const VIEW = `
          ) as read_only,
          (select max(id) from messages where dm_id = c.id) as last_message
   from dm_channels c`;
+
+function readPeople(value: unknown): DmView["members"] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    const person = typeof item === "string" ? (JSON.parse(item) as Record<string, unknown>) : null;
+    const id = text(person?.id);
+    if (!person || !id) return [];
+    return [{ id, label: text(person.label) ?? "", avatarId: text(person.avatarId) ?? null }];
+  });
+}
 
 function readView(row: Record<string, unknown>): DmView {
   const members: unknown = row.members;
@@ -110,6 +125,7 @@ function readView(row: Record<string, unknown>): DmView {
     name: text(row.name) ?? null,
     createdBy: text(row.created_by) ?? "",
     memberIds: Array.isArray(members) ? members.filter((member): member is string => typeof member === "string") : [],
+    members: readPeople(row.people),
     readOnly: row.read_only === true,
     createdAt: new Date(String(row.created_at)).toISOString(),
   };

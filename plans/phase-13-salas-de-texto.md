@@ -17,7 +17,7 @@ Pedida pelo usuário em 2026-10-27, decisões revisadas no mesmo dia: SSE, reten
 | F13-09 | Anexos: upload, validação por bytes, prévia de imagem, download seguro, limpeza de órfãos, comando Rust | F13-06 | WAITING_VALIDATION | G4,G10 |
 | F13-10 | Emoji próprio: API de envio/renomear/remover, limites, seletor com abas por servidor, uso em mensagem e reação | F13-07 | PENDING | G4,G10 |
 | F13-11 | DM na API: abrir 1:1, grupo até 10, adicionar/sair/renomear, bloqueio, mensagens reaproveitando F13-03 | F13-03 | IMPLEMENTED | G4,G10 |
-| F13-12 | DM na UI: entrada acima dos servidores, lista de conversas, abrir DM pelo membro, grupo, bloquear, aviso "sem E2EE" | F13-06,F13-11 | PENDING | G4 |
+| F13-12 | DM na UI: entrada acima dos servidores, lista de conversas, abrir DM pelo membro, grupo, bloquear, aviso "sem E2EE" | F13-06,F13-11 | WAITING_VALIDATION | G4 |
 | F13-13 | Não lidas e notificação: leituras, níveis, Windows + bandeja, título/favicon e `Notification` opcional na web | F13-08,F13-12 | PENDING | G4,G12 |
 | F13-14 | Docs (DEPLOYMENT, SECURITY, TROUBLESHOOTING, proxy SSE) e revisão independente | F13-09,F13-10,F13-13 | PENDING | G10,G12 |
 
