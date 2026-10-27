@@ -2,6 +2,8 @@
 
 Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, `VERIFIED`, `DONE`, `BLOCKED`.
 
+F04-13 — Remover salas e servidores: WAITING_VALIDATION. Pedida pelo usuário em 2026-10-27, branch `task/F04-13-remover-salas-servidores`. Remoção lógica (ADR 0023, proposto): dono ou moderador remove sala, só o dono remove servidor; a chamada fecha no SFU, os convites são revogados e o identificador da sala fica livre. Typecheck, lint, testes (TS e Rust) passaram; fluxo visto na web local com SFU falso; falta LiveKit real com gente na sala, o `.exe` e o aceite do ADR.
+
 F04-12 — Configurações globais de áudio e vídeo: WAITING_VALIDATION. Pedida pelo usuário em 2026-10-27, branch `task/F04-12-ajustes-globais`. Saída, câmera, blur e diagnóstico saem dos ajustes da chamada para Configurações (agora também na web); a escolha de dispositivo fica salva no aparelho e é aplicada ao entrar na sala. Typecheck, lint, testes e builds passaram; tela de Configurações vista no navegador fora da chamada; falta ver numa chamada real e no `.exe`. Escopo em `plans/phase-04-meeting-ui.md`.
 
 F07-09 — Release 0.2.5 pelo GitHub Actions: WAITING_VALIDATION. Pedida em 2026-10-26 com F04-11. Tag `v0.2.5`; falta conferir a run, instalar e validar a atualização 0.2.4 → 0.2.5.
@@ -59,6 +61,7 @@ F09-08 — Presença dos membros do servidor: WAITING_VALIDATION. Implementada e
 | F04-10 | Reuniões | Biblioteca de sons do servidor (ADR 0021) | F04-09 | WAITING_VALIDATION | Claude | G4,G10,G12 |
 | F04-11 | Reuniões | Rádio: entrada de áudio do PC na sala (ADR 0022) | F04-09 | WAITING_VALIDATION | Claude | G4,G10,G12 |
 | F04-12 | Reuniões | Configurações globais de áudio, vídeo e diagnóstico | F04-11 | WAITING_VALIDATION | Claude | G4 |
+| F04-13 | Reuniões | Remover salas e servidores (ADR 0023) | F04-12 | WAITING_VALIDATION | Claude | G4,G10 |
 | F05-01 | Desktop | Bandeja, atalhos, notificações, sessão | F04-04 | IMPLEMENTED | Grok | G5 |
 | F06-01 | Resiliência | Stats WebRTC/logs/reconexão/export | F05-01 | IMPLEMENTED | Grok | G6 |
 | F07-01 | Infra | Compose/TLS/TURN/backup/restauração | F06-01 | IMPLEMENTED | Grok | G7 |

@@ -67,6 +67,8 @@ Na reunião, o microfone e a câmera ligam e desligam a publicação. O volume e
 ## F04-03
 A reunião tem o botão de compartilhar e o de parar. Compartilhar abre o seletor; parar encerra a publicação em vez de trocar a origem. A tela compartilhada fica em destaque e as câmeras ficam na grade. O aviso diz monitor, janela ou guia. O áudio do sistema continua desligado. A janela não foi aberta. A fase não fecha aqui.
 
+## F04-13 — remover salas e servidores
+READY → IN_PROGRESS → WAITING_VALIDATION em 2026-10-27, branch `task/F04-13-remover-salas-servidores`. ADR 0023: `deleted_at` em `servers` e `rooms` (migração 0010), rotas `POST /rooms/:id/delete` (dono ou moderador) e `POST /servers/:id/delete` (só dono). Remover encerra, revoga convites e fecha a mídia depois do commit, com nova tentativa se o SFU falhar (S-04). Lixeira ao lado da sala e seção "Remover servidor" nas configurações, ambas com confirmação. Rotas liberadas na lista do cliente (`instance.ts`) e do Tauri (`session.rs`).
 ## F04-04
 A reunião troca microfone, saída e câmera sem criar outra sala. O relógio segue na reconexão e zera ao sair ou numa falha fatal. As métricas aparecem a cada 5 s. Sair de uma sala persistente deixa essa sala na lista do mesmo cliente. A janela não foi aberta. Os 60 min com cinco pessoas não rodaram. M09, M11 e A05 seguem sem PASS. A fase não fecha aqui.
 

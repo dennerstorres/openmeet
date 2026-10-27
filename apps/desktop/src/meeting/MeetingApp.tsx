@@ -56,6 +56,7 @@ import {
   IconScreen,
   IconSignal,
   IconSpeaker,
+  IconTrash,
   IconUsers,
 } from "./Icons";
 import { ShellConsent } from "../shell/ShellConsent";
@@ -262,6 +263,8 @@ export function MeetingApp() {
   const [radioInput, setRadioInput] = useState("");
   const [blurRadius, setBlurRadius] = useState(storedBlurRadius);
   const [kickTarget, setKickTarget] = useState<{ roomId: string; userId: string; label: string } | null>(null);
+  // ADR 0023: removing a room or a server always asks first.
+  const [removeTarget, setRemoveTarget] = useState<{ kind: "room" | "server"; id: string; label: string } | null>(null);
   const [levels, setLevels] = useState<Record<string, PlaybackLevel>>({});
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [controlPending, setControlPending] = useState(false);
@@ -841,7 +844,7 @@ export function MeetingApp() {
         ) : null}
         <ul className="room-list">
           {state.rooms.map((room) => (
-            <li key={room.id}>
+            <li key={room.id} className="room-row">
               <button
                 type="button"
                 className={`room-item${room.id === state.activeRoomId ? " active" : ""}`}
@@ -856,6 +859,21 @@ export function MeetingApp() {
                 <span className="room-name">{room.name}</span>
                 {room.ended ? <span className="badge">encerrada</span> : room.kind === "temporary" ? <span className="sr">temporária</span> : null}
               </button>
+              {state.canCreate ? (
+                <button
+                  type="button"
+                  className="icon-btn danger-text room-remove"
+                  disabled={state.pending}
+                  aria-label={`Remover a sala ${room.name}`}
+                  title={`Remover a sala ${room.name}`}
+                  onClick={() => {
+                    setRemoveTarget({ kind: "room", id: room.id, label: room.name });
+                    setMobileRooms(false);
+                  }}
+                >
+                  <IconTrash size={16} />
+                </button>
+              ) : null}
               {(state.presence?.[room.id] ?? []).length > 0 ? (
                 <ul className="occupants" aria-label={`Na sala ${room.name}`}>
                   {(state.presence?.[room.id] ?? []).map((person) => {
@@ -1102,6 +1120,32 @@ export function MeetingApp() {
                 Desconectar da sala
               </button>
               <button type="button" className="ghost" disabled={state.pending} onClick={() => setKickTarget(null)}>
+                Cancelar
+              </button>
+            </div>
+          </section>
+        ) : null}
+        {removeTarget ? (
+          <section className="inline-form" role="alertdialog" aria-label={removeTarget.kind === "room" ? "Remover sala" : "Remover servidor"}>
+            <p>
+              {removeTarget.kind === "room"
+                ? `Remover a sala ${removeTarget.label}? Quem estiver nela será desconectado e os convites deixam de valer.`
+                : `Remover o servidor ${removeTarget.label}? Todas as salas serão encerradas, todos os membros perdem o acesso e os convites deixam de valer.`}
+            </p>
+            <div className="row">
+              <button
+                type="button"
+                className="danger-text"
+                disabled={state.pending}
+                onClick={() =>
+                  void (removeTarget.kind === "room" ? model.deleteRoom(removeTarget.id) : model.deleteServer(removeTarget.id)).then(() =>
+                    setRemoveTarget(null),
+                  )
+                }
+              >
+                {removeTarget.kind === "room" ? "Remover sala" : "Remover servidor"}
+              </button>
+              <button type="button" className="ghost" disabled={state.pending} onClick={() => setRemoveTarget(null)}>
                 Cancelar
               </button>
             </div>
@@ -1501,6 +1545,27 @@ export function MeetingApp() {
                     />
                     Dono e moderadores podem identificar membros invisíveis
                   </label>
+                </section>
+              ) : null}
+              {selectedServer.role === "owner" ? (
+                <section className="modal-section">
+                  <div>
+                    <h2>Remover servidor</h2>
+                    <p className="hint">Encerra todas as salas e tira o acesso de todos os membros.</p>
+                  </div>
+                  <div className="row">
+                    <button
+                      type="button"
+                      className="danger-text"
+                      disabled={state.pending}
+                      onClick={() => {
+                        setRemoveTarget({ kind: "server", id: selectedServer.id, label: selectedServer.name });
+                        setServerSettingsOpen(false);
+                      }}
+                    >
+                      Remover servidor
+                    </button>
+                  </div>
                 </section>
               ) : null}
             </section>
