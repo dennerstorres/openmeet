@@ -31,6 +31,9 @@ const idleSnapshot: PocSnapshot = {
   backgroundBlurSupported: false,
   backgroundBlur: false,
   backgroundBlurRadius: 10,
+  voiceEffects: ["off"],
+  voiceEffect: "off",
+  voiceMonitor: false,
 };
 
 export function PocApp() {
