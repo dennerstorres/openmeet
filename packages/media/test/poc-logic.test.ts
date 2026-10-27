@@ -304,6 +304,10 @@ test("PC audio is asked only when marked, and a share without it is reported as 
     return undefined;
   };
   local.getTrackPublication = (source: Track.Source) => (source === Track.Source.ScreenShareAudio && audioPublished && sharing ? {} : undefined);
+  // ADR 0022: the PC audio is told apart from a radio by its track name, so the session reads the list.
+  Object.defineProperty(room.localParticipant, "audioTrackPublications", {
+    get: () => new Map(audioPublished && sharing ? [["PC", { source: Track.Source.ScreenShareAudio, trackName: "" }]] : []),
+  });
   Object.defineProperty(room.localParticipant, "isScreenShareEnabled", { get: () => sharing });
   const session = new LiveKitPocSession({ room, browser: { name: "edge", version: "141", outputSelection: true, screenAudio: true } });
 

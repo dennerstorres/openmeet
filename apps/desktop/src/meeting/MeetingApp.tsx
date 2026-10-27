@@ -97,6 +97,8 @@ const idleSnapshot: PocSnapshot = {
   voiceEffects: ["off"],
   voiceEffect: "off",
   voiceMonitor: false,
+  radio: false,
+  radioDevice: null,
   soundPlaying: null,
   soundVolume: 1,
   screenAudio: "off",
@@ -218,6 +220,8 @@ export function MeetingApp() {
   const [deafened, setDeafened] = useState(false);
   const [shareAudio, setShareAudio] = useState(storedShareAudio);
   const [microphoneVolume, setMicrophoneVolume] = useState(100);
+  // ADR 0022: the input picked for the radio before turning it on.
+  const [radioInput, setRadioInput] = useState("");
   const [blurRadius, setBlurRadius] = useState(storedBlurRadius);
   const [kickTarget, setKickTarget] = useState<{ roomId: string; userId: string; label: string } | null>(null);
   const [levels, setLevels] = useState<Record<string, PlaybackLevel>>({});
@@ -1549,6 +1553,50 @@ export function MeetingApp() {
                       Ouvir minha voz
                     </label>
                     <p className="hint">Todos na sala ouvem o efeito. Para se ouvir, use fone: no alto-falante a voz volta para o microfone.</p>
+                    {(() => {
+                      // ADR 0022: an input of this PC played to the room as its own card.
+                      const inputs = media.devices.filter((device) => device.kind === "audioinput");
+                      const micId = inputs.find((device) => device.active)?.deviceId ?? null;
+                      const chosen = media.radio ? (media.radioDevice ?? "") : radioInput || (inputs.find((device) => !device.active)?.deviceId ?? "");
+                      return (
+                        <fieldset className="radio-controls">
+                          <legend>Rádio</legend>
+                          <label>
+                            Entrada do rádio
+                            <select
+                              value={chosen}
+                              disabled={!controlsEnabled || controlPending || inputs.length === 0}
+                              onChange={(event) => {
+                                const value = event.currentTarget.value;
+                                setRadioInput(value);
+                                if (media.radio) void runControl("rádio", () => session().setRadio(value));
+                              }}
+                            >
+                              {inputs.map((device) => (
+                                <option key={device.deviceId} value={device.deviceId}>
+                                  {device.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <button
+                            type="button"
+                            className={media.radio ? "on" : ""}
+                            disabled={!controlsEnabled || controlPending || chosen === ""}
+                            onClick={() => void runControl("rádio", () => session().setRadio(media.radio ? null : chosen))}
+                          >
+                            {media.radio ? "Desligar rádio" : "Ligar rádio"}
+                          </button>
+                          {chosen !== "" && chosen === micId ? (
+                            <p className="hint">Essa é a mesma entrada do microfone: sua voz iria junto com a música.</p>
+                          ) : null}
+                          <p className="hint">
+                            Mande o som do player para um cabo virtual (como o VB-Audio Cable) e escolha-o aqui. Mixagem estéreo também leva a sala de volta e
+                            gera eco. O que toca é responsabilidade de quem liga o rádio.
+                          </p>
+                        </fieldset>
+                      );
+                    })()}
                     {session().browser.outputSelection ? (
                       <DeviceSelect
                         label="Saída"

@@ -37,7 +37,7 @@ Testes automatizados: WAV fora do formato, cabeçalho mentiroso, dados truncados
 
 Prova humana antes de DONE: migration em implantação real; dois PCs no `.exe` e na web; som ouvido do outro lado com mic aberto e mutado; voz não vaza durante som mutado; indicador de mic volta ao estado anterior; importar para outro servidor e tocar lá; moderador remove; alto-falante sem eco do próprio som.
 ## F04-11 — rádio da sala
-READY em 2026-10-26 com o aceite do ADR 0022. Depende de F04-09.
+READY → IN_PROGRESS → WAITING_VALIDATION em 2026-10-26, branch `task/F04-11-radio`. Entregue: `radio.ts` (captura e publicação), `setRadio` na sessão, áudio da tela e rádio separados pelo nome da faixa, card `radio` em `layout.ts` e `Cards.tsx` (fixável, nunca em destaque sozinho), seção Rádio nos ajustes com aviso de eco, de mesma entrada do microfone e de direito autoral. Achado: `setScreenShareEnabled(false)` do SDK despublica a primeira faixa `screen_share_audio`, que pode ser o rádio; a sessão republica o rádio em seguida, com um corte curto no som.
 
 Arquivos previstos: `packages/media/src/radio.ts` (captura sem filtros, preset de música, publicação como `screen_share_audio` com nome `openmeet-radio`), `session.ts` (ligar, trocar entrada, desligar, exclusão com áudio do PC, fim ao sair), `layout.ts` (card do rádio separado do áudio da tela), volume e mute locais por card em `playback.ts`, controles em `MeetingApp.tsx` e `Cards.tsx`; testes em `packages/media/test/`.
 

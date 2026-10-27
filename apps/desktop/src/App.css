@@ -2134,3 +2134,23 @@ textarea {
   flex-direction: column;
   gap: 8px;
 }
+
+/* ADR 0022: radio controls inside the settings panel. */
+.radio-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.radio-controls legend {
+  padding: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
