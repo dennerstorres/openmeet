@@ -23,6 +23,9 @@ const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({ dataTyp
 
 export const userRole = pgEnum("user_role", ["admin", "moderator", "participant"]);
 export const roomKind = pgEnum("room_kind", ["persistent", "temporary"]);
+export const roomChannel = pgEnum("room_channel", ["voice", "text"]);
+export const dmKind = pgEnum("dm_kind", ["direct", "group"]);
+export const notifyLevel = pgEnum("notify_level", ["all", "mentions", "none"]);
 export const membershipRole = pgEnum("membership_role", ["moderator", "participant"]);
 export const registrationMode = pgEnum("registration_mode", ["closed", "invite"]);
 export const serverRole = pgEnum("server_role", ["owner", "moderator", "participant"]);
@@ -148,6 +151,7 @@ export const rooms = pgTable(
       .references(() => servers.id),
     slug: text("slug").notNull(),
     kind: roomKind("kind").notNull(),
+    channel: roomChannel("channel").notNull().default("voice"),
     createdBy: uuid("created_by")
       .notNull()
       .references(() => users.id),
@@ -164,6 +168,7 @@ export const rooms = pgTable(
       .where(sql`${table.deletedAt} is null`),
     check("rooms_name_safe", sql`openmeet_is_label(${table.name})`),
     check("rooms_slug_charset", sql`${table.slug} ~ '^[A-Za-z0-9_-]{1,64}$'`),
+    check("rooms_text_persistent", sql`${table.channel} = 'voice' or ${table.kind} = 'persistent'`),
   ],
 );
 
@@ -348,12 +353,252 @@ export const oauthLogins = pgTable(
   (table) => [check("oauth_logins_failure_length", sql`${table.failure} is null or char_length(${table.failure}) between 1 and 64`)],
 );
 
+// ADR 0024. A direct DM is unique per pair through direct_key ("<smaller uuid>:<larger uuid>").
+export const dmChannels = pgTable(
+  "dm_channels",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    kind: dmKind("kind").notNull(),
+    name: text("name"),
+    directKey: text("direct_key").unique(),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references((): AnyPgColumn => users.id),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    check("dm_channels_name_safe", sql`${table.name} is null or (openmeet_is_label(${table.name}) and char_length(${table.name}) <= 100)`),
+    check(
+      "dm_channels_direct_shape",
+      sql`(${table.kind} = 'direct' and ${table.name} is null and ${table.directKey} is not null and ${table.directKey} ~ '^[0-9a-f-]{36}:[0-9a-f-]{36}$') or (${table.kind} = 'group' and ${table.directKey} is null)`,
+    ),
+  ],
+);
+
+export const dmMembers = pgTable(
+  "dm_members",
+  {
+    dmId: uuid("dm_id")
+      .notNull()
+      .references(() => dmChannels.id),
+    userId: uuid("user_id")
+      .notNull()
+      .references((): AnyPgColumn => users.id),
+    joinedAt: timestamp("joined_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    leftAt: timestamp("left_at", { withTimezone: true, mode: "date" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.dmId, table.userId] }),
+    index("dm_members_user")
+      .on(table.userId)
+      .where(sql`${table.leftAt} is null`),
+  ],
+);
+
+// A message belongs to exactly one text room or DM. Removing it clears the body; the row stays.
+export const messages = pgTable(
+  "messages",
+  {
+    id: bigint("id", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),
+    roomId: uuid("room_id").references((): AnyPgColumn => rooms.id),
+    dmId: uuid("dm_id").references(() => dmChannels.id),
+    authorId: uuid("author_id")
+      .notNull()
+      .references((): AnyPgColumn => users.id),
+    body: text("body").notNull(),
+    replyToId: bigint("reply_to_id", { mode: "bigint" }).references((): AnyPgColumn => messages.id),
+    mentionsEveryone: boolean("mentions_everyone").notNull().default(false),
+    pinnedAt: timestamp("pinned_at", { withTimezone: true, mode: "date" }),
+    pinnedBy: uuid("pinned_by").references((): AnyPgColumn => users.id),
+    editedAt: timestamp("edited_at", { withTimezone: true, mode: "date" }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "date" }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("messages_room")
+      .on(table.roomId, table.id)
+      .where(sql`${table.roomId} is not null`),
+    index("messages_dm")
+      .on(table.dmId, table.id)
+      .where(sql`${table.dmId} is not null`),
+    index("messages_pinned")
+      .on(table.roomId, table.dmId, table.pinnedAt)
+      .where(sql`${table.pinnedAt} is not null`),
+    index("messages_search")
+      .using("gin", sql`to_tsvector('simple', ${table.body})`)
+      .where(sql`${table.deletedAt} is null`),
+    check("messages_one_target", sql`num_nonnulls(${table.roomId}, ${table.dmId}) = 1`),
+    check("messages_body_length", sql`char_length(${table.body}) <= 4000`),
+    check("messages_removed_empty", sql`${table.deletedAt} is null or (${table.body} = '' and ${table.pinnedAt} is null)`),
+    check("messages_pin_pair", sql`(${table.pinnedAt} is null) = (${table.pinnedBy} is null)`),
+  ],
+);
+
+export const messageMentions = pgTable(
+  "message_mentions",
+  {
+    messageId: bigint("message_id", { mode: "bigint" })
+      .notNull()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references((): AnyPgColumn => users.id),
+  },
+  (table) => [primaryKey({ columns: [table.messageId, table.userId] }), index("message_mentions_user").on(table.userId, table.messageId)],
+);
+
+// emoji is the Unicode text itself or "custom:<server_emojis.id>".
+export const messageReactions = pgTable(
+  "message_reactions",
+  {
+    messageId: bigint("message_id", { mode: "bigint" })
+      .notNull()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references((): AnyPgColumn => users.id),
+    emoji: text("emoji").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.messageId, table.userId, table.emoji] }),
+    check(
+      "message_reactions_emoji",
+      sql`${table.emoji} ~ '^custom:[0-9a-f-]{36}$' or (char_length(${table.emoji}) between 1 and 16 and ${table.emoji} !~ '[[:space:][:cntrl:]<>:]')`,
+    ),
+  ],
+);
+
+// Uploaded before its message: message_id stays null until sent, and orphans are cleaned after 24 h.
+export const messageAttachments = pgTable(
+  "message_attachments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    messageId: bigint("message_id", { mode: "bigint" }).references(() => messages.id, { onDelete: "cascade" }),
+    uploaderId: uuid("uploader_id")
+      .notNull()
+      .references((): AnyPgColumn => users.id),
+    name: text("name").notNull(),
+    contentType: text("content_type").notNull(),
+    bytes: bytea("bytes").notNull(),
+    byteSize: integer("byte_size").notNull(),
+    width: integer("width"),
+    height: integer("height"),
+    sha256: text("sha256").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("message_attachments_message")
+      .on(table.messageId)
+      .where(sql`${table.messageId} is not null`),
+    index("message_attachments_orphan")
+      .on(table.createdAt)
+      .where(sql`${table.messageId} is null`),
+    check("message_attachments_name", sql`char_length(${table.name}) between 1 and 255 and ${table.name} !~ '[[:cntrl:]/\\\\]'`),
+    check("message_attachments_content_type", sql`char_length(${table.contentType}) between 1 and 127`),
+    check("message_attachments_byte_size", sql`${table.byteSize} between 1 and 26214400 and ${table.byteSize} = octet_length(${table.bytes})`),
+    check(
+      "message_attachments_dimensions",
+      sql`(${table.width} is null) = (${table.height} is null) and (${table.width} is null or (${table.width} between 1 and 16384 and ${table.height} between 1 and 16384))`,
+    ),
+    check("message_attachments_sha256", sql`${table.sha256} ~ '^[0-9a-f]{64}$'`),
+  ],
+);
+
+export const serverEmojis = pgTable(
+  "server_emojis",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    serverId: uuid("server_id")
+      .notNull()
+      .references((): AnyPgColumn => servers.id),
+    name: text("name").notNull(),
+    contentType: text("content_type").notNull(),
+    animated: boolean("animated").notNull(),
+    bytes: bytea("bytes").notNull(),
+    byteSize: integer("byte_size").notNull(),
+    sha256: text("sha256").notNull(),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references((): AnyPgColumn => users.id),
+    deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "date" }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("server_emojis_name_unique")
+      .on(table.serverId, sql`lower(${table.name})`)
+      .where(sql`${table.deletedAt} is null`),
+    check("server_emojis_name", sql`${table.name} ~ '^[A-Za-z0-9_]{2,32}$'`),
+    check("server_emojis_content_type", sql`${table.contentType} in ('image/png', 'image/gif', 'image/webp')`),
+    check("server_emojis_byte_size", sql`${table.byteSize} between 1 and 262144 and ${table.byteSize} = octet_length(${table.bytes})`),
+    check("server_emojis_sha256", sql`${table.sha256} ~ '^[0-9a-f]{64}$'`),
+  ],
+);
+
+export const userBlocks = pgTable(
+  "user_blocks",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references((): AnyPgColumn => users.id),
+    blockedId: uuid("blocked_id")
+      .notNull()
+      .references((): AnyPgColumn => users.id),
+    createdAt: createdAt(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.blockedId] }), check("user_blocks_not_self", sql`${table.userId} <> ${table.blockedId}`)],
+);
+
+export const chatReads = pgTable(
+  "chat_reads",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references((): AnyPgColumn => users.id),
+    roomId: uuid("room_id").references((): AnyPgColumn => rooms.id),
+    dmId: uuid("dm_id").references(() => dmChannels.id),
+    lastReadId: bigint("last_read_id", { mode: "bigint" }).notNull(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("chat_reads_room")
+      .on(table.userId, table.roomId)
+      .where(sql`${table.roomId} is not null`),
+    uniqueIndex("chat_reads_dm")
+      .on(table.userId, table.dmId)
+      .where(sql`${table.dmId} is not null`),
+    check("chat_reads_one_target", sql`num_nonnulls(${table.roomId}, ${table.dmId}) = 1`),
+  ],
+);
+
+// No target is the account default; otherwise one server, room or DM.
+export const notifyPrefs = pgTable(
+  "notify_prefs",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references((): AnyPgColumn => users.id),
+    serverId: uuid("server_id").references((): AnyPgColumn => servers.id),
+    roomId: uuid("room_id").references((): AnyPgColumn => rooms.id),
+    dmId: uuid("dm_id").references(() => dmChannels.id),
+    level: notifyLevel("level").notNull(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("notify_prefs_scope").on(
+      table.userId,
+      sql`coalesce(${table.serverId}, ${table.roomId}, ${table.dmId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
+    ),
+    check("notify_prefs_target", sql`num_nonnulls(${table.serverId}, ${table.roomId}, ${table.dmId}) <= 1`),
+  ],
+);
+
 export const schemaMigrations = pgTable("schema_migrations", {
   name: text("name").primaryKey(),
   appliedAt: timestamp("applied_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
-export const identityEnums = [userRole, roomKind, membershipRole, registrationMode, serverRole] as const;
+export const identityEnums = [userRole, roomKind, membershipRole, registrationMode, serverRole, roomChannel, dmKind, notifyLevel] as const;
 
 export const identityTables = [
   users,
@@ -372,5 +617,15 @@ export const identityTables = [
   bootstrapTokens,
   userIdentities,
   oauthLogins,
+  dmChannels,
+  dmMembers,
+  messages,
+  messageMentions,
+  messageReactions,
+  messageAttachments,
+  serverEmojis,
+  userBlocks,
+  chatReads,
+  notifyPrefs,
   schemaMigrations,
 ] as const;

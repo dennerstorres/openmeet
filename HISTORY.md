@@ -1,5 +1,11 @@
 # HISTORY — registro cronológico
 
+### 2026-10-27 — F13-02, schema de mensagens — Claude
+Branch `task/F13-02-schema-mensagens`, a partir da `main` 7593247. F13-01 na mesma branch: ADR 0024 aceito pelo usuário (salas de texto, DM, emoji próprio, anexos, SSE, retenção para sempre), SPEC item 23, item 17 e out of scope ajustados, F13 no PLAN e `plans/phase-13-salas-de-texto.md`. Migração `0011_text_rooms.sql`: `rooms.channel` (sala de texto só `persistent`), `dm_channels`/`dm_members` (1:1 única por `direct_key`), `messages` com sala xor DM e corpo vazio ao remover, menções, reações (Unicode ou `custom:<id>`), anexos com teto de 25 MiB, `server_emojis` com nome único entre ativos, bloqueios, leituras e preferências de notificação. Schema Drizzle espelha tudo.
+Windows 11: `pnpm typecheck`, `pnpm lint` e testes do servidor (85, novo teste das restrições da 0011) passaram. O teste achou um check que aceitava DM 1:1 sem `direct_key`; corrigido. `pnpm format:check` acusa só `.claude/launch.json` e os caches `.impeccable`, preexistentes.
+Riscos: migração não aplicada em implantação real; GIN de busca e índices sem medição de carga. Próximo passo: F13-03, API de mensagens das salas.
+
+
 ### 2026-10-27 — F04-13, remover salas e servidores — Claude
 Branch `task/F04-13-remover-salas-servidores`, a partir da `main` 95ba845. Pedido do usuário: opção de remover salas e servidores. ADR 0023 (proposto): remoção lógica com `deleted_at` (migração `0010_soft_delete.sql`, slug único só entre salas ativas). `deleteRoom`/`deleteServer` no service, rotas `POST .../delete`, métodos no modelo compartilhado, lixeira na lista de salas e seção no modal do servidor, com confirmação. Todas as consultas de sala/servidor filtram `deleted_at is null`.
 Comandos (Windows 11, 2026-10-27): `pnpm typecheck`, `npx eslint .`, `pnpm test` e `cargo test` em `src-tauri` — todos passaram; novo `apps/server/test/delete.test.ts` cobre permissão, ocultação, slug reaproveitado, convite revogado e nova tentativa após falha do SFU. Na web local (API PGlite com SFU falso, portas 3012/1430): sala e servidor removidos pela interface, `closeRoom` chamado para cada sala.

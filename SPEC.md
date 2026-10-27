@@ -25,15 +25,16 @@ Cliente desktop Windows e cliente web, servido pela própria instância, para sa
 14. Ensurdecer o áudio remoto só neste PC. ADR 0013. Não implementado.
 15. Áudio do PC opcional no compartilhamento, desligado por padrão. ADR 0008. Não implementado.
 16. Login com Google quando o servidor tem as chaves. ADR 0010. Não implementado.
-17. Cliente web em `https://{API_DOMAIN}/`, mesmo frontend do `.exe`, sessão em cookie `HttpOnly`, para Chrome, Edge e Firefox atuais em computador. Sem bandeja, atalhos globais, notificação do sistema nem cofre do Windows. ADR 0014. Não implementado.
+17. Cliente web em `https://{API_DOMAIN}/`, mesmo frontend do `.exe`, sessão em cookie `HttpOnly`, para Chrome, Edge e Firefox atuais em computador. Sem bandeja, atalhos globais nem cofre do Windows; aviso de mensagem só na aba e, se a pessoa ativar, pela notificação do navegador (ADR 0024). ADR 0014. Não implementado.
 18. Lista dos membros de cada servidor com presença online, ausente e desconectada; invisibilidade opcional conforme política do dono. ADR 0017.
 19. Ícone do servidor, avatar da conta e, em cada servidor, apelido e avatar próprios. ADR 0019.
 20. Efeitos de voz locais no microfone, ouvidos por toda a sala. ADR 0020. Não implementado.
 21. Biblioteca de sons por servidor, enviada pelos membros e tocada para a sala pela faixa do microfone. ADR 0021. Não implementado.
 22. Rádio: uma entrada de áudio do PC escolhida pelo participante, transmitida na sala como faixa própria. ADR 0022. Não implementado.
+23. Salas de texto no servidor, mensagem direta (1:1 e grupo de até 10), menções, reações, anexos, emoji próprio por servidor e notificação no app e na aba da web, entregues por SSE e guardadas para sempre. ADR 0024. Não implementado.
 
 ## Out of scope — MVP
-Mensagens persistentes, federação, apps móveis, macOS/Linux, gravações, transcrição, E2EE, plugins, quadro branco, acesso remoto, múltiplos nós, bots, integrações além do login Google, captura nativa do áudio do Windows, juntar conta Google a uma conta de senha e link que entra direto numa sala.
+Federação, apps móveis, macOS/Linux, gravações, transcrição, E2EE, plugins, quadro branco, acesso remoto, múltiplos nós, bots, integrações além do login Google, captura nativa do áudio do Windows, juntar conta Google a uma conta de senha e link que entra direto numa sala.
 
 ## Requisitos funcionais
 - RF-01: Usuário adiciona instância por HTTPS; cliente verifica metadados e não envia credenciais a host inesperado.

@@ -62,6 +62,7 @@ test("identity migration matches the schema and rejects a second admin, duplicat
       "0008_images_profiles.sql",
       "0009_sounds.sql",
       "0010_soft_delete.sql",
+      "0011_text_rooms.sql",
     ]);
     assert.deepEqual(await applyMigrations(client), []);
 
@@ -159,6 +160,7 @@ test("identity migration matches the schema and rejects a second admin, duplicat
         "0008_images_profiles.sql",
         "0009_sounds.sql",
         "0010_soft_delete.sql",
+        "0011_text_rooms.sql",
       ],
     );
   } finally {
@@ -199,6 +201,7 @@ test("the servers migration moves existing rooms into Geral and revokes room inv
       "0008_images_profiles.sql",
       "0009_sounds.sql",
       "0010_soft_delete.sql",
+      "0011_text_rooms.sql",
     ]);
 
     const servers = await client.query("select id, name, created_by from servers");
@@ -266,6 +269,7 @@ test("the session family migration names every chain by its root", async () => {
       "0008_images_profiles.sql",
       "0009_sounds.sql",
       "0010_soft_delete.sql",
+      "0011_text_rooms.sql",
     ]);
     const rows = await client.query("select id, family_id from refresh_sessions");
     const family = new Map(rows.rows.map((row) => [row.id, row.family_id]));
@@ -277,5 +281,129 @@ test("the session family migration names every chain by its root", async () => {
   } finally {
     await db.close();
     await rm(upTo, { recursive: true, force: true });
+  }
+});
+
+test("the text rooms migration keeps rooms as voice and guards messages, DMs, emojis and reads", async () => {
+  const db = new PGlite();
+  try {
+    const client = pgliteClient(db);
+    await applyMigrations(client);
+    const owner = await client.query("insert into users (username, password_hash, display_name) values ('dono', 'hash-dono', 'Dono') returning id");
+    const ownerId = owner.rows[0]?.id;
+    const friend = await client.query("insert into users (username, password_hash, display_name) values ('amiga', 'hash-amiga', 'Amiga') returning id");
+    const friendId = friend.rows[0]?.id;
+    const server = await client.query("insert into servers (name, created_by) values ('Geral', $1) returning id", [ownerId]);
+    const serverId = server.rows[0]?.id;
+
+    const voice = await client.query(
+      "insert into rooms (server_id, name, slug, kind, created_by) values ($1, 'Voz', 'voz', 'persistent', $2) returning channel",
+      [serverId, ownerId],
+    );
+    assert.equal(voice.rows[0]?.channel, "voice");
+    await expectSqlState(
+      () =>
+        client.query("insert into rooms (server_id, name, slug, kind, channel, created_by) values ($1, 'Rápida', 'rapida', 'temporary', 'text', $2)", [
+          serverId,
+          ownerId,
+        ]),
+      "23514",
+    );
+    const text = await client.query(
+      "insert into rooms (server_id, name, slug, kind, channel, created_by) values ($1, 'Geral', 'geral', 'persistent', 'text', $2) returning id",
+      [serverId, ownerId],
+    );
+    const roomId = text.rows[0]?.id;
+
+    const directKey = [String(ownerId), String(friendId)].sort().join(":");
+    const dm = await client.query("insert into dm_channels (kind, direct_key, created_by) values ('direct', $1, $2) returning id", [directKey, ownerId]);
+    const dmId = dm.rows[0]?.id;
+    await expectSqlState(
+      () => client.query("insert into dm_channels (kind, direct_key, created_by) values ('direct', $1, $2)", [directKey, friendId]),
+      "23505",
+    );
+    await expectSqlState(() => client.query("insert into dm_channels (kind, created_by) values ('direct', $1)", [ownerId]), "23514");
+    await expectSqlState(
+      () => client.query("insert into dm_channels (kind, name, direct_key, created_by) values ('group', 'Grupo', $1, $2)", ["a:b", ownerId]),
+      "23514",
+    );
+    await client.query("insert into dm_channels (kind, name, created_by) values ('group', 'Grupo', $1)", [ownerId]);
+
+    const message = await client.query("insert into messages (room_id, author_id, body) values ($1, $2, 'olá') returning id", [roomId, ownerId]);
+    const messageId = message.rows[0]?.id;
+    const later = await client.query("insert into messages (dm_id, author_id, body) values ($1, $2, 'oi') returning id", [dmId, friendId]);
+    assert.ok(BigInt(String(later.rows[0]?.id)) > BigInt(String(messageId)));
+    await expectSqlState(
+      () => client.query("insert into messages (room_id, dm_id, author_id, body) values ($1, $2, $3, 'x')", [roomId, dmId, ownerId]),
+      "23514",
+    );
+    await expectSqlState(() => client.query("insert into messages (author_id, body) values ($1, 'x')", [ownerId]), "23514");
+    await expectSqlState(
+      () => client.query("insert into messages (room_id, author_id, body) values ($1, $2, $3)", [roomId, ownerId, "a".repeat(4001)]),
+      "23514",
+    );
+    await expectSqlState(() => client.query("update messages set deleted_at = now() where id = $1", [messageId]), "23514");
+    await client.query("update messages set deleted_at = now(), body = '' where id = $1", [messageId]);
+    await expectSqlState(() => client.query("update messages set pinned_at = now() where id = $1", [later.rows[0]?.id]), "23514");
+
+    await client.query("insert into message_reactions (message_id, user_id, emoji) values ($1, $2, '👍')", [messageId, friendId]);
+    await expectSqlState(
+      () => client.query("insert into message_reactions (message_id, user_id, emoji) values ($1, $2, '👍')", [messageId, friendId]),
+      "23505",
+    );
+    await expectSqlState(
+      () => client.query("insert into message_reactions (message_id, user_id, emoji) values ($1, $2, '<b>')", [messageId, friendId]),
+      "23514",
+    );
+
+    const bytes = new Uint8Array([1, 2, 3]);
+    const sha = "a".repeat(64);
+    await client.query(
+      "insert into message_attachments (uploader_id, name, content_type, bytes, byte_size, sha256) values ($1, 'nota.txt', 'text/plain', $2, 3, $3)",
+      [ownerId, bytes, sha],
+    );
+    await expectSqlState(
+      () =>
+        client.query(
+          "insert into message_attachments (uploader_id, name, content_type, bytes, byte_size, sha256) values ($1, '../x', 'text/plain', $2, 3, $3)",
+          [ownerId, bytes, sha],
+        ),
+      "23514",
+    );
+    await expectSqlState(
+      () =>
+        client.query(
+          "insert into message_attachments (uploader_id, name, content_type, bytes, byte_size, sha256) values ($1, 'x.txt', 'text/plain', $2, 4, $3)",
+          [ownerId, bytes, sha],
+        ),
+      "23514",
+    );
+
+    const emoji =
+      "insert into server_emojis (server_id, name, content_type, animated, bytes, byte_size, sha256, created_by) values ($1, $2, $3, false, $4, 3, $5, $6)";
+    await client.query(emoji, [serverId, "Gato", "image/png", bytes, sha, ownerId]);
+    await expectSqlState(() => client.query(emoji, [serverId, "gato", "image/png", bytes, sha, ownerId]), "23505");
+    await expectSqlState(() => client.query(emoji, [serverId, "x", "image/png", bytes, sha, ownerId]), "23514");
+    await expectSqlState(() => client.query(emoji, [serverId, "svg", "image/svg+xml", bytes, sha, ownerId]), "23514");
+    await client.query("update server_emojis set deleted_at = now() where server_id = $1", [serverId]);
+    await client.query(emoji, [serverId, "gato", "image/png", bytes, sha, ownerId]);
+
+    await expectSqlState(() => client.query("insert into user_blocks (user_id, blocked_id) values ($1, $1)", [ownerId]), "23514");
+    await client.query("insert into chat_reads (user_id, room_id, last_read_id) values ($1, $2, $3)", [friendId, roomId, messageId]);
+    await expectSqlState(
+      () => client.query("insert into chat_reads (user_id, room_id, last_read_id) values ($1, $2, $3)", [friendId, roomId, messageId]),
+      "23505",
+    );
+    await expectSqlState(() => client.query("insert into chat_reads (user_id, last_read_id) values ($1, 1)", [friendId]), "23514");
+
+    await client.query("insert into notify_prefs (user_id, level) values ($1, 'mentions')", [friendId]);
+    await expectSqlState(() => client.query("insert into notify_prefs (user_id, level) values ($1, 'all')", [friendId]), "23505");
+    await client.query("insert into notify_prefs (user_id, server_id, level) values ($1, $2, 'all')", [friendId, serverId]);
+    await expectSqlState(
+      () => client.query("insert into notify_prefs (user_id, server_id, room_id, level) values ($1, $2, $3, 'none')", [friendId, serverId, roomId]),
+      "23514",
+    );
+  } finally {
+    await db.close();
   }
 });
