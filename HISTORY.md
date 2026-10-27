@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-26 — F07-09, release 0.2.5 — Claude
+Branch `main`, após o merge da F04-11. Versão 0.2.4 → 0.2.5 nos quatro arquivos, por pedido do usuário, com o rádio da sala. Push da `main` e tag `v0.2.5` para o workflow de release.
+
 ### 2026-10-26 — F04-11, rádio da sala — Claude
 Branch `task/F04-11-radio`, a partir da `main` 41b70e5 (ADR 0022 aceito pelo usuário). `radio.ts` captura a entrada pelo `deviceId` exato, sem eco, ruído nem ganho automático, estéreo, e publica como `screen_share_audio` com nome `openmeet-radio`, preset `musicHighQualityStereo`, sem DTX nem RED. A sessão separa rádio e áudio do PC pelo nome, desliga um ao ligar o outro, republica o rádio quando parar a tela o derruba e esquece o rádio ao desconectar. Card `radio` com volume e mute locais; ensurdecer também o cala.
 Windows 11: `pnpm test` (shared 53, media 77, server 82, desktop 22), `pnpm typecheck`, `pnpm lint`, builds desktop e web passaram. `pnpm format:check` acusa só `apps/desktop/.impeccable/hook.cache.json`, preexistente. Nenhum rádio foi ouvido; o LiveKit real ainda precisa aceitar a faixa nomeada ao lado de um compartilhamento.

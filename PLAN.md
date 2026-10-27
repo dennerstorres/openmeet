@@ -2,6 +2,8 @@
 
 Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, `VERIFIED`, `DONE`, `BLOCKED`.
 
+F07-09 — Release 0.2.5 pelo GitHub Actions: WAITING_VALIDATION. Pedida em 2026-10-26 com F04-11. Tag `v0.2.5`; falta conferir a run, instalar e validar a atualização 0.2.4 → 0.2.5.
+
 F04-11 — Rádio da sala: WAITING_VALIDATION. ADR 0022 aceito em 2026-10-26; implementado na branch `task/F04-11-radio`. Entrada escolhida publicada como `screen_share_audio` com nome `openmeet-radio`, sem filtros de voz e com preset de música; card próprio com volume e mute locais; exclusão com o áudio do PC e republicação depois que o SDK derruba o rádio ao parar a tela. Testes, typecheck, lint e builds passaram; falta o LiveKit real, cabo virtual em dois PCs e revisão independente. Escopo em `plans/phase-04-meeting-ui.md`.
 
 F07-08 — Release 0.2.4 pelo GitHub Actions: WAITING_VALIDATION. Pedida em 2026-10-26 com F04-09 e F04-10. Run 40443440366 publicou instalador, assinatura, `latest.json` e `SHA256SUMS`. Falta instalar e validar a atualização 0.2.3 → 0.2.4.
@@ -62,6 +64,7 @@ F09-08 — Presença dos membros do servidor: WAITING_VALIDATION. Implementada e
 | F07-06 | Distribuição | Entrega 0.2.2 | F04-08,F09-10 | WAITING_VALIDATION | Claude | G7 |
 | F07-07 | Distribuição | Release 0.2.3 com updater | F07-06 | WAITING_VALIDATION | Claude | G7 |
 | F07-08 | Distribuição | Release 0.2.4 com efeitos de voz e sons | F04-09,F04-10 | WAITING_VALIDATION | Claude | G7 |
+| F07-09 | Distribuição | Release 0.2.5 com o rádio da sala | F04-11 | WAITING_VALIDATION | Claude | G7 |
 | F02-02 | POC | Conectar dois clientes Windows ao mesmo room | F02-01 | WAITING_VALIDATION | Grok | G2 |
 | F02-03 | POC | Áudio bidirecional, mic/câmera e devices | F02-02 | WAITING_VALIDATION | Grok | G2 |
 | F02-04 | POC | Captura de monitor e janela | F02-02 | WAITING_VALIDATION | Grok | G2 |
