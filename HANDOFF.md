@@ -41,8 +41,9 @@ Cliente: `packages/shared/src/chat.ts`, `meeting.ts`, `instance.ts`; `apps/deskt
 - `.exe` nunca abriu o fluxo nativo; SSE não testado atrás do Traefik/Coolify; logout fecha o fluxo só no keep-alive (até 25 s).
 - Migração 0011 não aplicada em implantação real.
 
-## Próximos passos exatos
-1. Commitar a F13-07 se ainda não estiver (sem `.claude/launch.json`).
-2. Em paralelo, cada uma numa branch a partir da F13-07: F13-08 (menções: autocompletar `@`, `@everyone`/`@here` só dono e moderador, `message_mentions`, destaque), F13-09 (anexos: upload antes do envio, validação por bytes, prévia de imagem, download com `Content-Disposition: attachment`, limpeza de órfãos, comando Rust), F13-11 (DM na API: 1:1 por `direct_key`, grupo até 10, bloqueio, reaproveitar `messages.ts` com `dm_id`, público SSE pelos `dm_members`).
-3. Depois: F13-10 (emoji próprio, depende da F13-07), F13-12 (DM na UI), F13-13 (não lidas e notificação), F13-14 (docs e revisão).
-4. Para cada tarefa: rotas novas em `allowed_call` e `instancePath`, stub em `web/native.ts` se mexer no nativo, `PLAN.md`, plano da fase e `HISTORY.md`; commit sem `.claude/launch.json`.
+## Próximos passos exatos (atualizado 2026-10-27, usuário autorizou implementar tudo e testar no fim)
+1. `task/F13-integracao` = F13-07 + F13-08 + F13-11 (fc4db22; menção resolve em DM pelos `dm_members`, sem `@everyone` em DM). A sessão da F13-09 está juntando a `task/F13-09-anexos` nela.
+2. Depois, em paralelo a partir da integração: F13-10 (emoji próprio) e F13-12 (DM na UI), cada uma na sua branch; juntar de volta na integração.
+3. F13-13 (não lidas e notificação; persistir o contador de menções que hoje é só memória em `MeetingApp.tsx`), depois F13-14 (docs e revisão).
+4. Para cada tarefa: rotas novas em `allowed_call` e `instancePath`, stub em `web/native.ts` se mexer no nativo, `PLAN.md`, plano da fase e `HISTORY.md`; commit sem `.claude/launch.json`. Nada na `main`, sem push.
+5. No fim: o usuário testa tudo no `.exe` e na web.
