@@ -1,4 +1,4 @@
-import { prepareInstanceRequest } from "@openmeet/shared";
+import { prepareInstanceRequest, titleWithCount } from "@openmeet/shared";
 import type * as Native from "../shell/native";
 
 // ADR 0014: the web build resolves `../shell/native` to this file (see vite.config.ts). Tray, global
@@ -121,4 +121,101 @@ export const renewDesktopSession: typeof Native.renewDesktopSession = async () =
 // A new tab without access back to this page; the address was already limited to http and https.
 export const openChatLink: typeof Native.openChatLink = async (url) => {
   window.open(url, "_blank", "noopener,noreferrer");
+};
+
+// ADR 0024 (F13-13): on the web the count goes to the tab title and a dot on the favicon, and the browser's
+// Notification only shows after the person turned it on in Settings, which is when permission is asked.
+const NOTIFY_KEY = "openmeet.webNotifications";
+const BASE_ICON = "/icon.svg";
+const openChatHandlers = new Set<(chat: Native.NotifiedChat) => void>();
+let baseTitle: string | null = null;
+let shownCount = -1;
+
+function storedFlag(): boolean {
+  try {
+    return window.localStorage.getItem(NOTIFY_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
+
+export const browserNotifications: typeof Native.browserNotifications = {
+  supported: () => typeof Notification === "function",
+  enabled: () => typeof Notification === "function" && Notification.permission === "granted" && storedFlag(),
+  // Only ever called from a click: browsers refuse (or remember a refusal of) a prompt nobody asked for.
+  enable: async () => {
+    if (typeof Notification !== "function") return false;
+    const permission = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
+    if (permission !== "granted") return false;
+    try {
+      window.localStorage.setItem(NOTIFY_KEY, "on");
+    } catch {
+      // Without storage the choice lasts until the tab closes.
+    }
+    return true;
+  },
+  disable: () => {
+    try {
+      window.localStorage.removeItem(NOTIFY_KEY);
+    } catch {
+      // Nothing kept, nothing to drop.
+    }
+  },
+};
+
+export const notifyChat: typeof Native.notifyChat = async (title, body, chat) => {
+  if (!browserNotifications.enabled()) return;
+  const shown = new Notification(title, { body, tag: `${chat.kind}:${chat.id}` });
+  shown.onclick = () => {
+    window.focus();
+    for (const handler of openChatHandlers) handler(chat);
+    shown.close();
+  };
+};
+
+export const listenOpenChat: typeof Native.listenOpenChat = async (handler) => {
+  openChatHandlers.add(handler);
+  return () => openChatHandlers.delete(handler);
+};
+
+function faviconLink(): HTMLLinkElement {
+  const found = document.querySelector<HTMLLinkElement>("link[rel='icon']");
+  if (found) return found;
+  const link = document.createElement("link");
+  link.rel = "icon";
+  document.head.appendChild(link);
+  return link;
+}
+
+// The app icon with a red dot in the corner; the plain icon when nothing is unread.
+function paintFavicon(dot: boolean): void {
+  const link = faviconLink();
+  if (!dot) {
+    link.type = "image/svg+xml";
+    link.href = BASE_ICON;
+    return;
+  }
+  const image = new Image();
+  image.onload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 64;
+    const context = canvas.getContext("2d");
+    if (!context || shownCount <= 0) return;
+    context.drawImage(image, 0, 0, 64, 64);
+    context.beginPath();
+    context.arc(48, 48, 15, 0, Math.PI * 2);
+    context.fillStyle = "#e5484d";
+    context.fill();
+    link.type = "image/png";
+    link.href = canvas.toDataURL("image/png");
+  };
+  image.src = BASE_ICON;
+}
+
+export const setUnreadBadge: typeof Native.setUnreadBadge = async (count) => {
+  baseTitle ??= document.title.replace(/^\(\d+\+?\) /, "");
+  document.title = titleWithCount(baseTitle, count);
+  if (count > 0 !== shownCount > 0) paintFavicon(count > 0);
+  shownCount = count;
 };

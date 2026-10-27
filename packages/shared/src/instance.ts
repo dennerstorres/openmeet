@@ -353,13 +353,17 @@ function instancePath(path: string): string {
   const image = /^\/api\/v1\/images\/([0-9a-f-]{36})$/i.exec(path);
   if (image?.[1] !== undefined && UUID.test(image[1])) return path;
   // ADR 0024: text room messages; the only query is the message cursor.
-  const roomChat = /^\/api\/v1\/rooms\/([0-9a-f-]{36})\/(?:messages(?:\?(?:before|after|around)=[1-9][0-9]{0,17}|\/search)?|pins|typing)$/i.exec(path);
+  const roomChat = /^\/api\/v1\/rooms\/([0-9a-f-]{36})\/(?:messages(?:\?(?:before|after|around)=[1-9][0-9]{0,17}|\/search)?|pins|typing|read)$/i.exec(path);
   if (roomChat?.[1] !== undefined && UUID.test(roomChat[1])) return path;
   if (/^\/api\/v1\/messages\/[1-9][0-9]{0,17}\/(?:edit|delete|pin|reactions)$/.test(path)) return path;
   // ADR 0024: DMs and blocks; DM messages share the message routes above.
   if (path === "/api/v1/dms" || path === "/api/v1/blocks") return path;
+  // ADR 0024 (F13-13): unread counts and notification levels.
+  if (path === "/api/v1/unread" || path === "/api/v1/notify-prefs") return path;
   const dm =
-    /^\/api\/v1\/dms\/([0-9a-f-]{36})(?:\/(?:messages(?:\?(?:before|after|around)=[1-9][0-9]{0,17}|\/search)?|pins|typing|members|leave|rename))?$/i.exec(path);
+    /^\/api\/v1\/dms\/([0-9a-f-]{36})(?:\/(?:messages(?:\?(?:before|after|around)=[1-9][0-9]{0,17}|\/search)?|pins|typing|read|members|leave|rename))?$/i.exec(
+      path,
+    );
   if (dm?.[1] !== undefined && UUID.test(dm[1])) return path;
   const block = /^\/api\/v1\/users\/([0-9a-f-]{36})\/block$/i.exec(path);
   if (block?.[1] !== undefined && UUID.test(block[1])) return path;

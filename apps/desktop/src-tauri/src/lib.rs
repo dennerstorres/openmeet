@@ -1,3 +1,4 @@
+mod alerts;
 mod attachments;
 mod events;
 mod google;
@@ -115,6 +116,8 @@ pub fn run() {
             shell::shell_set_autostart,
             shell::shell_tracks,
             shell::shell_show,
+            alerts::shell_notify,
+            alerts::shell_badge,
             invite::invite_take,
             google::open_google_login,
             google::open_chat_link,

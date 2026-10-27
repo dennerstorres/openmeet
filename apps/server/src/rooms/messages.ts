@@ -78,7 +78,7 @@ export type ChatKind = "room" | "dm";
 
 // Where the messages hang from: a text room of a server, or a DM. The column is one of two fixed names, so it
 // is safe to place in the SQL text.
-interface Chat {
+export interface Chat {
   column: "room_id" | "dm_id";
   target: string;
   /** Null in a DM. */
@@ -125,7 +125,7 @@ async function dmChat(db: MigrationClient, actor: PublicUser, id: string): Promi
   return { column: "dm_id", target: dm.id, room: null, moderator: false, canPin: true, closed: dm.readOnly ? "blocked" : undefined };
 }
 
-function loadChat(db: MigrationClient, actor: PublicUser, id: string, kind: ChatKind): Promise<Chat> {
+export function loadChat(db: MigrationClient, actor: PublicUser, id: string, kind: ChatKind): Promise<Chat> {
   return kind === "dm" ? dmChat(db, actor, id) : textRoom(db, actor, id);
 }
 

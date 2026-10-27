@@ -163,6 +163,36 @@ export function listenShell(handler: (action: string) => void): Promise<Unlisten
   });
 }
 
+/** ADR 0024 (F13-13): the chat a notification belongs to, opened when it is clicked. */
+export interface NotifiedChat {
+  kind: "room" | "dm";
+  id: string;
+}
+
+/** A Windows toast for a chat message; the page already decided it should notify. */
+export function notifyChat(title: string, body: string, chat: NotifiedChat): Promise<void> {
+  return invoke("shell_notify", { title, body, kind: chat.kind, id: chat.id });
+}
+
+/** The unread count on the tray icon; zero restores the plain icon. */
+export function setUnreadBadge(count: number): Promise<void> {
+  return invoke("shell_badge", { count: Math.max(0, Math.min(count, 999)) });
+}
+
+export function listenOpenChat(handler: (chat: NotifiedChat) => void): Promise<UnlistenFn> {
+  return listen<NotifiedChat>("shell-open-chat", (event) => {
+    if ((event.payload.kind === "room" || event.payload.kind === "dm") && typeof event.payload.id === "string") handler(event.payload);
+  });
+}
+
+/** The browser's Notification is opt-in on the web; the app always has toasts. */
+export const browserNotifications = {
+  supported: (): boolean => false,
+  enabled: (): boolean => true,
+  enable: async (): Promise<boolean> => true,
+  disable: (): void => undefined,
+};
+
 /** An invite link the app was opened with, taken once. The Rust side already kept only openmeet://convite links. */
 export function takeInvite(): Promise<string | null> {
   return invoke<string | null>("invite_take");

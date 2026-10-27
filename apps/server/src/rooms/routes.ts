@@ -70,6 +70,7 @@ import {
   typingRoom,
   type MessageView,
 } from "./messages.js";
+import { markRead, readOwnMessage, setNotifyLevel, unreadState } from "./unread.js";
 import { addDmMember, getDm, leaveDm, listBlocks, listDms, openDm, renameDm, setBlock, type DmView } from "./dms.js";
 import { deleteEmoji, listMyEmojis, listServerEmojis, readEmoji, renameEmoji, uploadEmoji } from "./emojis.js";
 import { deleteSound, importSound, listLibrary, listOwnSounds, readSound, removeFromLibrary, renameSound, uploadSound } from "./sounds.js";
@@ -978,6 +979,7 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
         replyToId: textField(request.body, "replyToId"),
         attachmentIds: parseAttachmentIds(bodyField(request.body, "attachmentIds")),
       });
+      await readOwnMessage(db, actor.id, message);
       await publishMessage(request, "message.created", message);
       return reply.code(201).header("cache-control", "no-store").send(message);
     } catch (error) {
@@ -1238,6 +1240,7 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
         attachmentIds: parseAttachmentIds(bodyField(request.body, "attachmentIds")),
       };
       const message = await sendMessage(db, actor, param(request, "id"), input, "dm");
+      await readOwnMessage(db, actor.id, message);
       await publishMessage(request, "message.created", message);
       return reply.code(201).header("cache-control", "no-store").send(message);
     } catch (error) {
@@ -1281,6 +1284,48 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
         events.signal(audience, "typing", { dmId: dm, userId: actor.id });
       }
       return reply.code(204).header("cache-control", "no-store").send();
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  // ADR 0024 (F13-13): reads and notification levels. A read goes back to the reader's other clients as "read".
+  app.get("/api/v1/unread", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await unreadState(db, actor));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  const readIn = (kind: "room" | "dm") => async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const read = await markRead(db, actor, param(request, "id"), kind, { messageId: bodyField(request.body, "messageId") });
+      events?.publish([actor.id], "read", read);
+      return reply.code(200).header("cache-control", "no-store").send(read);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  };
+  app.post("/api/v1/rooms/:id/read", readIn("room"));
+  app.post("/api/v1/dms/:id/read", readIn("dm"));
+
+  app.post("/api/v1/notify-prefs", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      await setNotifyLevel(db, actor, { scope: bodyField(request.body, "scope"), id: bodyField(request.body, "id"), level: bodyField(request.body, "level") });
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await unreadState(db, actor));
     } catch (error) {
       return sendError(request, reply, error);
     }
