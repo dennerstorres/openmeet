@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-26 — F07-08, release 0.2.4 — Claude
+Branch `main`. Versão 0.2.3 → 0.2.4 nos quatro arquivos, por pedido do usuário, com efeitos de voz (F04-09) e biblioteca de sons (F04-10). Push da `main` e tag `v0.2.4` para o workflow de release; primeira atualização N → N+1 pelo updater. A API com a migration 0009 só entra em produção quando o deploy da instância rodar.
+
 ### 2026-10-26 — F04-10, biblioteca de sons — Claude
 Branch `task/F04-10-biblioteca-de-sons`, a partir da `main` df48aa1 (commits d7567ca API, fe45881 ponte/mídia e o da UI). Shared valida e gera o WAV canônico (PCM 16 bits mono 24 kHz, até 20 s). Migration 0009 cria `sounds` e `server_sounds`; rotas listam, enviam (limite de 20 envios por conta a cada 10 min, `bodyLimit` próprio), leem, importam (só o dono do som, membro do destino), tiram (dono do som, dono ou moderador), renomeiam e apagam (só o dono). Rust ganhou as rotas na lista fechada e `instance_sound`, que só devolve o WAV canônico. Mídia: portão de voz e barramento de sons depois do ganho; com mic mutado, `playSound` fecha a voz, desmuta, toca e muta de novo antes de reabrir a voz; o usuário mutar durante o som para o som.
 Windows 11: `pnpm test` (shared 53, media 70, server 82, desktop 22), `pnpm typecheck`, `pnpm lint`, builds desktop e web e `cargo test --lib` (23) passaram. `pnpm format:check` acusa só `apps/desktop/.impeccable/hook.cache.json`, preexistente. Nenhum som foi ouvido; a migration não rodou fora do PGlite e o painel não foi visto numa chamada. Riscos: crescimento do Postgres sem teto de quantidade, eco do som no alto-falante, e o botão do mic aparecendo ligado durante o som mutado.

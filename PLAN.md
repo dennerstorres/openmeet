@@ -2,6 +2,8 @@
 
 Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, `VERIFIED`, `DONE`, `BLOCKED`.
 
+F07-08 — Release 0.2.4 pelo GitHub Actions: WAITING_VALIDATION. Pedida em 2026-10-26 com F04-09 e F04-10. Tag `v0.2.4`; falta conferir a run, instalar e validar a atualização 0.2.3 → 0.2.4.
+
 F04-10 — Biblioteca de sons do servidor: WAITING_VALIDATION. ADR 0021 aceito em 2026-10-26; implementada na branch `task/F04-10-biblioteca-de-sons`. Migration 0009, rotas com testes de permissão e de WAV falso, comando Rust `instance_sound`, mixer depois do portão de voz e painel "Sons" na chamada. Testes, typecheck, lint, `cargo test` e builds passaram; falta migration em implantação real, ouvir com dois clientes (mic aberto e mutado) e revisão independente. Escopo em `plans/phase-04-meeting-ui.md`.
 
 F04-09 — Efeitos de voz no microfone: WAITING_VALIDATION. ADR 0020 aceito em 2026-10-26; implementada na branch `task/F04-09-efeitos-de-voz`. Oito efeitos no mesmo processor do ganho, pitch por worklet do bundle, "Ouvir minha voz" local. Testes, typecheck, lint e builds passaram; falta ouvir os efeitos com microfone real em dois PCs e revisão independente. Escopo e testes em `plans/phase-04-meeting-ui.md`.
@@ -56,6 +58,7 @@ F09-08 — Presença dos membros do servidor: WAITING_VALIDATION. Implementada e
 | F07-05 | Distribuição | Atualização automática assinada (ADR 0018) | F07-02 | WAITING_VALIDATION | Claude | G7,G10 |
 | F07-06 | Distribuição | Entrega 0.2.2 | F04-08,F09-10 | WAITING_VALIDATION | Claude | G7 |
 | F07-07 | Distribuição | Release 0.2.3 com updater | F07-06 | WAITING_VALIDATION | Claude | G7 |
+| F07-08 | Distribuição | Release 0.2.4 com efeitos de voz e sons | F04-09,F04-10 | WAITING_VALIDATION | Claude | G7 |
 | F02-02 | POC | Conectar dois clientes Windows ao mesmo room | F02-01 | WAITING_VALIDATION | Grok | G2 |
 | F02-03 | POC | Áudio bidirecional, mic/câmera e devices | F02-02 | WAITING_VALIDATION | Grok | G2 |
 | F02-04 | POC | Captura de monitor e janela | F02-02 | WAITING_VALIDATION | Grok | G2 |
