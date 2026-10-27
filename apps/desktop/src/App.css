@@ -2206,3 +2206,245 @@ textarea {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+/* ADR 0024: a text room sits over the call area, like Configurações, so a call underneath keeps playing. */
+.text-room {
+  position: absolute;
+  inset: 0 16px 16px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-main);
+  overflow: hidden;
+}
+
+.text-room-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-muted);
+}
+
+.text-room-head h1 {
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 12px 0;
+  overflow-y: auto;
+  list-style: none;
+  overscroll-behavior: contain;
+}
+
+.message-start,
+.message-more {
+  padding: 8px 16px 16px;
+  color: var(--text-muted);
+}
+
+.message-start p {
+  margin: 6px 0 0;
+  font-size: 15px;
+}
+
+.message {
+  position: relative;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  column-gap: 12px;
+  padding: 4px 16px;
+  margin-top: 10px;
+}
+
+.message.grouped {
+  margin-top: 0;
+  padding-top: 1px;
+}
+
+.message:hover,
+.message:focus-within {
+  background: var(--bg-hover);
+}
+
+.message .avatar.small {
+  grid-column: 1;
+  align-self: start;
+}
+
+.message .avatar.small span {
+  width: 36px;
+}
+
+.message-main {
+  grid-column: 2;
+  min-width: 0;
+}
+
+.message-reply {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 2px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.message-reply span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.message-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+}
+
+.message-meta strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.message-meta time {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.message-body {
+  margin: 0;
+  color: var(--text-body);
+  font-size: 15px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.message-body.removed,
+.message-edited {
+  color: var(--text-faint);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.message-actions {
+  position: absolute;
+  top: -14px;
+  right: 16px;
+  display: none;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-panel);
+}
+
+.message:hover .message-actions,
+.message:focus-within .message-actions {
+  display: flex;
+}
+
+.message-edit textarea,
+.composer textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  field-sizing: content;
+  max-height: 40vh;
+}
+
+.message-edit .hint {
+  margin: 4px 0 0;
+}
+
+.message-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--text-body);
+  font-size: 13px;
+}
+
+.typing {
+  min-height: 20px;
+  margin: 0;
+  padding: 0 16px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.composer {
+  position: relative;
+  padding: 0 16px 16px;
+}
+
+.composer textarea {
+  min-height: 44px;
+  padding: 11px 48px 11px 14px;
+  border-radius: 8px;
+}
+
+.composer-reply {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.composer-count {
+  position: absolute;
+  right: 28px;
+  bottom: 28px;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.composer-count.over {
+  color: var(--danger-text);
+}
+
+.text-room-closed {
+  padding: 0 16px 16px;
+}
+
+@media (max-width: 900px) {
+  .text-room {
+    inset: 0 8px 8px;
+  }
+
+  .message {
+    padding-inline: 10px;
+  }
+
+  /* No hover on touch: the actions stay visible but quiet. */
+  .message-actions {
+    position: static;
+    grid-column: 2;
+    display: flex;
+    justify-self: start;
+    border: 0;
+    background: transparent;
+  }
+}

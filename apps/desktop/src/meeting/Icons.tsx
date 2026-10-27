@@ -156,3 +156,29 @@ export function IconLogo({ size = 20 }: { size?: number }) {
     </svg>
   );
 }
+
+export function IconHash({ size }: { size?: number }) {
+  return (
+    <Icon size={size}>
+      <path d="M5 9h14M4 15h14M10 3L8 21M16 3l-2 18" />
+    </Icon>
+  );
+}
+
+export function IconReply({ size }: { size?: number }) {
+  return (
+    <Icon size={size}>
+      <path d="M9 14L4 9l5-5" />
+      <path d="M4 9h10a6 6 0 0 1 6 6v4" />
+    </Icon>
+  );
+}
+
+export function IconPencil({ size }: { size?: number }) {
+  return (
+    <Icon size={size}>
+      <path d="M4 20h4L19 9l-4-4L4 16z" />
+      <path d="M13.5 6.5l4 4" />
+    </Icon>
+  );
+}

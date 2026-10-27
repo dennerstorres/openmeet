@@ -49,6 +49,7 @@ import {
   IconClock,
   IconGear,
   IconHangUp,
+  IconHash,
   IconHeadphones,
   IconLogo,
   IconMic,
@@ -63,10 +64,12 @@ import { ShellConsent } from "../shell/ShellConsent";
 import {
   createDesktopApi,
   createDesktopBroker,
+  createDesktopChatTransport,
   isTauri,
   listenInvite,
   listenShell,
   openGoogleLogin,
+  renewDesktopSession,
   setAutostart,
   setShortcutConsent,
   shellStatus,
@@ -78,6 +81,8 @@ import {
 import { createFetchApi, createLiveKitMedia } from "./api";
 import { prepareGoogleWindow } from "../web/google";
 import { createWebSession } from "../web/session";
+import { createChatFeed, createChatHub, createWebTransport, type ChatTransport } from "./chat-events";
+import { TextRoom, type ChatPerson } from "./TextRoom";
 
 const idleSnapshot: PocSnapshot = {
   phase: "idle",
@@ -227,6 +232,19 @@ function platform(): { api: InstanceApi; broker: SessionBroker | undefined } {
   return { api: isTauri() ? createDesktopApi(createFetchApi()) : createFetchApi(), broker: isTauri() ? createDesktopBroker() : undefined };
 }
 
+// ADR 0024: the chat stream needs the session where it lives: the cookie on the web, the native process in
+// the .exe. A plain browser on the desktop build (dev) has neither, so it gets no live feed.
+function chatTransport(origin: string, broker: SessionBroker | undefined): { transport: ChatTransport; renew: () => Promise<boolean> } | null {
+  if (__WEB__) {
+    return {
+      transport: createWebTransport(origin),
+      renew: async () => (await broker?.refresh(origin))?.status === 200,
+    };
+  }
+  if (!isTauri()) return null;
+  return { transport: createDesktopChatTransport(origin), renew: () => renewDesktopSession(origin) };
+}
+
 function storedAddress(): string {
   try {
     return localStorage.getItem("openmeet.instance") ?? "http://127.0.0.1:3000";
@@ -247,6 +265,10 @@ export function MeetingApp() {
   const [roomName, setRoomName] = useState("");
   const [roomSlug, setRoomSlug] = useState("");
   const [roomKind, setRoomKind] = useState("persistent");
+  const [roomChannel, setRoomChannel] = useState<"voice" | "text">("voice");
+  const [textRoomId, setTextRoomId] = useState<string | null>(null);
+  const [chatHub] = useState(createChatHub);
+  const brokerRef = useRef<SessionBroker | undefined>(undefined);
   const [serverName, setServerName] = useState("");
   const [pastedInvite, setPastedInvite] = useState("");
   const [copied, setCopied] = useState(false);
@@ -298,6 +320,7 @@ export function MeetingApp() {
 
   if (modelRef.current === null) {
     const { api, broker } = platform();
+    brokerRef.current = broker;
     modelRef.current = new MeetingModel(api, createLiveKitMedia(session), broker, undefined, __WEB__ ? invitePageLink : undefined);
   }
   const model = modelRef.current;
@@ -343,6 +366,14 @@ export function MeetingApp() {
     });
   }, [model]);
   const presenceKey = state.step === "rooms" || state.step === "meeting" ? `${state.selectedServerId ?? ""}:${state.activeRoomId ?? ""}` : null;
+  const chatOrigin = (state.step === "rooms" || state.step === "meeting") && state.userId !== null ? state.origin : null;
+  useEffect(() => {
+    if (chatOrigin === null) return;
+    const link = chatTransport(chatOrigin, brokerRef.current);
+    if (link === null) return;
+    const feed = createChatFeed(link.transport, { renew: link.renew, event: chatHub.event, reset: chatHub.reset });
+    return () => feed.close();
+  }, [chatHub, chatOrigin]);
   useEffect(() => {
     if (presenceKey === null) return;
     void model.refreshPresence();
@@ -505,6 +536,11 @@ export function MeetingApp() {
   // server keeps the LiveKit name and the initial.
   const selfMember = state.serverPresence?.members.find((member) => member.self);
   const memberById = new Map((state.serverPresence?.members ?? []).map((member) => [member.id, member]));
+  const textRoom = state.rooms.find((room) => room.id === textRoomId && room.channel === "text");
+  const chatPerson = (id: string): ChatPerson => {
+    const member = memberById.get(id);
+    return member ? { label: member.label, avatarId: member.avatarId } : { label: "Ex-membro", avatarId: null };
+  };
   const callMembers = inCall && state.activeServerId === state.selectedServerId ? memberById : new Map<string, ServerPresenceMember>();
   const browsingAway = inCall && state.activeServerId !== null && state.activeServerId !== state.selectedServerId;
   const caption = screenCaption(localScreenSurface(media.tiles), media.screen);
@@ -758,8 +794,8 @@ export function MeetingApp() {
             >
               Salas
             </button>
-            <button type="button" aria-pressed={!mobileRooms} disabled={!inCall && !kickTarget} onClick={() => setMobileRooms(false)}>
-              {inCall ? "Voltar à chamada" : "Chamada"}
+            <button type="button" aria-pressed={!mobileRooms} disabled={!inCall && !kickTarget && !textRoom} onClick={() => setMobileRooms(false)}>
+              {textRoom ? `#${textRoom.name}` : inCall ? "Voltar à chamada" : "Chamada"}
             </button>
           </nav>
           {mobileRooms && notice ? (
@@ -847,15 +883,22 @@ export function MeetingApp() {
             <li key={room.id} className="room-row">
               <button
                 type="button"
-                className={`room-item${room.id === state.activeRoomId ? " active" : ""}`}
-                disabled={state.pending || room.ended || room.id === state.activeRoomId}
-                onClick={() =>
+                className={`room-item${room.id === state.activeRoomId || room.id === textRoom?.id ? " active" : ""}`}
+                disabled={room.channel === "text" ? false : state.pending || room.ended || room.id === state.activeRoomId}
+                aria-current={room.id === textRoom?.id ? "page" : undefined}
+                onClick={() => {
+                  if (room.channel === "text") {
+                    setTextRoomId(room.id);
+                    setMobileRooms(false);
+                    return;
+                  }
+                  setTextRoomId(null);
                   void model.enterRoom(room.id, "").then(() => {
                     if (model.snapshot().activeRoomId === room.id) setMobileRooms(false);
-                  })
-                }
+                  });
+                }}
               >
-                {room.kind === "temporary" ? <IconClock /> : <IconSpeaker />}
+                {room.channel === "text" ? <IconHash /> : room.kind === "temporary" ? <IconClock /> : <IconSpeaker />}
                 <span className="room-name">{room.name}</span>
                 {room.ended ? <span className="badge">encerrada</span> : room.kind === "temporary" ? <span className="sr">temporária</span> : null}
               </button>
@@ -917,7 +960,7 @@ export function MeetingApp() {
               className="inline-form"
               onSubmit={(event: FormEvent) => {
                 event.preventDefault();
-                void model.createRoom(roomName, roomSlug, roomKind).then(() => {
+                void model.createRoom(roomName, roomSlug, roomChannel === "text" ? "persistent" : roomKind, roomChannel).then(() => {
                   setRoomName("");
                   setRoomSlug("");
                   setCreating(null);
@@ -933,12 +976,23 @@ export function MeetingApp() {
                 <input value={roomSlug} onChange={(event) => setRoomSlug(event.currentTarget.value)} spellCheck={false} maxLength={64} />
               </label>
               <label>
-                Tipo
-                <select value={roomKind} onChange={(event) => setRoomKind(event.currentTarget.value)}>
-                  <option value="persistent">Persistente</option>
-                  <option value="temporary">Temporária</option>
+                Canal
+                <select value={roomChannel} onChange={(event) => setRoomChannel(event.currentTarget.value === "text" ? "text" : "voice")}>
+                  <option value="voice">Voz</option>
+                  <option value="text">Texto</option>
                 </select>
               </label>
+              {roomChannel === "voice" ? (
+                <label>
+                  Tipo
+                  <select value={roomKind} onChange={(event) => setRoomKind(event.currentTarget.value)}>
+                    <option value="persistent">Persistente</option>
+                    <option value="temporary">Temporária</option>
+                  </select>
+                </label>
+              ) : (
+                <p className="hint">Sala de texto guarda as mensagens e é sempre persistente.</p>
+              )}
               <div className="row">
                 <button type="submit" disabled={state.pending}>
                   Criar sala
@@ -1154,6 +1208,21 @@ export function MeetingApp() {
         {notice ? <p className="error">{notice}</p> : null}
         {invitePanel}
         {mediaError ? <p className="error">{mediaError}</p> : null}
+        {textRoom ? (
+          <TextRoom
+            model={model}
+            room={textRoom}
+            origin={state.origin}
+            userId={state.userId}
+            manager={selectedServer?.role === "owner" || selectedServer?.role === "moderator"}
+            person={chatPerson}
+            subscribe={chatHub.subscribe}
+            onClose={() => {
+              setTextRoomId(null);
+              if (!inCall) setMobileRooms(true);
+            }}
+          />
+        ) : null}
         {settingsOpen ? (
           <section className="settings-page" aria-labelledby="settings-title">
             <header>

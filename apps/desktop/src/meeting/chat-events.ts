@@ -198,3 +198,22 @@ export function createWebTransport(origin: string, fetchImpl: typeof fetch = glo
     },
   };
 }
+
+export type ChatListener = { event: (name: string, data: unknown) => void; reset: () => void };
+
+/** One feed for the session, many open views: each text room listens while it is on screen. */
+export function createChatHub(): { subscribe(listener: ChatListener): () => void; event(name: string, data: unknown): void; reset(): void } {
+  const listeners = new Set<ChatListener>();
+  return {
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    event(name, data) {
+      for (const listener of listeners) listener.event(name, data);
+    },
+    reset() {
+      for (const listener of listeners) listener.reset();
+    },
+  };
+}

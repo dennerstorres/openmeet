@@ -16,6 +16,17 @@ export {
 } from "./instance.js";
 export { IMAGE_MAX_BYTES, IMAGE_MAX_SIDE, IMAGE_TYPES, sniffImage } from "./image.js";
 export type { ImageInfo, ImageType } from "./image.js";
+export {
+  MESSAGE_MAX_CHARS,
+  canDeleteMessage,
+  canEditMessage,
+  compareMessageIds,
+  mergeMessages,
+  parseChatMessage,
+  parseChatPage,
+  sendableBody,
+} from "./chat.js";
+export type { ChatMessage, ChatPage } from "./chat.js";
 export { SOUND_MAX_BYTES, SOUND_MAX_MS, SOUND_NAME_MAX, SOUND_SAMPLE_RATE, encodeSound, parseOwnSounds, parseSoundLibrary, sniffSound } from "./sound.js";
 export type { OwnSound, SoundInfo, SoundSummary } from "./sound.js";
 export { inviteFromFragment, inviteLink, invitePageLink, isInviteCode, parseInvite } from "./invite.js";

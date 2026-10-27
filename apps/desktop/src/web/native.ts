@@ -63,3 +63,13 @@ export const fetchSound: typeof Native.fetchSound = async (origin, id) => {
   if (response.status !== 200) throw new Error("sound_not_found");
   return new Uint8Array(await response.arrayBuffer());
 };
+
+// ADR 0024: the web reads the chat stream with fetch (meeting/chat-events.ts); there is no native one.
+export const createDesktopChatTransport: typeof Native.createDesktopChatTransport = () => ({
+  open: (_lastEventId, _event, closed) => {
+    queueMicrotask(() => closed(0));
+    return () => undefined;
+  },
+});
+
+export const renewDesktopSession: typeof Native.renewDesktopSession = async () => false;

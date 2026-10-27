@@ -1,6 +1,7 @@
 import { PocInputError } from "./poc.js";
 import { inviteHost, inviteLink, parseInvite, type InviteLink } from "./invite.js";
 import { parseOwnSounds, parseSoundLibrary, type OwnSound, type SoundSummary } from "./sound.js";
+import { parseChatMessage, parseChatPage, type ChatMessage, type ChatPage } from "./chat.js";
 import {
   canonicalInstanceUrl,
   hasControlCharacter,
@@ -71,6 +72,8 @@ export interface ShellSnapshot {
   /** The system browser is open on Google and the app is waiting for the session. */
   googleWaiting: boolean;
   userLabel: string | null;
+  /** The signed-in account, to tell its own messages apart. */
+  userId: string | null;
   role: string | null;
   /** The instance admin creates servers. */
   canCreateServer: boolean;
@@ -176,6 +179,7 @@ export class MeetingModel {
   private sessionEpoch = 0;
   private readonly broker: SessionBroker;
   private userLabel: string | null = null;
+  private userId: string | null = null;
   private role: string | null = null;
   private servers: ServerSummary[] = [];
   private selectedServerId: string | null = null;
@@ -214,6 +218,7 @@ export class MeetingModel {
       googleLogin: this.googleLogin,
       googleWaiting: this.googleWaiting,
       userLabel: this.userLabel,
+      userId: this.userId,
       role,
       canCreateServer: role === "admin",
       canCreate: selected !== undefined && (selected.role === "owner" || selected.role === "moderator"),
@@ -336,7 +341,7 @@ export class MeetingModel {
     this.publish();
   }
 
-  async createRoom(name: string, slug: string, kind: string): Promise<void> {
+  async createRoom(name: string, slug: string, kind: string, channel: "voice" | "text" = "voice"): Promise<void> {
     await this.run(async (generation) => {
       const origin = this.pinned();
       const accessToken = this.accessToken;
@@ -349,11 +354,11 @@ export class MeetingModel {
         this.error = "forbidden";
         return;
       }
-      if (kind !== "persistent" && kind !== "temporary") {
+      if ((kind !== "persistent" && kind !== "temporary") || (channel === "text" && kind !== "persistent")) {
         this.error = "invalid_body";
         return;
       }
-      const result = await this.api.request(origin, "POST", `/api/v1/servers/${server.id}/rooms`, { name, slug, kind }, accessToken);
+      const result = await this.api.request(origin, "POST", `/api/v1/servers/${server.id}/rooms`, { name, slug, kind, channel }, accessToken);
       if (generation !== this.generation) return;
       if (result.status !== 201) {
         if (await this.dropIfUnauthorized(generation, result.body)) return;
@@ -650,37 +655,67 @@ export class MeetingModel {
 
   /** ADR 0021: one server library, or null when it could not be read. The call's server, not the browsed one. */
   async listSounds(serverId: string): Promise<SoundSummary[] | null> {
-    const body = await this.soundCall("GET", `/api/v1/servers/${serverId}/sounds`, null);
+    const body = await this.memberCall("GET", `/api/v1/servers/${serverId}/sounds`, null);
     return body === null ? null : parseSoundLibrary(body);
   }
 
   /** `sound` is base64 of the canonical WAV; the API judges it again. */
   async uploadSound(serverId: string, name: string, sound: string): Promise<boolean> {
-    return (await this.soundCall("POST", `/api/v1/servers/${serverId}/sounds`, { name, sound }, 201)) !== null;
+    return (await this.memberCall("POST", `/api/v1/servers/${serverId}/sounds`, { name, sound }, 201)) !== null;
   }
 
   async removeSound(serverId: string, soundId: string): Promise<boolean> {
-    return (await this.soundCall("POST", `/api/v1/servers/${serverId}/sounds/${soundId}/remove`, {})) !== null;
+    return (await this.memberCall("POST", `/api/v1/servers/${serverId}/sounds/${soundId}/remove`, {})) !== null;
   }
 
   async importSound(serverId: string, soundId: string): Promise<boolean> {
-    return (await this.soundCall("POST", `/api/v1/servers/${serverId}/sounds/${soundId}/import`, {})) !== null;
+    return (await this.memberCall("POST", `/api/v1/servers/${serverId}/sounds/${soundId}/import`, {})) !== null;
   }
 
   async listOwnSounds(): Promise<OwnSound[] | null> {
-    const body = await this.soundCall("GET", "/api/v1/sounds/mine", null);
+    const body = await this.memberCall("GET", "/api/v1/sounds/mine", null);
     return body === null ? null : parseOwnSounds(body);
   }
 
   async renameSound(soundId: string, name: string): Promise<boolean> {
-    return (await this.soundCall("POST", `/api/v1/sounds/${soundId}/rename`, { name })) !== null;
+    return (await this.memberCall("POST", `/api/v1/sounds/${soundId}/rename`, { name })) !== null;
   }
 
   async deleteSound(soundId: string): Promise<boolean> {
-    return (await this.soundCall("POST", `/api/v1/sounds/${soundId}/delete`, {})) !== null;
+    return (await this.memberCall("POST", `/api/v1/sounds/${soundId}/delete`, {})) !== null;
   }
 
-  private async soundCall(method: "GET" | "POST", path: string, body: unknown, ok = 200): Promise<unknown> {
+  // ADR 0024: text room messages. Each call answers the message (or page) or null after showing the error.
+  async listMessages(roomId: string, cursor: { before?: string; after?: string } = {}): Promise<ChatPage | null> {
+    const query = cursor.before !== undefined ? `?before=${cursor.before}` : cursor.after !== undefined ? `?after=${cursor.after}` : "";
+    const body = await this.memberCall("GET", `/api/v1/rooms/${roomId}/messages${query}`, null);
+    return body === null ? null : (parseChatPage(body) ?? null);
+  }
+
+  async sendMessage(roomId: string, body: string, replyToId?: string): Promise<ChatMessage | null> {
+    const sent = await this.memberCall("POST", `/api/v1/rooms/${roomId}/messages`, { body, replyToId }, 201);
+    return sent === null ? null : (parseChatMessage(sent) ?? null);
+  }
+
+  async editMessage(messageId: string, body: string): Promise<ChatMessage | null> {
+    const edited = await this.memberCall("POST", `/api/v1/messages/${messageId}/edit`, { body });
+    return edited === null ? null : (parseChatMessage(edited) ?? null);
+  }
+
+  async deleteMessage(messageId: string): Promise<ChatMessage | null> {
+    const removed = await this.memberCall("POST", `/api/v1/messages/${messageId}/delete`, {});
+    return removed === null ? null : (parseChatMessage(removed) ?? null);
+  }
+
+  /** Best effort: a lost typing signal is not worth an error on screen. */
+  async signalTyping(roomId: string): Promise<void> {
+    const origin = this.origin;
+    const accessToken = this.accessToken;
+    if (origin === null || accessToken === null) return;
+    await this.api.request(origin, "POST", `/api/v1/rooms/${roomId}/typing`, {}, accessToken).catch(() => undefined);
+  }
+
+  private async memberCall(method: "GET" | "POST", path: string, body: unknown, ok = 200): Promise<unknown> {
     const origin = this.origin;
     const accessToken = this.accessToken;
     if (origin === null || accessToken === null) return null;
@@ -826,6 +861,7 @@ export class MeetingModel {
     this.sessionEpoch += 1;
     this.accessToken = session.accessToken;
     this.userLabel = session.user.displayName;
+    this.userId = session.user.id;
     this.role = session.user.role;
     this.step = "rooms";
     await this.redeemPendingInvite(generation);
@@ -922,6 +958,7 @@ export class MeetingModel {
     }
     this.accessToken = null;
     this.userLabel = null;
+    this.userId = null;
     this.role = null;
     this.servers = [];
     this.selectedServerId = null;
