@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Room, Track, type AudioProcessorOptions } from "livekit-client";
+import { LocalAudioTrack, Room, Track, type AudioProcessorOptions } from "livekit-client";
 import { InputGain } from "../src/input-gain.js";
 import { LiveKitPocSession } from "../src/session.js";
 import { VOICE_EFFECTS, buildVoiceEffect, isVoiceEffect, voiceEffectsFor } from "../src/voice-effects.js";
@@ -70,6 +70,19 @@ function fakeContext() {
           (this as FakeNode).stopped = ((this as FakeNode).stopped ?? 0) + 1;
         },
       }),
+    createBufferSource: () =>
+      node("buffer", {
+        buffer: null,
+        onended: null,
+        started: 0,
+        start() {
+          (this as unknown as { started: number }).started++;
+        },
+        stop() {
+          (this as unknown as { onended: (() => void) | null }).onended?.();
+        },
+      }),
+    decodeAudioData: async (data: ArrayBuffer) => ({ length: data.byteLength }),
     createMediaStreamDestination: () =>
       node("destination", {
         stream: { getAudioTracks: () => [{ stop: () => undefined }] },
@@ -205,7 +218,8 @@ test("the monitor plays the processed voice locally and unplugs when turned off"
     const gain = new InputGain();
     gain.setMonitor(true);
     await gain.init({ kind: Track.Kind.Audio, track: {} as MediaStreamTrack, audioContext: fake.context });
-    const monitor = fake.nodes.find((node) => node.kind === "gain" && node.targets.includes(fake.destination));
+    // The sound bus also reaches the speakers; the monitor is the gain that reaches only them.
+    const monitor = fake.nodes.find((node) => node.kind === "gain" && node.targets.length === 1 && node.targets[0] === fake.destination);
     assert.ok(monitor, "monitor reaches the speakers");
     gain.setMonitor(false);
     assert.equal(monitor.targets.length, 0);
@@ -227,4 +241,157 @@ test("the session reports the effects it can run and resets them when the room d
   await Promise.resolve();
   assert.equal(session.snapshot().voiceEffect, "off");
   assert.equal(session.snapshot().voiceMonitor, false);
+});
+
+// ADR 0021: library sounds share the microphone graph. Wiring only; a real room must prove the sound.
+
+type FakeSource = FakeNode & { started: number; onended: (() => void) | null; stop(): void };
+
+test("sounds skip the voice path, cut each other, and stop with the graph", async () => {
+  const fake = fakeContext();
+  await withAudioGlobals(async () => {
+    const gain = new InputGain();
+    await assert.rejects(gain.decodeSound(new Uint8Array(4)), /microphone_unavailable/);
+    await assert.rejects(gain.playSound({} as AudioBuffer), /microphone_unavailable/);
+    assert.throws(() => gain.setSoundVolume(1.5), RangeError);
+    gain.setSoundVolume(0.4);
+    await gain.init({ kind: Track.Kind.Audio, track: {} as MediaStreamTrack, audioContext: fake.context });
+    const published = fake.nodes.find((node) => node.kind === "destination")!;
+    const gains = fake.nodes.filter((node) => node.kind === "gain") as (FakeNode & { gain: { value: number } })[];
+    const gate = gains.find((node) => node.targets.includes(published) && !node.targets.includes(fake.destination));
+    const bus = gains.find((node) => node.targets.includes(published) && node.targets.includes(fake.destination));
+    assert.ok(gate && bus, "voice gate and sound bus both reach the published track; only the bus reaches the speakers");
+    assert.equal(bus.gain.value, 0.4);
+
+    gain.setVoiceOpen(false);
+    assert.equal(gate.gain.value, 0);
+    gain.setVoiceOpen(true);
+    assert.equal(gate.gain.value, 1);
+
+    const buffer = await gain.decodeSound(new Uint8Array(10));
+    let firstEnded = false;
+    const first = gain.playSound(buffer).then(() => {
+      firstEnded = true;
+    });
+    const firstNode = fake.nodes.filter((node) => node.kind === "buffer").at(-1) as FakeSource;
+    assert.equal(firstNode.started, 1);
+    assert.ok(firstNode.targets.includes(bus));
+    assert.equal(gain.soundPlaying, true);
+    const second = gain.playSound(buffer);
+    await first;
+    assert.equal(firstEnded, true, "a new sound cuts the previous one");
+    const secondNode = fake.nodes.filter((node) => node.kind === "buffer").at(-1) as FakeSource;
+    assert.notEqual(secondNode, firstNode);
+    secondNode.onended?.();
+    await second;
+    assert.equal(gain.soundPlaying, false);
+
+    const third = gain.playSound(buffer);
+    await gain.restart({ kind: Track.Kind.Audio, track: {} as MediaStreamTrack, audioContext: fake.context });
+    await third;
+    assert.equal(gain.soundPlaying, false, "a device change leaves no sound behind");
+    assert.equal(gain.soundVolume, 0.4);
+    await gain.destroy();
+  }, fake.nodes);
+});
+
+const SOUND = "11111111-2222-4333-8444-555555555555";
+
+function soundRoom(muted: boolean) {
+  const room = new Room();
+  const calls: string[] = [];
+  const state = { muted };
+  const track = Object.create(LocalAudioTrack.prototype) as LocalAudioTrack;
+  const local = room.localParticipant as unknown as Record<string, unknown>;
+  Object.defineProperty(local, "isMicrophoneEnabled", { configurable: true, get: () => !state.muted });
+  local.getTrackPublication = (source: Track.Source) => (source === Track.Source.Microphone ? { track } : undefined);
+  local.setMicrophoneEnabled = async (enabled: boolean) => {
+    calls.push(enabled ? "enable" : "disable");
+    state.muted = !enabled;
+  };
+  track.unmute = async () => {
+    calls.push("unmute");
+    state.muted = false;
+    return track;
+  };
+  track.mute = async () => {
+    calls.push("mute");
+    state.muted = true;
+    return track;
+  };
+  return { room, track, calls, state };
+}
+
+function fakeGain(session: LiveKitPocSession, track: LocalAudioTrack) {
+  const events: string[] = [];
+  let finish: (() => void) | undefined;
+  const gain = {
+    effect: "off",
+    monitor: false,
+    soundVolume: 1,
+    decodeSound: async () => ({}) as AudioBuffer,
+    setVoiceOpen: (open: boolean) => events.push(open ? "voice-open" : "voice-closed"),
+    playSound: () =>
+      new Promise<void>((resolve) => {
+        events.push("play");
+        finish = resolve;
+      }),
+    stopSound: () => {
+      events.push("stop");
+      finish?.();
+    },
+    setMonitor: () => undefined,
+    setEffect: async () => undefined,
+  };
+  track.getProcessor = () => gain as never;
+  (session as unknown as { inputGain: unknown }).inputGain = gain;
+  return { events, end: () => finish?.() };
+}
+
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+test("a sound opens a muted microphone with the voice at zero and closes it again", async () => {
+  const { room, track, calls, state } = soundRoom(true);
+  const session = new LiveKitPocSession({ room, audioWorklet: false });
+  const { events, end } = fakeGain(session, track);
+
+  await session.playSound(SOUND, new Uint8Array(46));
+  assert.deepEqual(calls, ["unmute"]);
+  assert.deepEqual(events, ["voice-closed", "play"]);
+  assert.equal(session.snapshot().soundPlaying, SOUND);
+  end();
+  await tick();
+  assert.deepEqual(calls, ["unmute", "mute"]);
+  assert.deepEqual(events.slice(-1), ["voice-open"], "the voice comes back only after the track is muted");
+  assert.equal(state.muted, true);
+  assert.equal(session.snapshot().soundPlaying, null);
+});
+
+test("an open microphone stays open, and muting during a sound stops it", async () => {
+  const open = soundRoom(false);
+  const session = new LiveKitPocSession({ room: open.room, audioWorklet: false });
+  const fake = fakeGain(session, open.track);
+  await session.playSound(SOUND, new Uint8Array(46));
+  fake.end();
+  await tick();
+  assert.deepEqual(open.calls, [], "nothing to unmute or mute back");
+  assert.equal(fake.events.includes("voice-closed"), false);
+
+  const muted = soundRoom(true);
+  const other = new LiveKitPocSession({ room: muted.room, audioWorklet: false });
+  const held = fakeGain(other, muted.track);
+  await other.playSound(SOUND, new Uint8Array(46));
+  await other.setMicrophone(false).catch(() => undefined);
+  assert.ok(held.events.includes("stop"), "the user's mute stops the sound");
+  assert.ok(held.events.includes("voice-open"));
+  await tick();
+  assert.equal(muted.calls.includes("mute"), false, "no automatic close after the user chose");
+});
+
+test("without a processed microphone there is nothing to play into", async () => {
+  const room = new Room();
+  const local = room.localParticipant as unknown as Record<string, unknown>;
+  local.getTrackPublication = () => undefined;
+  const session = new LiveKitPocSession({ room, audioWorklet: false });
+  await assert.rejects(session.playSound(SOUND, new Uint8Array(46)), /microphone_unavailable/);
 });

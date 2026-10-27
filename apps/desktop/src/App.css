@@ -2083,3 +2083,54 @@ textarea {
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* ADR 0021: sound library panel, same surface as the settings panel. */
+.sound-panel {
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+}
+
+.sound-panel h3 {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sound-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sound-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.sound-list li > button:first-child,
+.sound-list li > span:first-child {
+  flex: 1 1 160px;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sound-list select {
+  max-width: 140px;
+}
+
+.sound-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

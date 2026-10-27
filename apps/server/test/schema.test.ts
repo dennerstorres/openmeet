@@ -60,6 +60,7 @@ test("identity migration matches the schema and rejects a second admin, duplicat
       "0006_media_cut.sql",
       "0007_server_presence.sql",
       "0008_images_profiles.sql",
+      "0009_sounds.sql",
     ]);
     assert.deepEqual(await applyMigrations(client), []);
 
@@ -155,6 +156,7 @@ test("identity migration matches the schema and rejects a second admin, duplicat
         "0006_media_cut.sql",
         "0007_server_presence.sql",
         "0008_images_profiles.sql",
+        "0009_sounds.sql",
       ],
     );
   } finally {
@@ -193,6 +195,7 @@ test("the servers migration moves existing rooms into Geral and revokes room inv
       "0006_media_cut.sql",
       "0007_server_presence.sql",
       "0008_images_profiles.sql",
+      "0009_sounds.sql",
     ]);
 
     const servers = await client.query("select id, name, created_by from servers");
@@ -253,7 +256,13 @@ test("the session family migration names every chain by its root", async () => {
     const a = await session("a", b);
     const alone = await session("alone", null);
 
-    assert.deepEqual(await applyMigrations(client), ["0005_session_family.sql", "0006_media_cut.sql", "0007_server_presence.sql", "0008_images_profiles.sql"]);
+    assert.deepEqual(await applyMigrations(client), [
+      "0005_session_family.sql",
+      "0006_media_cut.sql",
+      "0007_server_presence.sql",
+      "0008_images_profiles.sql",
+      "0009_sounds.sql",
+    ]);
     const rows = await client.query("select id, family_id from refresh_sessions");
     const family = new Map(rows.rows.map((row) => [row.id, row.family_id]));
     assert.equal(family.get(a), a);

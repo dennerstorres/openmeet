@@ -82,13 +82,14 @@ test("input gain applies levels, rebuilds on device change and releases only own
     assert.equal(levels[0]?.value, 0);
     gain.setVolume(2);
     await gain.restart(options);
-    assert.equal(levels[1]?.value, 2);
+    // Each build makes the input gain, the voice gate and the sound bus, in that order.
+    assert.equal(levels[3]?.value, 2);
     assert.equal(stopped, 1);
     await gain.destroy();
     await gain.destroy();
     assert.equal(stopped, 2);
-    // Each build unplugs the source once before wiring the (empty) effect.
-    assert.equal(disconnected, 8);
+    // Each build unplugs the source once before wiring; each teardown unplugs five nodes.
+    assert.equal(disconnected, 12);
     assert.equal(gain.processedTrack, undefined);
   } finally {
     if (original) Object.defineProperty(globalThis, "MediaStream", original);

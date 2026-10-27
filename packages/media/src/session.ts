@@ -104,6 +104,9 @@ export interface PocSnapshot {
   voiceEffects: VoiceEffect[];
   voiceEffect: VoiceEffect;
   voiceMonitor: boolean;
+  /** ADR 0021: id of the library sound playing now, and the panel volume (0–1). */
+  soundPlaying: string | null;
+  soundVolume: number;
 }
 
 type Listener = (snapshot: PocSnapshot) => void;
@@ -157,6 +160,9 @@ export class LiveKitPocSession {
   private audioPlayback = true;
   private speakers: string[] = [];
   private screenAudioRequested = false;
+  private soundId: string | null = null;
+  /** The microphone was muted and only opened for the sound; it closes again when the sound ends. */
+  private soundOpenedMic = false;
   private stats: RtcSnapshot;
   private marks: ReconnectMark[] = [];
 
@@ -202,6 +208,10 @@ export class LiveKitPocSession {
       this.speakers = [];
       // ADR 0020: every room entry starts with the plain voice.
       this.inputGain.setMonitor(false);
+      this.inputGain.stopSound();
+      this.inputGain.setVoiceOpen(true);
+      this.soundId = null;
+      this.soundOpenedMic = false;
       void this.inputGain.setEffect("off").catch(() => undefined);
       this.note("info", `disconnected: ${outcome.reason}`);
     });
@@ -298,6 +308,8 @@ export class LiveKitPocSession {
       voiceEffects: voiceEffectsFor(this.audioWorklet),
       voiceEffect: this.inputGain.effect,
       voiceMonitor: this.inputGain.monitor,
+      soundPlaying: this.soundId,
+      soundVolume: this.inputGain.soundVolume,
     };
   }
 
@@ -351,6 +363,12 @@ export class LiveKitPocSession {
   }
 
   async setMicrophone(enabled: boolean): Promise<void> {
+    // A choice made while a sound holds the microphone open wins over the automatic close.
+    if (this.soundOpenedMic) {
+      this.soundOpenedMic = false;
+      this.inputGain.setVoiceOpen(true);
+      if (!enabled) this.inputGain.stopSound();
+    }
     await this.toggle(async () => {
       const local = this.room.localParticipant;
       const existing = local.getTrackPublication(Track.Source.Microphone)?.track;
@@ -393,6 +411,49 @@ export class LiveKitPocSession {
     } finally {
       this.emit();
     }
+  }
+
+  /**
+   * ADR 0021: plays a library sound to the room through the microphone track. With the microphone muted,
+   * the track opens only for the sound, with the voice at zero, and mutes again when it ends or stops.
+   */
+  async playSound(id: string, bytes: Uint8Array): Promise<void> {
+    const local = this.room.localParticipant;
+    const track = local.getTrackPublication(Track.Source.Microphone)?.track;
+    if (!(track instanceof LocalAudioTrack) || track.getProcessor() !== this.inputGain) throw new Error("microphone_unavailable");
+    const buffer = await this.inputGain.decodeSound(bytes);
+    if (!local.isMicrophoneEnabled && !this.soundOpenedMic) {
+      this.inputGain.setVoiceOpen(false);
+      this.soundOpenedMic = true;
+      await track.unmute();
+    }
+    this.soundId = id;
+    this.note("info", "sound played");
+    const ended = this.inputGain.playSound(buffer);
+    void ended.then(() => this.afterSound(id, track));
+  }
+
+  stopSound(): void {
+    this.inputGain.stopSound();
+  }
+
+  setSoundVolume(value: number): void {
+    this.inputGain.setSoundVolume(value);
+    this.emit();
+  }
+
+  private async afterSound(id: string, track: LocalAudioTrack): Promise<void> {
+    if (this.soundId !== id) return;
+    this.soundId = null;
+    if (this.soundOpenedMic) {
+      this.soundOpenedMic = false;
+      try {
+        await track.mute();
+      } finally {
+        this.inputGain.setVoiceOpen(true);
+      }
+    }
+    this.emit();
   }
 
   setVoiceMonitor(enabled: boolean): void {

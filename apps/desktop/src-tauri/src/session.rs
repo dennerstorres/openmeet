@@ -191,6 +191,11 @@ fn allowed_call(method: &str, path: &str) -> bool {
         ("POST", ["", "api", "v1", "servers", id, "presence", "heartbeat" | "mode" | "policy"]) => is_id(id),
         ("POST", ["", "api", "v1", "servers", id, "icon" | "profile"]) => is_id(id),
         ("POST", ["", "api", "v1", "profile", "avatar"]) => true,
+        // ADR 0021: server sound libraries and the caller's own sounds. The bytes go through instance_sound.
+        ("GET" | "POST", ["", "api", "v1", "servers", id, "sounds"]) => is_id(id),
+        ("POST", ["", "api", "v1", "servers", id, "sounds", sound, "import" | "remove"]) => is_id(id) && is_id(sound),
+        ("GET", ["", "api", "v1", "sounds", "mine"]) => true,
+        ("POST", ["", "api", "v1", "sounds", sound, "rename" | "delete"]) => is_id(sound),
         _ => false,
     }
 }
@@ -289,9 +294,61 @@ pub async fn instance_image(held: tauri::State<'_, NativeSession>, origin: Strin
     Ok(tauri::ipc::Response::new(bytes.to_vec()))
 }
 
+/// ADR 0021: the canonical WAV is never larger than 20 s of 24 kHz mono 16-bit plus its header.
+const SOUND_MAX_BYTES: usize = 44 + 24_000 * 2 * 20;
+
+/// RIFF/WAVE with PCM, mono, 24 kHz, 16 bits. The page checks the whole header again before playing it.
+fn is_sound(bytes: &[u8]) -> bool {
+    bytes.len() >= 46
+        && bytes.len() <= SOUND_MAX_BYTES
+        && &bytes[0..4] == b"RIFF"
+        && &bytes[8..16] == b"WAVEfmt "
+        && bytes[20..24] == [1, 0, 1, 0]
+        && bytes[24..28] == 24_000u32.to_le_bytes()
+        && bytes[34..36] == [16, 0]
+        && &bytes[36..40] == b"data"
+}
+
+/// The bytes of one library sound, `GET /api/v1/sounds/:id` and nothing else, refused unless it is the
+/// declared and actual canonical WAV within the size cap.
+#[tauri::command]
+pub async fn instance_sound(held: tauri::State<'_, NativeSession>, origin: String, id: String) -> Result<tauri::ipc::Response, String> {
+    if !is_id(&id) {
+        return Err("invalid_path".to_string());
+    }
+    let access = held.access_for(&origin).ok_or("unauthorized")?;
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(15))
+        .build()
+        .map_err(|_| "request_failed".to_string())?;
+    let response = client
+        .get(format!("{origin}/api/v1/sounds/{id}"))
+        .bearer_auth(access)
+        .send()
+        .await
+        .map_err(|_| "request_failed".to_string())?;
+    let status = response.status().as_u16();
+    if status == 401 {
+        held.forget();
+    }
+    if status != 200 {
+        return Err(if status == 404 { "sound_not_found" } else { "request_failed" }.to_string());
+    }
+    let declared = response.headers().get("content-type").and_then(|value| value.to_str().ok()).unwrap_or_default() == "audio/wav";
+    if response.content_length().is_some_and(|length| length > SOUND_MAX_BYTES as u64) {
+        return Err("invalid_sound".to_string());
+    }
+    let bytes = response.bytes().await.map_err(|_| "request_failed".to_string())?;
+    if !declared || !is_sound(&bytes) {
+        return Err("invalid_sound".to_string());
+    }
+    Ok(tauri::ipc::Response::new(bytes.to_vec()))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{allowed_call, image_kind, parse_json, take_access, take_refresh, NativeSession, Reply, ACCESS_MARKER};
+    use super::{allowed_call, image_kind, is_sound, parse_json, take_access, take_refresh, NativeSession, Reply, ACCESS_MARKER};
     use serde_json::json;
 
     #[test]
@@ -364,6 +421,13 @@ mod tests {
             ("POST", format!("/api/v1/servers/{id}/icon")),
             ("POST", format!("/api/v1/servers/{id}/profile")),
             ("POST", "/api/v1/profile/avatar".to_string()),
+            ("GET", format!("/api/v1/servers/{id}/sounds")),
+            ("POST", format!("/api/v1/servers/{id}/sounds")),
+            ("POST", format!("/api/v1/servers/{id}/sounds/{id}/import")),
+            ("POST", format!("/api/v1/servers/{id}/sounds/{id}/remove")),
+            ("GET", "/api/v1/sounds/mine".to_string()),
+            ("POST", format!("/api/v1/sounds/{id}/rename")),
+            ("POST", format!("/api/v1/sounds/{id}/delete")),
         ] {
             assert!(allowed_call(method, &path), "{method} {path}");
         }
@@ -385,9 +449,43 @@ mod tests {
             ("POST", format!("/api/v1/servers/{id}/members/{id}/profile")),
             ("GET", format!("/api/v1/images/{id}")),
             ("POST", "/api/v1/profile".to_string()),
+            ("GET", format!("/api/v1/sounds/{id}")),
+            ("POST", format!("/api/v1/servers/{id}/sounds/{id}")),
+            ("GET", format!("/api/v1/servers/{id}/sounds/{id}/import")),
+            ("POST", format!("/api/v1/servers/{id}/sounds/not-an-id/remove")),
+            ("POST", "/api/v1/sounds/mine".to_string()),
+            ("POST", format!("/api/v1/sounds/{id}/play")),
         ] {
             assert!(!allowed_call(method, &path), "{method} {path}");
         }
+    }
+
+    #[test]
+    fn only_the_canonical_wav_passes_as_a_sound() {
+        let mut wav = Vec::new();
+        wav.extend_from_slice(b"RIFF");
+        wav.extend_from_slice(&40u32.to_le_bytes());
+        wav.extend_from_slice(b"WAVEfmt ");
+        wav.extend_from_slice(&16u32.to_le_bytes());
+        wav.extend_from_slice(&[1, 0, 1, 0]);
+        wav.extend_from_slice(&24_000u32.to_le_bytes());
+        wav.extend_from_slice(&48_000u32.to_le_bytes());
+        wav.extend_from_slice(&[2, 0, 16, 0]);
+        wav.extend_from_slice(b"data");
+        wav.extend_from_slice(&2u32.to_le_bytes());
+        wav.extend_from_slice(&[0, 0]);
+        assert!(is_sound(&wav));
+        let mut stereo = wav.clone();
+        stereo[22] = 2;
+        assert!(!is_sound(&stereo));
+        let mut fast = wav.clone();
+        fast[24..28].copy_from_slice(&48_000u32.to_le_bytes());
+        assert!(!is_sound(&fast));
+        assert!(!is_sound(&wav[..44]));
+        assert!(!is_sound(b"ID3       not a wav at all, but long enough to look at"));
+        let mut huge = wav.clone();
+        huge.resize(44 + 24_000 * 2 * 20 + 2, 0);
+        assert!(!is_sound(&huge));
     }
 
     #[test]

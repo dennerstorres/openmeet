@@ -27,7 +27,7 @@ Testes automatizados: grafo montado por efeito; troca sem novo processor; reiní
 Prova humana antes de DONE: dois PCs, cada efeito ouvido do outro lado no `.exe` e na web (Chrome, Edge, Firefox); latência percebida nos efeitos de pitch; sem eco com alto-falante; mute, troca de microfone e reconexão mantêm o efeito; áudio da tela sem efeito; CPU aceitável em 10 min com efeito ligado.
 
 ## F04-10 — biblioteca de sons do servidor
-READY em 2026-10-26 com o aceite do ADR 0021. Depende de F04-09. Grande: dividir em commits de API, ponte nativa, mídia e UI.
+READY → IN_PROGRESS → WAITING_VALIDATION em 2026-10-26, branch `task/F04-10-biblioteca-de-sons`, em três commits (API; ponte e mídia; UI). Entregue: `sound.ts` em shared (validador e codificador WAV), migration `0009_sounds.sql`, `rooms/sounds.ts` e rotas, `instance_sound` no Rust, `fetchSound` web/nativo, chamadas no `MeetingModel`, portão de voz e barramento de sons no `InputGain`, `playSound`/`stopSound`/`setSoundVolume` na sessão e `sounds.tsx` (biblioteca do servidor da chamada, envio, importar e apagar com dois cliques). Renomear existe na API e não tem tela. Durante o som com mic mutado, o próprio botão do mic aparece ligado. Grande: dividir em commits de API, ponte nativa, mídia e UI.
 
 Arquivos previstos: migration `0009` (`sound`, `server_sound`); rotas de sons no servidor com testes de permissão; leitor/validador WAV em `packages/shared`; rotas na lista fechada do Rust (F10-18) e no cliente web; `packages/media/src/sound-board.ts` (conversão para WAV 24 kHz mono, tocar/parar, ganho do painel); `input-gain.ts` com a entrada dos sons e a voz em zero para tocar mutado; painel em `MeetingApp.tsx`.
 
