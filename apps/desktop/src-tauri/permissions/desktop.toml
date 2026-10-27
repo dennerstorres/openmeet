@@ -112,3 +112,13 @@ commands.allow = ["instance_events_open"]
 identifier = "allow-instance-events-close"
 description = "Enables the instance_events_close command without any pre-configured scope."
 commands.allow = ["instance_events_close"]
+
+[[permission]]
+identifier = "allow-shell-notify"
+description = "Enables the shell_notify command without any pre-configured scope."
+commands.allow = ["shell_notify"]
+
+[[permission]]
+identifier = "allow-shell-badge"
+description = "Enables the shell_badge command without any pre-configured scope."
+commands.allow = ["shell_badge"]

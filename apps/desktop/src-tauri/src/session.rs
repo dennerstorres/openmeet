@@ -234,6 +234,10 @@ fn allowed_call(method: &str, path: &str) -> bool {
         ("POST", ["", "api", "v1", "dms", id, "messages", "search"]) => is_id(id),
         ("GET", ["", "api", "v1", "blocks"]) => true,
         ("POST", ["", "api", "v1", "users", id, "block"]) => is_id(id),
+        // ADR 0024 (F13-13): unread counts, reads and notification levels.
+        ("GET", ["", "api", "v1", "unread"]) => true,
+        ("POST", ["", "api", "v1", "notify-prefs"]) => true,
+        ("POST", ["", "api", "v1", "rooms" | "dms", id, "read"]) => is_id(id),
         // A file goes up here as base64; it comes back through instance_attachment(_save).
         ("POST", ["", "api", "v1", "rooms" | "dms", id, "attachments"]) => is_id(id),
         // ADR 0024: server emojis; the picture comes back through instance_emoji.
@@ -663,6 +667,18 @@ mod tests {
         assert!(!allowed_call("GET", &format!("/api/v1/emojis/{id}")));
         assert!(!allowed_call("POST", "/api/v1/emojis/not-an-id/delete"));
         assert!(!allowed_call("DELETE", &format!("/api/v1/servers/{id}/emojis")));
+    }
+
+    #[test]
+    fn unread_routes_are_allowed_and_nothing_around_them() {
+        let id = "0f8fad5b-d9cb-469f-a165-70867728950e";
+        assert!(allowed_call("GET", "/api/v1/unread"));
+        assert!(allowed_call("POST", "/api/v1/notify-prefs"));
+        assert!(allowed_call("POST", &format!("/api/v1/rooms/{id}/read")));
+        assert!(allowed_call("POST", &format!("/api/v1/dms/{id}/read")));
+        assert!(!allowed_call("GET", &format!("/api/v1/rooms/{id}/read")));
+        assert!(!allowed_call("POST", "/api/v1/dms/not-an-id/read"));
+        assert!(!allowed_call("POST", "/api/v1/unread"));
     }
 
     #[test]

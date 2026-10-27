@@ -1,3 +1,4 @@
+import { parseUnreadChat, parseUnreadState, type NotifyLevel, type UnreadChat, type UnreadState } from "./unread.js";
 import { PocInputError } from "./poc.js";
 import { inviteHost, inviteLink, parseInvite, type InviteLink } from "./invite.js";
 import { parseOwnSounds, parseSoundLibrary, type OwnSound, type SoundSummary } from "./sound.js";
@@ -784,6 +785,32 @@ export class MeetingModel {
     const accessToken = this.accessToken;
     if (origin === null || accessToken === null) return;
     await this.api.request(origin, "POST", `${chatPath(chat)}/typing`, {}, accessToken).catch(() => undefined);
+  }
+
+  // ADR 0024 (F13-13): reads and notification levels.
+  async listUnread(): Promise<UnreadState | null> {
+    const origin = this.origin;
+    const accessToken = this.accessToken;
+    if (origin === null || accessToken === null) return null;
+    const result = await this.api.request(origin, "GET", "/api/v1/unread", null, accessToken).catch(() => null);
+    return result?.status === 200 ? (parseUnreadState(result.body) ?? null) : null;
+  }
+
+  /** Best effort, like typing: a lost read only leaves a count that the next read clears. No id: up to the newest. */
+  async markRead(chat: ChatRef, messageId?: string): Promise<UnreadChat | null> {
+    const origin = this.origin;
+    const accessToken = this.accessToken;
+    if (origin === null || accessToken === null) return null;
+    const result = await this.api
+      .request(origin, "POST", `${chatPath(chat)}/read`, messageId === undefined ? {} : { messageId }, accessToken)
+      .catch(() => null);
+    return result?.status === 200 ? (parseUnreadChat(result.body) ?? null) : null;
+  }
+
+  /** Null clears the level, so the chat follows its server again. */
+  async setNotifyLevel(scope: "server" | ChatRef["kind"], id: string, level: NotifyLevel | null): Promise<UnreadState | null> {
+    const body = await this.memberCall("POST", "/api/v1/notify-prefs", { scope, id, level });
+    return body === null ? null : (parseUnreadState(body) ?? null);
   }
 
   // ADR 0024: DMs. Each call answers the DM (or list) or null after showing the error.

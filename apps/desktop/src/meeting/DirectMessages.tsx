@@ -1,5 +1,5 @@
 import { DM_GROUP_MAX, bumpDm, dmTitle, parseChatMessage, parseDm, upsertDm, type DmMember, type DmSummary, type MeetingModel } from "@openmeet/shared";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type { ChatListener } from "./chat-events";
 import { dmClosed, dmPeer } from "./dm-state";
 import { IconPlus, IconUserPlus, IconUsers } from "./Icons";
@@ -145,6 +145,8 @@ export function DmList(props: {
   selfId: string | null;
   origin: string | null;
   openId: string | null;
+  /** ADR 0024 (F13-13): what each conversation shows as unread. */
+  badge: (id: string) => { mentions: number; unread: boolean };
   candidates: readonly DmMember[];
   onOpen: (dm: DmSummary) => void;
 }) {
@@ -195,11 +197,12 @@ export function DmList(props: {
         {props.dms.map((dm) => {
           const peer = dmPeer(dm, props.selfId);
           const title = dmTitle(dm, props.selfId);
+          const badge = props.badge(dm.id);
           return (
             <li key={dm.id} className="room-row">
               <button
                 type="button"
-                className={`room-item${dm.id === props.openId ? " active" : ""}`}
+                className={`room-item${dm.id === props.openId ? " active" : ""}${badge.unread ? " unread" : ""}`}
                 aria-current={dm.id === props.openId ? "page" : undefined}
                 onClick={() => props.onOpen(dm)}
               >
@@ -209,6 +212,7 @@ export function DmList(props: {
                 <span className="room-name">{title}</span>
                 {dm.kind === "group" ? <span className="dm-size">{dm.members.length}</span> : null}
                 {dm.readOnly ? <span className="badge">só leitura</span> : null}
+                {badge.unread ? <span className="pill-dot" aria-label="Mensagens não lidas" /> : null}
               </button>
             </li>
           );
@@ -243,6 +247,8 @@ export function DmChat(props: {
   /** Someone who left the group still signs the messages they wrote. */
   fallback: (id: string) => ChatPerson;
   subscribe: Subscribe;
+  /** ADR 0024 (F13-13): the notification level picker, next to the other actions. */
+  notify?: ReactNode;
   onBlock: (userId: string, on: boolean) => void;
   onChanged: (dm: DmSummary) => void;
   onLeft: () => void;
@@ -397,7 +403,12 @@ export function DmChat(props: {
       members={dm.members.map((member) => ({ id: member.id, label: member.label, globalName: member.label }))}
       subscribe={props.subscribe}
       onClose={props.onClose}
-      actions={actions}
+      actions={
+        <>
+          {props.notify}
+          {actions}
+        </>
+      }
       banner={banner}
     />
   );

@@ -37,8 +37,16 @@ import {
   type ServerPresenceMember,
   type SessionBroker,
   type ShellSnapshot,
-  mentionsUser,
-  parseChatMessage,
+  chatBadge,
+  dmTitle,
+  effectiveLevel,
+  findUnread,
+  plainBody,
+  serverBadge,
+  type ChatMessage,
+  type ChatRef,
+  type NotifyLevel,
+  type UnreadState,
 } from "@openmeet/shared";
 import desktopPackage from "../../package.json";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -70,6 +78,8 @@ import {
   createDesktopChatTransport,
   isTauri,
   listenInvite,
+  browserNotifications,
+  listenOpenChat,
   listenShell,
   openGoogleLogin,
   renewDesktopSession,
@@ -87,6 +97,7 @@ import { createWebSession } from "../web/session";
 import { createChatFeed, createChatHub, createWebTransport, type ChatTransport } from "./chat-events";
 import { TextRoom, type ChatPerson } from "./TextRoom";
 import { DmChat, DmList, MemberCard, useDirectMessages } from "./DirectMessages";
+import { NotifyLevelPicker, useUnread, useWindowFocus } from "./notify";
 
 const idleSnapshot: PocSnapshot = {
   phase: "idle",
@@ -267,6 +278,34 @@ function storedAddress(): string {
   }
 }
 
+/** A room row: the mention count, or nothing (the row itself turns bold when unread). */
+function UnreadMark(props: { badge: { mentions: number; unread: boolean } }) {
+  if (props.badge.mentions === 0) return null;
+  return (
+    <span className="mention-count" aria-label={`${props.badge.mentions} menções`}>
+      {Math.min(props.badge.mentions, 99)}
+    </span>
+  );
+}
+
+/** On a server or the DM pill: the count when something calls the person, else a dot for unread. */
+function PillBadge(props: { mentions: number; unread: boolean }) {
+  if (props.mentions > 0)
+    return (
+      <span className="pill-count" aria-label={`${props.mentions} não lidas`}>
+        {props.mentions > 99 ? "99+" : props.mentions}
+      </span>
+    );
+  return props.unread ? <span className="pill-dot" aria-label="Mensagens não lidas" /> : null;
+}
+
+/** The level picker of the open room or DM; "Padrão" follows the server (rooms) or "all" (DMs). */
+function ChatLevel(props: { state: UnreadState; chat: ChatRef; label: string; onChange: (level: NotifyLevel | null) => void }) {
+  const found = findUnread(props.state, props.chat);
+  const inherited = effectiveLevel(props.state, { ...props.chat, serverId: found?.serverId ?? null, lastReadId: null, unread: 0, mentions: 0, level: null });
+  return <NotifyLevelPicker label={props.label} value={found?.level ?? null} inherited={inherited} onChange={props.onChange} />;
+}
+
 export function MeetingApp() {
   const sessionRef = useRef<LiveKitPocSession | null>(null);
   const modelRef = useRef<MeetingModel | null>(null);
@@ -282,10 +321,7 @@ export function MeetingApp() {
   const [roomChannel, setRoomChannel] = useState<"voice" | "text">("voice");
   const [textRoomId, setTextRoomId] = useState<string | null>(null);
   const [chatHub] = useState(createChatHub);
-  // ADR 0024: mentions that arrived in a room not on screen. Kept only in memory until reads land (F13-13).
-  const [mentionCounts, setMentionCounts] = useState<Record<string, number>>({});
-  const openTextRef = useRef<string | null>(null);
-  openTextRef.current = textRoomId;
+  const openNotified = useRef<(chat: ChatRef) => void>(() => undefined);
   // ADR 0024: the DM entry above the servers swaps the room list for the conversations.
   const [dmView, setDmView] = useState(false);
   const [dmOpenId, setDmOpenId] = useState<string | null>(null);
@@ -317,6 +353,7 @@ export function MeetingApp() {
   const [shell, setShell] = useState<ShellStatus | null>(null);
   const [shellPending, setShellPending] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [webNotify, setWebNotify] = useState(() => browserNotifications.enabled());
   const [serverSettingsOpen, setServerSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [nickname, setNickname] = useState("");
@@ -398,29 +435,6 @@ export function MeetingApp() {
   }, [chatHub, chatOrigin]);
   const selfId = state.userId;
   const directMessages = useDirectMessages(model, chatHub.subscribe, selfId, chatOrigin);
-  useEffect(
-    () =>
-      chatHub.subscribe({
-        event(name, data) {
-          if (name !== "message.created") return;
-          const message = parseChatMessage(data);
-          const roomId = message?.roomId;
-          if (!message || !roomId || roomId === openTextRef.current || !mentionsUser(message, selfId)) return;
-          setMentionCounts((held) => ({ ...held, [roomId]: (held[roomId] ?? 0) + 1 }));
-        },
-        reset() {},
-      }),
-    [chatHub, selfId],
-  );
-  useEffect(() => {
-    if (textRoomId === null) return;
-    setMentionCounts((held) => {
-      if (held[textRoomId] === undefined) return held;
-      const rest = { ...held };
-      delete rest[textRoomId];
-      return rest;
-    });
-  }, [textRoomId]);
   useEffect(() => {
     if (presenceKey === null) return;
     void model.refreshPresence();
@@ -520,6 +534,18 @@ export function MeetingApp() {
     };
   }, []);
   useEffect(() => {
+    let stop: (() => void) | undefined;
+    let closed = false;
+    void listenOpenChat((chat) => openNotified.current(chat)).then((unlisten) => {
+      if (closed) unlisten();
+      else stop = unlisten;
+    });
+    return () => {
+      closed = true;
+      stop?.();
+    };
+  }, []);
+  useEffect(() => {
     const live = state.step === "meeting" && publicationControlsEnabled(media.phase);
     if (!live) return;
     return holdMeetingLock();
@@ -605,6 +631,31 @@ export function MeetingApp() {
     setMobileRooms(false);
     if (__WEB__ && window.innerWidth <= 900) setMembersOpen(false);
   };
+  // ADR 0024 (F13-13): counts kept on the server; a message notifies unless its chat is the one in front.
+  const focused = useWindowFocus();
+  const openChat: ChatRef | null = textRoomId !== null ? { kind: "room", id: textRoomId } : dmOpenId !== null ? { kind: "dm", id: dmOpenId } : null;
+  const describeMessage = (message: ChatMessage) => {
+    const dm = message.dmId ? directMessages.dms.find((item) => item.id === message.dmId) : undefined;
+    const label = (id: string) => dm?.members.find((member) => member.id === id)?.label ?? memberById.get(id)?.label ?? "Alguém";
+    const room = message.roomId ? state.rooms.find((item) => item.id === message.roomId) : undefined;
+    const title = dm ? dmTitle(dm, state.userId) : room ? `#${room.name}` : message.dmId ? "Mensagem direta" : "Nova mensagem";
+    const text = plainBody(message.body, label).trim();
+    return { title, body: `${label(message.authorId)}: ${text.length > 0 ? text : "enviou um arquivo"}` };
+  };
+  const unread = useUnread({ model, subscribe: chatHub.subscribe, selfId, origin: chatOrigin, open: openChat, focused, describe: describeMessage });
+  openNotified.current = (chat) => {
+    if (chat.kind === "dm") {
+      showDm(chat.id);
+      return;
+    }
+    const serverId = findUnread(unread.state, chat)?.serverId;
+    setDmView(false);
+    setDmOpenId(null);
+    setMobileRooms(false);
+    if (serverId && serverId !== state.selectedServerId) void model.selectServer(serverId).then(() => setTextRoomId(chat.id));
+    else setTextRoomId(chat.id);
+  };
+  const dmBadge = directMessages.dms.reduce((total, dm) => total + (chatBadge(unread.state, { kind: "dm", id: dm.id }).unread ? 1 : 0), 0);
   const messageMember = (userId: string) =>
     void model.openDm([userId]).then((dm) => {
       if (dm === null) return;
@@ -886,6 +937,7 @@ export function MeetingApp() {
           onClick={() => setDmView(true)}
         >
           <IconChat size={22} />
+          <PillBadge mentions={dmBadge} unread={false} />
         </button>
         <span className="server-separator" aria-hidden="true" />
         {state.servers.map((server) => (
@@ -902,6 +954,7 @@ export function MeetingApp() {
             }}
           >
             <Face origin={state.origin} imageId={server.iconId} label={server.name} />
+            <PillBadge {...serverBadge(unread.state, server.id)} />
           </button>
         ))}
         <button
@@ -923,6 +976,7 @@ export function MeetingApp() {
             selfId={state.userId}
             origin={state.origin}
             openId={openDm?.id ?? null}
+            badge={(id) => chatBadge(unread.state, { kind: "dm", id })}
             candidates={dmCandidates}
             onOpen={(dm) => {
               directMessages.keep(dm);
@@ -972,6 +1026,17 @@ export function MeetingApp() {
                 ) : null}
               </div>
             </header>
+            {selectedServer ? (
+              <div className="room-bar-notify">
+                <span>Notificações</span>
+                <NotifyLevelPicker
+                  label={`Notificações de ${selectedServer.name}`}
+                  value={unread.state.servers[selectedServer.id] ?? "mentions"}
+                  inherited={null}
+                  onChange={(level) => void unread.setLevel("server", selectedServer.id, level)}
+                />
+              </div>
+            ) : null}
             {state.servers.length === 0 ? (
               <p className="hint">
                 {state.canCreateServer ? "Crie o primeiro servidor no botão + à esquerda." : "Você ainda não participa de nenhum servidor. Peça um convite."}
@@ -982,7 +1047,9 @@ export function MeetingApp() {
                 <li key={room.id} className="room-row">
                   <button
                     type="button"
-                    className={`room-item${room.id === state.activeRoomId || room.id === textRoom?.id ? " active" : ""}`}
+                    className={`room-item${room.id === state.activeRoomId || room.id === textRoom?.id ? " active" : ""}${
+                      room.channel === "text" && chatBadge(unread.state, { kind: "room", id: room.id }).unread ? " unread" : ""
+                    }`}
                     disabled={room.channel === "text" ? false : state.pending || room.ended || room.id === state.activeRoomId}
                     aria-current={room.id === textRoom?.id ? "page" : undefined}
                     onClick={() => {
@@ -1000,11 +1067,7 @@ export function MeetingApp() {
                   >
                     {room.channel === "text" ? <IconHash /> : room.kind === "temporary" ? <IconClock /> : <IconSpeaker />}
                     <span className="room-name">{room.name}</span>
-                    {(mentionCounts[room.id] ?? 0) > 0 ? (
-                      <span className="mention-count" aria-label={`${mentionCounts[room.id]} menções`}>
-                        {Math.min(mentionCounts[room.id] ?? 0, 99)}
-                      </span>
-                    ) : null}
+                    <UnreadMark badge={chatBadge(unread.state, { kind: "room", id: room.id })} />
                     {room.ended ? <span className="badge">encerrada</span> : room.kind === "temporary" ? <span className="sr">temporária</span> : null}
                   </button>
                   {state.canCreate ? (
@@ -1347,6 +1410,14 @@ export function MeetingApp() {
             person={chatPerson}
             members={state.serverPresence?.members ?? []}
             subscribe={chatHub.subscribe}
+            actions={
+              <ChatLevel
+                state={unread.state}
+                chat={{ kind: "room", id: textRoom.id }}
+                label={`Notificações de #${textRoom.name}`}
+                onChange={(level) => void unread.setLevel("room", textRoom.id, level)}
+              />
+            }
             onClose={() => {
               setTextRoomId(null);
               if (!inCall) setMobileRooms(true);
@@ -1362,6 +1433,14 @@ export function MeetingApp() {
             candidates={dmCandidates}
             fallback={chatPerson}
             subscribe={chatHub.subscribe}
+            notify={
+              <ChatLevel
+                state={unread.state}
+                chat={{ kind: "dm", id: openDm.id }}
+                label="Notificações desta conversa"
+                onChange={(level) => void unread.setLevel("dm", openDm.id, level)}
+              />
+            }
             onBlock={(userId, on) => void directMessages.block(userId, on)}
             onChanged={directMessages.keep}
             onLeft={() => {
@@ -1461,6 +1540,32 @@ export function MeetingApp() {
                     <p className="hint">Controle os atalhos globais usados pelo OpenMeet neste computador.</p>
                   </div>
                   {consent}
+                </>
+              ) : null}
+              {browserNotifications.supported() ? (
+                <>
+                  <div>
+                    <h2>Notificações</h2>
+                    <p className="hint">Avisos do navegador para menções e mensagens diretas quando esta aba não está na frente.</p>
+                  </div>
+                  <div className="settings-group">
+                    <label className="effect-toggle">
+                      <input
+                        type="checkbox"
+                        checked={webNotify}
+                        onChange={(event) => {
+                          if (!event.target.checked) {
+                            browserNotifications.disable();
+                            setWebNotify(false);
+                            return;
+                          }
+                          // The permission prompt only ever follows this click.
+                          void browserNotifications.enable().then(setWebNotify);
+                        }}
+                      />
+                      Mostrar notificações do navegador
+                    </label>
+                  </div>
                 </>
               ) : null}
               <div>

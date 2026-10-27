@@ -320,6 +320,7 @@ test("a block keeps the blocked one out and leaves an existing direct DM read on
 
     // A new direct DM with the blocker is refused.
     await w.db.query("delete from dm_members where dm_id = $1", [dm.id]);
+    await w.db.query("delete from chat_reads where dm_id = $1", [dm.id]);
     await w.db.query("delete from messages where dm_id = $1", [dm.id]);
     await w.db.query("delete from dm_channels where id = $1", [dm.id]);
     assert.deepEqual(await open(w, w.bia, [w.ana.id]).then((result) => result.status), 403);

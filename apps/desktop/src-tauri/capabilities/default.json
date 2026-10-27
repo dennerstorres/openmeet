@@ -25,6 +25,8 @@
     "allow-shell-set-autostart",
     "allow-shell-tracks",
     "allow-shell-show",
+    "allow-shell-notify",
+    "allow-shell-badge",
     "allow-invite-take",
     "allow-open-google-login",
     "allow-open-chat-link",
