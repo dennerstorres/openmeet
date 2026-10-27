@@ -2,7 +2,9 @@
 
 Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, `VERIFIED`, `DONE`, `BLOCKED`.
 
-F07-08 — Release 0.2.4 pelo GitHub Actions: WAITING_VALIDATION. Pedida em 2026-10-26 com F04-09 e F04-10. Tag `v0.2.4`; falta conferir a run, instalar e validar a atualização 0.2.3 → 0.2.4.
+F04-11 — Rádio da sala: READY. Pedido pelo usuário em 2026-10-26: transmitir na sala um canal de áudio do próprio PC. ADR 0022 aceito no mesmo dia; RF-26 na SPEC. Escopo em `plans/phase-04-meeting-ui.md`.
+
+F07-08 — Release 0.2.4 pelo GitHub Actions: WAITING_VALIDATION. Pedida em 2026-10-26 com F04-09 e F04-10. Run 40443440366 publicou instalador, assinatura, `latest.json` e `SHA256SUMS`. Falta instalar e validar a atualização 0.2.3 → 0.2.4.
 
 F04-10 — Biblioteca de sons do servidor: WAITING_VALIDATION. ADR 0021 aceito em 2026-10-26; implementada na branch `task/F04-10-biblioteca-de-sons`. Migration 0009, rotas com testes de permissão e de WAV falso, comando Rust `instance_sound`, mixer depois do portão de voz e painel "Sons" na chamada. Testes, typecheck, lint, `cargo test` e builds passaram; falta migration em implantação real, ouvir com dois clientes (mic aberto e mutado) e revisão independente. Escopo em `plans/phase-04-meeting-ui.md`.
 
@@ -51,6 +53,7 @@ F09-08 — Presença dos membros do servidor: WAITING_VALIDATION. Implementada e
 | F04-08 | Reuniões | Intensidade ajustável do blur de fundo | F04-06 | WAITING_VALIDATION | Claude | G4,G10 |
 | F04-09 | Reuniões | Efeitos de voz no microfone (ADR 0020) | F04-05 | WAITING_VALIDATION | Claude | G4,G10,G12 |
 | F04-10 | Reuniões | Biblioteca de sons do servidor (ADR 0021) | F04-09 | WAITING_VALIDATION | Claude | G4,G10,G12 |
+| F04-11 | Reuniões | Rádio: entrada de áudio do PC na sala (ADR 0022) | F04-09 | READY | Claude | G4,G10,G12 |
 | F05-01 | Desktop | Bandeja, atalhos, notificações, sessão | F04-04 | IMPLEMENTED | Grok | G5 |
 | F06-01 | Resiliência | Stats WebRTC/logs/reconexão/export | F05-01 | IMPLEMENTED | Grok | G6 |
 | F07-01 | Infra | Compose/TLS/TURN/backup/restauração | F06-01 | IMPLEMENTED | Grok | G7 |

@@ -30,6 +30,7 @@ Cliente desktop Windows e cliente web, servido pela própria instância, para sa
 19. Ícone do servidor, avatar da conta e, em cada servidor, apelido e avatar próprios. ADR 0019.
 20. Efeitos de voz locais no microfone, ouvidos por toda a sala. ADR 0020. Não implementado.
 21. Biblioteca de sons por servidor, enviada pelos membros e tocada para a sala pela faixa do microfone. ADR 0021. Não implementado.
+22. Rádio: uma entrada de áudio do PC escolhida pelo participante, transmitida na sala como faixa própria. ADR 0022. Não implementado.
 
 ## Out of scope — MVP
 Mensagens persistentes, federação, apps móveis, macOS/Linux, gravações, transcrição, E2EE, plugins, quadro branco, acesso remoto, múltiplos nós, bots, integrações além do login Google, captura nativa do áudio do Windows, juntar conta Google a uma conta de senha e link que entra direto numa sala.
@@ -60,6 +61,7 @@ Mensagens persistentes, federação, apps móveis, macOS/Linux, gravações, tra
 - RF-23: O dono troca o ícone do servidor. Cada membro troca só o próprio apelido e avatar naquele servidor; sem eles vale o perfil da conta. Imagem só PNG, JPEG ou WebP, validada pelo conteúdo, até 256 KB e 512 px, guardada no Postgres e lida só por quem divide um servidor com ela. ADR 0019.
 - RF-24: O usuário escolhe um efeito de voz (Robô, Rádio, Telefone, Eco, Caverna, Grave, Esquilo, Monstro) aplicado no aparelho antes de publicar o microfone. Nasce desligado em toda entrada, troca sem republicar, preserva o cancelamento de eco e não afeta o áudio da tela. "Ouvir minha voz" toca só localmente. Sem `AudioWorklet`, os efeitos de pitch somem. ADR 0020.
 - RF-25: Cada servidor tem uma biblioteca de sons que todo membro usa. O som nasce no servidor do upload e só quem subiu o importa para outro servidor de que é membro. Sem limite de quantidade; até 20 s, enviado como WAV PCM 16 bits mono 24 kHz e validado pela API. Toca um por vez para a sala, misturado no microfone, mesmo mutado. Dono e moderadores tiram sons do servidor. ADR 0021.
+- RF-26: O participante liga um rádio a partir de uma entrada de áudio do aparelho (cabo virtual, mixagem estéreo), publicada como faixa separada do microfone, sem filtros de voz e com preset de música. Aparece como card próprio; cada pessoa ajusta volume e mute só para si, e só quem ligou para ou troca a entrada. Acaba quando essa pessoa sai. Sem bot no servidor nem integração com YouTube ou Spotify. ADR 0022.
 
 ## Requisitos não funcionais
 - Segredo jamais incluído no repo, logs ou CI; TLS em produção; Argon2id com parâmetros documentados.

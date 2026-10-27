@@ -1,5 +1,9 @@
 # HISTORY — registro cronológico
 
+### 2026-10-26 — F04-11, desenho do rádio — Claude
+Branch `main`, só documentação. Pedido do usuário: bot de música na sala. Spotify (DRM, sem API de áudio) e retransmissão do YouTube (termos) ficaram fora; o usuário trocou por transmitir um canal de áudio do próprio PC. ADR 0022 proposto, item 22 e RF-26 na SPEC, F04-11 `PENDING` no PLAN e escopo/testes em `plans/phase-04-meeting-ui.md`. Faixa `screen_share_audio` com nome `openmeet-radio`, já coberta pelo grant; falta provar no LiveKit real. Nenhum código nem teste executado.
+Release 0.2.4: run 40443440366 concluída com sucesso; GitHub Release `v0.2.4` com `OpenMeet_0.2.4_x64-setup.exe`, `.sig`, `latest.json` e `SHA256SUMS`.
+
 ### 2026-10-26 — F07-08, release 0.2.4 — Claude
 Branch `main`. Versão 0.2.3 → 0.2.4 nos quatro arquivos, por pedido do usuário, com efeitos de voz (F04-09) e biblioteca de sons (F04-10). Push da `main` e tag `v0.2.4` para o workflow de release; primeira atualização N → N+1 pelo updater. A API com a migration 0009 só entra em produção quando o deploy da instância rodar.
 

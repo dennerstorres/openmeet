@@ -36,6 +36,17 @@ Escopo: listar a biblioteca do servidor, subir, renomear o próprio som, tocar, 
 Testes automatizados: WAV fora do formato, cabeçalho mentiroso, dados truncados, mais de 20 s e nome com controle/bidi recusados; não membro não lista nem baixa; importar som alheio ou para servidor sem membership dá 403; moderador tira mas não apaga de vez; apagar de vez some das duas bibliotecas; limite de upload por tempo; conversão no cliente gera WAV válido e corta acima de 20 s com erro; tocar corta o anterior; som fora do efeito e do ganho do mic; mutado desmuta, zera a voz e remuta ao fim e ao Parar; troca de dispositivo não deixa som órfão. Typecheck, lint, format:check, `cargo test`, builds desktop e web; CSP sem mudança.
 
 Prova humana antes de DONE: migration em implantação real; dois PCs no `.exe` e na web; som ouvido do outro lado com mic aberto e mutado; voz não vaza durante som mutado; indicador de mic volta ao estado anterior; importar para outro servidor e tocar lá; moderador remove; alto-falante sem eco do próprio som.
+## F04-11 — rádio da sala
+READY em 2026-10-26 com o aceite do ADR 0022. Depende de F04-09.
+
+Arquivos previstos: `packages/media/src/radio.ts` (captura sem filtros, preset de música, publicação como `screen_share_audio` com nome `openmeet-radio`), `session.ts` (ligar, trocar entrada, desligar, exclusão com áudio do PC, fim ao sair), `layout.ts` (card do rádio separado do áudio da tela), volume e mute locais por card em `playback.ts`, controles em `MeetingApp.tsx` e `Cards.tsx`; testes em `packages/media/test/`.
+
+Escopo: escolher entrada, ligar e desligar o rádio, trocar entrada com ele ligado, card "Rádio de <nome>" com volume 0–100% e mute locais, ensurdecer cala o rádio, aviso de direito autoral e de eco ao ligar, aviso quando a entrada for a mesma do microfone. Rádio e áudio do PC do compartilhamento se excluem.
+
+Testes automatizados: captura pede `deviceId` exato e desliga eco, ruído e ganho automático; publica com fonte e nome certos e preset de música; desligar despublica e para a captura; sair da sala e desconexão encerram; ligar rádio com áudio do PC ligado desliga um deles com aviso; faixa remota `openmeet-radio` vira card de rádio e não card de tela; volume e mute do card não mexem no microfone nem no áudio da tela; diagnóstico sem nome de dispositivo. Typecheck, lint, format:check, builds desktop e web; grant e CSP sem mudança.
+
+Prova humana antes de DONE: dois PCs no `.exe` e na web; VB-Audio Cable e mixagem estéreo listados; música estéreo ouvida do outro lado; volume e mute locais; sair encerra; LiveKit real aceita rádio e compartilhamento com áudio sem confundir faixas; rede ruim sem cortar a voz.
+
 ## Execução
 Consultar as tarefas `F04-*` em `PLAN.md`, seus pré-requisitos e os quality gates. Dividir implementações em pequenos commits e evidenciar testes.
 
