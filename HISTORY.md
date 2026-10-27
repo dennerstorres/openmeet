@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-26 — F04-09, desenho dos efeitos de voz — Claude
+Branch `main`, só documentação. Pedido do usuário: painel de efeitos de voz ouvidos pela sala. ADR 0020 proposto, item 20 e RF-24 na SPEC, F04-09 `PENDING` no PLAN e escopo/testes em `plans/phase-04-meeting-ui.md`. Efeito entra no mesmo processor do `InputGain`, depois do cancelamento de eco; pitch por `AudioWorklet` próprio servido por `'self'`, sem mudar CSP. Nenhum código nem teste executado. ADR 0020 aceito pelo usuário no mesmo dia; F04-09 passa a `READY`.
+
 ### 2026-10-26 — F07-07, release 0.2.3 — Claude
 Branch `main`. Repo `dennerstorres/openmeet` tornado público pelo usuário após auditoria: gitleaks v8.21.2 via Docker em 93 commits de todas as branches, sem achados; busca manual só achou valores de teste e os domínios `openmeet`/`livekit.dennerstorres.dev`. Tag `v0.2.2` falhou (run 40339165942): `dtolnay/rust-toolchain` fixado por SHA sem `toolchain`, mesmo defeito da run da 0.2.0. Workflow passa `toolchain: 1.98.1` (igual ao `rust-toolchain.toml`). Versão 0.2.2 → 0.2.3 nos quatro arquivos, porque a 0.2.2 local já foi instalada. A tag `v0.2.2` ficou sem release. Quem tem build local precisa instalar a 0.2.3 uma vez; prova N → N+1 do ADR 0018 pendente.
 Run 40339799398: instalador e assinatura gerados (SHA-256 `cc034966cf1878ca914b6709c75d570f3f09375bb580b7084371bb49a541d816`), mas o job `publish` falhou: `gh release create` sem checkout precisa de `--repo`. Release `v0.2.3` publicada à mão com os artefatos dessa run; workflow corrigido para as próximas.

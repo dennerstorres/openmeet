@@ -15,6 +15,17 @@ READY → IN_PROGRESS → WAITING_VALIDATION em 2026-10-25. Alterados `video-bac
 
 Roteiro pendente: abrir web e instalador; conferir ambos os ícones e menus por teclado; falar entre dois PCs com volume em 0/50/100/200%; trocar microfone, mutar/desmutar, sair/entrar e reconectar; verificar ausência de eco local e áudio da tela inalterado. Como admin membro do servidor, desconectar participante pela sidebar, conferir encerramento da mídia remota e novo ingresso permitido; como participante, chamada direta deve retornar 403. SFU indisponível deve mostrar erro e permitir repetir. Nada disso foi marcado PASS por mock.
 
+## F04-09 — efeitos de voz no microfone
+READY em 2026-10-26 com o aceite do ADR 0020. Depende de F04-05.
+
+Arquivos previstos: `input-gain.ts` vira cadeia de áudio (efeito → ganho) ou ganha um módulo `voice-effects.ts` chamado por ele; worklet de pitch em `packages/media/src/worklets/`; `session.ts` e `index.ts` de mídia; painel em `MeetingApp.tsx`; testes em `packages/media/test/`.
+
+Escopo: Desligado, Robô, Rádio, Telefone, Eco, Caverna, Grave, Esquilo e Monstro. Troca no mesmo processor, sem republicar. Nada salvo; nasce desligado. "Ouvir minha voz" local, com aviso de fone, desligado ao fechar o painel. Sem `AudioWorklet`, esconder os efeitos de pitch. Erro no efeito volta para voz normal com aviso.
+
+Testes automatizados: grafo montado por efeito; troca sem novo processor; reinício do grafo na troca de dispositivo mantém o efeito; destruir libera nós e worklet; ganho continua valendo com efeito; ausência de `AudioWorklet` filtra a lista; falha do worklet cai para Desligado. Typecheck, lint, format:check, build desktop e web; CSP sem mudança.
+
+Prova humana antes de DONE: dois PCs, cada efeito ouvido do outro lado no `.exe` e na web (Chrome, Edge, Firefox); latência percebida nos efeitos de pitch; sem eco com alto-falante; mute, troca de microfone e reconexão mantêm o efeito; áudio da tela sem efeito; CPU aceitável em 10 min com efeito ligado.
+
 ## Execução
 Consultar as tarefas `F04-*` em `PLAN.md`, seus pré-requisitos e os quality gates. Dividir implementações em pequenos commits e evidenciar testes.
 
