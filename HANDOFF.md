@@ -9,7 +9,10 @@
 | F13-04 SSE por conta | `task/F13-04-sse` | 92703a9 | IMPLEMENTED |
 | F13-05 ponte Rust e feed JS | `task/F13-05-ponte-sse` | da9c10f | IMPLEMENTED |
 | F13-06 tela da sala de texto | `task/F13-06-ui-texto` | 16572cd | WAITING_VALIDATION |
-| F13-07 markdown, reações, fixadas, busca | `task/F13-07-mensagens-ricas` | ver `git log` | WAITING_VALIDATION |
+| F13-07 markdown, reações, fixadas, busca | `task/F13-07-mensagens-ricas` | a53f7f3 | WAITING_VALIDATION |
+| F13-08 menções | `task/F13-08-mencoes` | ver `git log` | WAITING_VALIDATION |
+| F13-09 anexos | worktree da sessão `f13-09-anexos` | em andamento | — |
+| F13-11 DM na API | worktree da sessão `f13-11-dm-api` | em andamento | — |
 
 Cada branch sai da anterior; nada foi mergeado na `main`. Se a F13-07 ainda não estiver commitada, as mudanças dela estão no working tree da `task/F13-07-mensagens-ricas`.
 `.claude/launch.json` tem mudança do usuário que não entra em commit.

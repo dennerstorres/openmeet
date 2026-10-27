@@ -21,12 +21,19 @@ export {
   canDeleteMessage,
   canEditMessage,
   compareMessageIds,
+  mentionCandidates,
+  mentionDisplay,
+  mentionQuery,
+  mentionToken,
+  mentionWire,
+  mentionsUser,
   mergeMessages,
   parseChatMessage,
   parseChatPage,
+  plainBody,
   sendableBody,
 } from "./chat.js";
-export type { ChatMessage, ChatPage, ChatReaction } from "./chat.js";
+export type { ChatMessage, ChatPage, ChatReaction, MentionCandidate } from "./chat.js";
 export { SOUND_MAX_BYTES, SOUND_MAX_MS, SOUND_NAME_MAX, SOUND_SAMPLE_RATE, encodeSound, parseOwnSounds, parseSoundLibrary, sniffSound } from "./sound.js";
 export type { OwnSound, SoundInfo, SoundSummary } from "./sound.js";
 export { inviteFromFragment, inviteLink, invitePageLink, isInviteCode, parseInvite } from "./invite.js";

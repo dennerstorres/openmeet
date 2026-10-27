@@ -5,7 +5,9 @@ export type Inline =
   | { type: "text"; text: string }
   | { type: "bold" | "italic" | "underline" | "strike" | "spoiler"; children: Inline[] }
   | { type: "code"; text: string }
-  | { type: "link"; url: string; children: Inline[] };
+  | { type: "link"; url: string; children: Inline[] }
+  | { type: "mention"; userId: string }
+  | { type: "everyone"; name: "everyone" | "here" };
 
 export type Block = { type: "text"; children: Inline[] } | { type: "codeblock"; lang: string; text: string } | { type: "quote"; children: Block[] };
 
@@ -126,6 +128,12 @@ export function parseInline(source: string, depth: number): Inline[] {
       }
     }
     if (char === "<") {
+      const mention = /^<@([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})>/i.exec(rest);
+      if (mention) {
+        push({ type: "mention", userId: (mention[1] ?? "").toLowerCase() });
+        index += mention[0].length;
+        continue;
+      }
       const angled = /^<(https?:\/\/[^\s>]{1,2048})>/.exec(rest);
       const url = angled ? safeLink(angled[1] ?? "") : undefined;
       if (angled && url) {
@@ -140,6 +148,14 @@ export function parseInline(source: string, depth: number): Inline[] {
       if (url) {
         push({ type: "link", url, children: [{ type: "text", text: raw }] });
         index += raw.length;
+        continue;
+      }
+    }
+    if (char === "@" && (index === 0 || !/[\w@]/.test(source[index - 1] ?? ""))) {
+      const loud = /^@(everyone|here)(?!\w)/.exec(rest);
+      if (loud) {
+        push({ type: "everyone", name: loud[1] === "here" ? "here" : "everyone" });
+        index += loud[0].length;
         continue;
       }
     }

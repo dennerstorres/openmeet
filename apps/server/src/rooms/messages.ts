@@ -15,6 +15,13 @@ const AROUND_SIDE = 25;
 /** Like Discord: at most 20 different reactions on one message. */
 export const REACTIONS_PER_MESSAGE = 20;
 const MESSAGE_ID = /^[1-9][0-9]{0,17}$/;
+/** A person is mentioned as `<@user id>`; the client shows the name. */
+const MENTION = /<@([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})>/gi;
+const EVERYONE = /(^|[^\w@])@(everyone|here)(?![\w])/;
+// Code is shown as typed, so nothing inside it mentions anyone.
+const CODE = /```[\s\S]*?```|`[^`\n]*`/g;
+/** Past this many people in one message the rest stay as text. */
+export const MENTIONS_PER_MESSAGE = 20;
 // C0 controls other than tab and newline, DEL, and bidi overrides that can disguise a link.
 function hidden(value: string): boolean {
   for (let index = 0; index < value.length; index += 1) {
@@ -36,6 +43,10 @@ export interface MessageView {
   createdAt: string;
   /** Who reacted is public in the room, so the same list serves every viewer and the live events. */
   reactions: { emoji: string; userIds: string[] }[];
+  /** Members the message resolved to; a `<@id>` of anyone else stays plain text. */
+  mentions: string[];
+  /** `@everyone` or `@here` from an owner or moderator; from anyone else it is only text. */
+  mentionsEveryone: boolean;
   canEdit: boolean;
   canDelete: boolean;
 }
@@ -90,6 +101,8 @@ export async function typingRoom(db: MigrationClient, actor: PublicUser, id: str
 export function publicMessage(view: MessageView): Omit<MessageView, "canEdit" | "canDelete"> {
   return {
     reactions: view.reactions,
+    mentions: view.mentions,
+    mentionsEveryone: view.mentionsEveryone,
     id: view.id,
     roomId: view.roomId,
     authorId: view.authorId,
@@ -104,7 +117,8 @@ export function publicMessage(view: MessageView): Omit<MessageView, "canEdit" | 
 
 const SELECT = `
   select m.id::text as id, m.room_id, m.author_id, m.body, m.pinned_at is not null as pinned, m.edited_at is not null as edited,
-         m.deleted_at is not null as deleted, m.created_at,
+         m.deleted_at is not null as deleted, m.created_at, m.mentions_everyone,
+         array(select x.user_id::text from message_mentions x where x.message_id = m.id order by x.user_id) as mentions,
          r.id::text as reply_id, r.author_id as reply_author, left(r.body, ${REPLY_PREVIEW_CHARS}) as reply_body, r.deleted_at is not null as reply_deleted,
          coalesce((
            select json_agg(json_build_object('emoji', x.emoji, 'userIds', x.users) order by x.first, x.emoji)
@@ -140,6 +154,8 @@ function readMessage(row: Record<string, unknown>, actor: PublicUser, chat: Chat
     deleted,
     createdAt: new Date(String(row.created_at)).toISOString(),
     reactions: readReactions(row.reactions),
+    mentions: deleted || !Array.isArray(row.mentions) ? [] : row.mentions.filter((user): user is string => typeof user === "string"),
+    mentionsEveryone: !deleted && row.mentions_everyone === true,
     canEdit: mine && !deleted,
     canDelete: !deleted && (mine || chat.moderator),
   };
@@ -210,6 +226,33 @@ async function readOne(db: MigrationClient, actor: PublicUser, chat: Chat, id: s
   return readMessage(row, actor, chat);
 }
 
+interface Mentions {
+  users: string[];
+  everyone: boolean;
+}
+
+/** Who the text names among the room's members, and whether it may call everyone. */
+export async function resolveMentions(db: MigrationClient, chat: Chat, body: string): Promise<Mentions> {
+  const prose = body.replace(CODE, " ");
+  const named = [...new Set([...prose.matchAll(MENTION)].map((match) => (match[1] ?? "").toLowerCase()))].slice(0, MENTIONS_PER_MESSAGE);
+  const everyone = chat.moderator && EVERYONE.test(prose);
+  if (named.length === 0) return { users: [], everyone };
+  const found = await db.query(
+    `select m.user_id::text as id
+     from server_members m join users u on u.id = m.user_id
+     where m.server_id = $1 and m.removed_at is null and u.disabled_at is null and m.user_id = any($2::uuid[])`,
+    [chat.room.serverId, named],
+  );
+  return { users: found.rows.map((row) => text(row.id) ?? "").filter((user) => user !== ""), everyone };
+}
+
+async function saveMentions(db: MigrationClient, id: string, mentions: Mentions): Promise<void> {
+  await db.query("delete from message_mentions where message_id = $1::bigint", [id]);
+  if (mentions.users.length > 0) {
+    await db.query("insert into message_mentions (message_id, user_id) select $1::bigint, unnest($2::uuid[]) on conflict do nothing", [id, mentions.users]);
+  }
+}
+
 export async function sendMessage(
   db: MigrationClient,
   actor: PublicUser,
@@ -224,14 +267,17 @@ export async function sendMessage(
     const target = await db.query("select 1 from messages where id = $1::bigint and room_id = $2", [replyTo, chat.room.id]);
     if (!target.rows[0]) throw new RoomError("message_not_found");
   }
-  const inserted = await db.query("insert into messages (room_id, author_id, body, reply_to_id) values ($1, $2, $3, $4::bigint) returning id::text as id", [
-    chat.room.id,
-    actor.id,
-    body,
-    replyTo ?? null,
-  ]);
-  const created = text(inserted.rows[0]?.id);
-  if (!created) throw new RoomError("conflict");
+  const mentions = await resolveMentions(db, chat, body);
+  const created = await db.transaction(async (tx) => {
+    const inserted = await tx.query(
+      "insert into messages (room_id, author_id, body, reply_to_id, mentions_everyone) values ($1, $2, $3, $4::bigint, $5) returning id::text as id",
+      [chat.room.id, actor.id, body, replyTo ?? null, mentions.everyone],
+    );
+    const id = text(inserted.rows[0]?.id);
+    if (!id) throw new RoomError("conflict");
+    await saveMentions(tx, id, mentions);
+    return id;
+  });
   return readOne(db, actor, chat, created);
 }
 
@@ -257,7 +303,15 @@ export async function editMessage(db: MigrationClient, actor: PublicUser, id: st
   if (deleted) throw new RoomError("message_not_found");
   if (authorId !== actor.id) throw new RoomError("forbidden");
   if (chat.room.ended) throw new RoomError("room_ended");
-  await db.query("update messages set body = $2, edited_at = now() where id = $1::bigint and deleted_at is null", [id, body]);
+  const mentions = await resolveMentions(db, chat, body);
+  await db.transaction(async (tx) => {
+    await tx.query("update messages set body = $2, mentions_everyone = $3, edited_at = now() where id = $1::bigint and deleted_at is null", [
+      id,
+      body,
+      mentions.everyone,
+    ]);
+    await saveMentions(tx, id, mentions);
+  });
   return readOne(db, actor, chat, id);
 }
 

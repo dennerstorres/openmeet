@@ -1,6 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canDeleteMessage, canEditMessage, mergeMessages, parseChatMessage, parseChatPage, sendableBody, type ChatMessage } from "../src/chat.js";
+import {
+  canDeleteMessage,
+  canEditMessage,
+  mentionCandidates,
+  mentionDisplay,
+  mentionQuery,
+  mentionWire,
+  mentionsUser,
+  mergeMessages,
+  parseChatMessage,
+  parseChatPage,
+  plainBody,
+  sendableBody,
+  type ChatMessage,
+} from "../src/chat.js";
 import { prepareInstanceRequest } from "../src/instance.js";
 
 const roomId = "11111111-1111-4111-8111-111111111111";
@@ -19,6 +33,8 @@ function message(id: string, body = `m${id}`, extra: Partial<ChatMessage> = {}):
     deleted: false,
     createdAt: "2026-10-27T12:00:00.000Z",
     reactions: [],
+    mentions: [],
+    mentionsEveryone: false,
     ...extra,
   };
 }
@@ -111,4 +127,49 @@ test("the message routes pass the instance path check, with only the cursor as q
   ]) {
     assert.throws(() => prepareInstanceRequest(origin, origin, "GET", path, undefined, null));
   }
+});
+
+test("mentions show as names and travel as tokens", () => {
+  const label = (id: string) => (id === bia ? "Bia Souza" : "Ana");
+  const body = `oi <@${bia}>, viu <@${ana}>?`;
+  assert.equal(plainBody(body, label), "oi @Bia Souza, viu @Ana?");
+  const shown = mentionDisplay(body, label);
+  assert.equal(shown.text, "oi @Bia Souza, viu @Ana?");
+  assert.equal(mentionWire(shown.text, shown.picks), body);
+  assert.equal(mentionWire("mail@Ana e @Anabela e @Ana.", { "@Ana": ana }), `mail@Ana e @Anabela e <@${ana}>.`);
+  assert.deepEqual(mentionQuery("fala @bi", 8), { start: 5, query: "bi" });
+  assert.equal(mentionQuery("mail@bi", 7), undefined);
+  assert.equal(mentionQuery("@bia souza", 10), undefined);
+});
+
+test("candidates match a word of the name and keep @everyone for managers", () => {
+  const members = [
+    { id: ana, label: "Ana", globalName: "Ana" },
+    { id: bia, label: "Bia Souza", globalName: "Beatriz" },
+  ];
+  assert.deepEqual(
+    mentionCandidates(members, "sou", false).map((item) => item.id),
+    [bia],
+  );
+  assert.deepEqual(
+    mentionCandidates(members, "be", false).map((item) => item.id),
+    [bia],
+  );
+  assert.deepEqual(
+    mentionCandidates(members, "e", false).map((item) => item.id),
+    [],
+  );
+  assert.deepEqual(
+    mentionCandidates(members, "e", true).map((item) => item.id),
+    ["everyone"],
+  );
+  assert.equal(mentionCandidates(members, "", true).length, 4);
+});
+
+test("a message calls whoever it names, never its author", () => {
+  assert.equal(mentionsUser(message("1", "x", { mentions: [bia] }), bia), true);
+  assert.equal(mentionsUser(message("1", "x", { mentionsEveryone: true }), bia), true);
+  assert.equal(mentionsUser(message("1", "x", { mentionsEveryone: true }), ana), false);
+  assert.equal(mentionsUser(message("1", "x", { mentions: [ana] }), bia), false);
+  assert.deepEqual(parseChatMessage({ ...message("1"), mentions: ["nope"] }), undefined);
 });

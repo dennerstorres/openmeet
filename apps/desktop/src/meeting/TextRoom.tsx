@@ -2,9 +2,16 @@ import {
   MESSAGE_MAX_CHARS,
   canDeleteMessage,
   canEditMessage,
+  mentionCandidates,
+  mentionDisplay,
+  mentionQuery,
+  mentionWire,
+  mentionsUser,
   mergeMessages,
   parseChatMessage,
+  plainBody,
   sendableBody,
+  type MentionCandidate,
   type ChatMessage,
   type MeetingModel,
   type RoomSummary,
@@ -45,6 +52,8 @@ interface Props {
   userId: string | null;
   manager: boolean;
   person: (id: string) => ChatPerson;
+  /** Who `@` can name: the members of the room's server. */
+  members: readonly { id: string; label: string; globalName: string }[];
   subscribe: (listener: ChatListener) => () => void;
   onClose: () => void;
 }
@@ -64,13 +73,16 @@ function typingLine(names: string[]): string {
   return "Várias pessoas estão digitando…";
 }
 
-export function TextRoom({ model, room, origin, userId, manager, person, subscribe, onClose }: Props) {
+export function TextRoom({ model, room, origin, userId, manager, person, members, subscribe, onClose }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
-  const [editing, setEditing] = useState<{ id: string; body: string } | null>(null);
+  const [editing, setEditing] = useState<{ id: string; body: string; picks: Record<string, string> } | null>(null);
+  // The composer shows `@name`; picks says which id each chosen name stands for when it is sent.
+  const [picks, setPicks] = useState<Record<string, string>>({});
+  const [suggest, setSuggest] = useState<{ start: number; end: number; items: MentionCandidate[]; index: number } | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [typing, setTyping] = useState<Record<string, number>>({});
@@ -272,7 +284,7 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
   }
 
   async function send(): Promise<void> {
-    const body = sendableBody(draft);
+    const body = sendableBody(mentionWire(draft, picks));
     if (body === undefined || sending) return;
     setSending(true);
     const sent = await model.sendMessage(room.id, body, replyTo?.id);
@@ -281,13 +293,15 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
     stickRef.current = true;
     apply([sent]);
     setDraft("");
+    setPicks({});
+    setSuggest(null);
     setReplyTo(null);
     composerRef.current?.focus();
   }
 
   async function saveEdit(): Promise<void> {
     if (!editing) return;
-    const body = sendableBody(editing.body);
+    const body = sendableBody(mentionWire(editing.body, editing.picks));
     if (body === undefined) return;
     const edited = await model.editMessage(editing.id, body);
     if (edited === null) return;
@@ -301,7 +315,44 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
     if (removed !== null) apply([removed]);
   }
 
+  const label = (id: string) => person(id).label;
+
+  function startEdit(message: ChatMessage): void {
+    const shown = mentionDisplay(message.body, label);
+    setEditing({ id: message.id, body: shown.text, picks: shown.picks });
+  }
+
+  function choose(item: MentionCandidate): void {
+    if (!suggest) return;
+    const name = `@${item.label}`;
+    const next = `${draft.slice(0, suggest.start)}${name} ${draft.slice(suggest.end)}`;
+    if (item.id !== "everyone" && item.id !== "here") setPicks((held) => ({ ...held, [name]: item.id }));
+    setDraft(next);
+    setSuggest(null);
+    const caret = suggest.start + name.length + 1;
+    requestAnimationFrame(() => composerRef.current?.setSelectionRange(caret, caret));
+  }
+
   function onComposerKey(event: KeyboardEvent<HTMLTextAreaElement>): void {
+    if (suggest && suggest.items.length > 0) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const step = event.key === "ArrowDown" ? 1 : -1;
+        setSuggest({ ...suggest, index: (suggest.index + step + suggest.items.length) % suggest.items.length });
+        return;
+      }
+      if ((event.key === "Enter" || event.key === "Tab") && !event.shiftKey && !event.nativeEvent.isComposing) {
+        event.preventDefault();
+        const item = suggest.items[suggest.index];
+        if (item) choose(item);
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setSuggest(null);
+        return;
+      }
+    }
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       void send();
@@ -311,13 +362,16 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
       const own = [...messages].reverse().find((message) => canEditMessage(message, userId));
       if (own) {
         event.preventDefault();
-        setEditing({ id: own.id, body: own.body });
+        startEdit(own);
       }
     }
   }
 
-  function onDraft(value: string): void {
+  function onDraft(value: string, caret: number): void {
     setDraft(value);
+    const typed = mentionQuery(value, caret);
+    const items = typed ? mentionCandidates(members, typed.query, manager) : [];
+    setSuggest(typed && items.length > 0 ? { start: typed.start, end: caret, items, index: 0 } : null);
     const now = Date.now();
     if (value.trim() !== "" && now - typedAt.current > TYPING_SEND_MS) {
       typedAt.current = now;
@@ -422,13 +476,13 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
               <li
                 key={message.id}
                 data-message={message.id}
-                className={`message${grouped ? " grouped" : ""}${message.deleted ? " removed" : ""}${highlight === message.id ? " highlight" : ""}`}
+                className={`message${grouped ? " grouped" : ""}${message.deleted ? " removed" : ""}${highlight === message.id ? " highlight" : ""}${mentionsUser(message, userId) ? " mentioned" : ""}`}
               >
                 {message.replyTo ? (
                   <button type="button" className="message-reply" onClick={() => void jumpTo(message.replyTo?.id ?? message.id)}>
                     <IconReply size={14} />
                     <strong>{person(message.replyTo.authorId).label}</strong>
-                    <span>{message.replyTo.deleted ? "mensagem removida" : message.replyTo.body}</span>
+                    <span>{message.replyTo.deleted ? "mensagem removida" : plainBody(message.replyTo.body, label)}</span>
                   </button>
                 ) : null}
                 {grouped ? null : (
@@ -460,7 +514,7 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
                         value={editing.body}
                         autoFocus
                         aria-label="Editar mensagem"
-                        onChange={(event) => setEditing({ id: message.id, body: event.currentTarget.value })}
+                        onChange={(event) => setEditing({ ...editing, body: event.currentTarget.value })}
                         onKeyDown={(event) => {
                           if (event.key === "Escape") setEditing(null);
                           if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -473,7 +527,11 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
                     </form>
                   ) : (
                     <div className="message-body">
-                      <Markdown source={message.body} onLink={setPendingLink} />
+                      <Markdown
+                        source={message.body}
+                        onLink={setPendingLink}
+                        mentions={{ users: message.mentions, everyone: message.mentionsEveryone, self: userId, label }}
+                      />
                       {message.edited ? <span className="message-edited"> (editada)</span> : null}
                     </div>
                   )}
@@ -561,13 +619,7 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
                       </button>
                     ) : null}
                     {canEditMessage(message, userId) ? (
-                      <button
-                        type="button"
-                        className="icon-btn"
-                        aria-label="Editar"
-                        title="Editar"
-                        onClick={() => setEditing({ id: message.id, body: message.body })}
-                      >
+                      <button type="button" className="icon-btn" aria-label="Editar" title="Editar" onClick={() => startEdit(message)}>
                         <IconPencil size={16} />
                       </button>
                     ) : null}
@@ -595,7 +647,7 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
                   <li key={message.id}>
                     <button type="button" className="chat-hit" onClick={() => void jumpTo(message.id)}>
                       <strong>{person(message.authorId).label}</strong>
-                      <span>{message.body}</span>
+                      <span>{plainBody(message.body, label)}</span>
                     </button>
                   </li>
                 ))}
@@ -629,7 +681,7 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
                     <button type="button" className="chat-hit" onClick={() => void jumpTo(message.id)}>
                       <strong>{person(message.authorId).label}</strong>
                       <time dateTime={message.createdAt}>{stamp(message.createdAt)}</time>
-                      <span>{message.body}</span>
+                      <span>{plainBody(message.body, label)}</span>
                     </button>
                   </li>
                 ))}
@@ -671,13 +723,34 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
               </button>
             </p>
           ) : null}
+          {suggest ? (
+            <ul className="mention-list" role="listbox" aria-label="Mencionar">
+              {suggest.items.map((item, index) => (
+                <li key={item.id} role="option" aria-selected={index === suggest.index}>
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    className={index === suggest.index ? "active" : undefined}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      choose(item);
+                    }}
+                  >
+                    <strong>@{item.label}</strong>
+                    {item.detail ? <span>{item.detail}</span> : null}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <textarea
             ref={composerRef}
             value={draft}
             rows={1}
             placeholder={`Conversar em #${room.name}`}
             aria-label={`Mensagem para #${room.name}`}
-            onChange={(event) => onDraft(event.currentTarget.value)}
+            onChange={(event) => onDraft(event.currentTarget.value, event.currentTarget.selectionStart)}
+            onBlur={() => setSuggest(null)}
             onKeyDown={onComposerKey}
           />
           {remaining < 200 ? <span className={`composer-count${remaining < 0 ? " over" : ""}`}>{remaining}</span> : null}

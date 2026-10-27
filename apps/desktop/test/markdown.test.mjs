@@ -58,3 +58,15 @@ test("deep nesting stops parsing instead of recursing without end", () => {
   const deep = "**".repeat(40) + "x" + "**".repeat(40);
   assert.doesNotThrow(() => parseInline(deep, 0));
 });
+
+test("mentions parse outside code, @everyone only at a word edge", () => {
+  const id = "22222222-2222-4222-8222-222222222222";
+  assert.deepEqual(parseInline(`oi <@${id.toUpperCase()}>!`, 0), [t("oi "), { type: "mention", userId: id }, t("!")]);
+  assert.deepEqual(parseInline("`<@x>` @here e a@everyone.com", 0), [
+    { type: "code", text: "<@x>" },
+    t(" "),
+    { type: "everyone", name: "here" },
+    t(" e a@everyone.com"),
+  ]);
+  assert.deepEqual(parseInline("@everyoneX", 0), [t("@everyoneX")]);
+});

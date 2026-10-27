@@ -37,6 +37,8 @@ import {
   type ServerPresenceMember,
   type SessionBroker,
   type ShellSnapshot,
+  mentionsUser,
+  parseChatMessage,
 } from "@openmeet/shared";
 import desktopPackage from "../../package.json";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -268,6 +270,10 @@ export function MeetingApp() {
   const [roomChannel, setRoomChannel] = useState<"voice" | "text">("voice");
   const [textRoomId, setTextRoomId] = useState<string | null>(null);
   const [chatHub] = useState(createChatHub);
+  // ADR 0024: mentions that arrived in a room not on screen. Kept only in memory until reads land (F13-13).
+  const [mentionCounts, setMentionCounts] = useState<Record<string, number>>({});
+  const openTextRef = useRef<string | null>(null);
+  openTextRef.current = textRoomId;
   const brokerRef = useRef<SessionBroker | undefined>(undefined);
   const [serverName, setServerName] = useState("");
   const [pastedInvite, setPastedInvite] = useState("");
@@ -374,6 +380,29 @@ export function MeetingApp() {
     const feed = createChatFeed(link.transport, { renew: link.renew, event: chatHub.event, reset: chatHub.reset });
     return () => feed.close();
   }, [chatHub, chatOrigin]);
+  const selfId = state.userId;
+  useEffect(
+    () =>
+      chatHub.subscribe({
+        event(name, data) {
+          if (name !== "message.created") return;
+          const message = parseChatMessage(data);
+          if (!message || message.roomId === openTextRef.current || !mentionsUser(message, selfId)) return;
+          setMentionCounts((held) => ({ ...held, [message.roomId]: (held[message.roomId] ?? 0) + 1 }));
+        },
+        reset() {},
+      }),
+    [chatHub, selfId],
+  );
+  useEffect(() => {
+    if (textRoomId === null) return;
+    setMentionCounts((held) => {
+      if (held[textRoomId] === undefined) return held;
+      const rest = { ...held };
+      delete rest[textRoomId];
+      return rest;
+    });
+  }, [textRoomId]);
   useEffect(() => {
     if (presenceKey === null) return;
     void model.refreshPresence();
@@ -900,6 +929,11 @@ export function MeetingApp() {
               >
                 {room.channel === "text" ? <IconHash /> : room.kind === "temporary" ? <IconClock /> : <IconSpeaker />}
                 <span className="room-name">{room.name}</span>
+                {(mentionCounts[room.id] ?? 0) > 0 ? (
+                  <span className="mention-count" aria-label={`${mentionCounts[room.id]} menções`}>
+                    {Math.min(mentionCounts[room.id] ?? 0, 99)}
+                  </span>
+                ) : null}
                 {room.ended ? <span className="badge">encerrada</span> : room.kind === "temporary" ? <span className="sr">temporária</span> : null}
               </button>
               {state.canCreate ? (
@@ -1216,6 +1250,7 @@ export function MeetingApp() {
             userId={state.userId}
             manager={selectedServer?.role === "owner" || selectedServer?.role === "moderator"}
             person={chatPerson}
+            members={state.serverPresence?.members ?? []}
             subscribe={chatHub.subscribe}
             onClose={() => {
               setTextRoomId(null);

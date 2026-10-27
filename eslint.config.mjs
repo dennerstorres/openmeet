@@ -9,7 +9,7 @@ const typeScriptAndJavaScript = [js.configs.recommended, tseslint.configs.recomm
 
 export default defineConfig(
   {
-    ignores: ["**/dist/**", "**/dist-web/**", "**/node_modules/**", "**/src-tauri/**", "coverage/**"],
+    ignores: ["**/dist/**", "**/dist-web/**", "**/node_modules/**", "**/src-tauri/**", "coverage/**", ".claude/**"],
   },
   {
     files: ["apps/desktop/src/**/*.{ts,tsx}"],

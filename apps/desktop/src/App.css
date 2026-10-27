@@ -2672,3 +2672,73 @@ button.message-reply:hover span {
     background: transparent;
   }
 }
+
+/* ADR 0024: mentions. */
+.md-mention {
+  padding: 0 2px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.md-mention.self {
+  background: color-mix(in srgb, var(--warn) 22%, transparent);
+  color: inherit;
+}
+
+.message.mentioned {
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+  box-shadow: inset 2px 0 0 var(--warn);
+}
+
+.mention-list {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  margin: 0 0 6px;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
+}
+
+.mention-list button {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.mention-list button.active,
+.mention-list button:hover {
+  background: var(--bg-active);
+}
+
+.mention-list span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.mention-count {
+  min-width: 18px;
+  margin-left: auto;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}

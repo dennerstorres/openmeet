@@ -381,3 +381,39 @@ test("around brings the message between its neighbours, without gaps, to jump to
     await w.app.close();
   }
 });
+
+test("mentions resolve only members, @everyone only from owners and moderators", async () => {
+  const w = await world();
+  try {
+    const ids = await w.db.query("select id::text as id, username from users where username in ('mod', 'fora')");
+    const idOf = (name: string) => String(ids.rows.find((row) => row.username === name)?.id);
+    const mod = idOf("mod");
+    const outsider = idOf("fora");
+    type Mentioned = Message & { mentions: string[]; mentionsEveryone: boolean };
+
+    const named = (await send(w, w.member, `oi <@${mod}> e <@${outsider}> e <@${mod.toUpperCase()}> \`<@${w.memberId}>\``)).json() as Mentioned;
+    assert.deepEqual(named.mentions, [mod]);
+    assert.equal(named.mentionsEveryone, false);
+
+    const loud = (await send(w, w.member, "@everyone olhem")).json() as Mentioned;
+    assert.equal(loud.mentionsEveryone, false);
+    const here = (await send(w, w.moderator, "pessoal @here")).json() as Mentioned;
+    assert.equal(here.mentionsEveryone, true);
+    const mail = (await send(w, w.owner, "fulano@everyone.com e `@everyone`")).json() as Mentioned;
+    assert.equal(mail.mentionsEveryone, false);
+
+    const edited = (await act(w, w.member, named.id, "edit", { body: `agora <@${w.memberId}>` })).json() as Mentioned;
+    assert.deepEqual(edited.mentions, [w.memberId]);
+    const stored = await w.db.query("select user_id::text as id from message_mentions where message_id = $1::bigint", [named.id]);
+    assert.deepEqual(
+      stored.rows.map((row) => row.id),
+      [w.memberId],
+    );
+
+    const removed = (await act(w, w.moderator, here.id, "delete")).json() as Mentioned;
+    assert.equal(removed.mentionsEveryone, false);
+    assert.deepEqual(removed.mentions, []);
+  } finally {
+    await w.app.close();
+  }
+});
