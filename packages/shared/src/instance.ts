@@ -324,7 +324,8 @@ function instancePath(path: string): string {
     path === "/api/v1/invites/accept" ||
     path === "/api/v1/auth/google/start" ||
     path === "/api/v1/auth/google/poll" ||
-    path === "/api/v1/profile/avatar"
+    path === "/api/v1/profile/avatar" ||
+    path === "/api/v1/sounds/mine"
   ) {
     return path;
   }
@@ -336,6 +337,11 @@ function instancePath(path: string): string {
   if (serverRooms?.[1] !== undefined && UUID.test(serverRooms[1])) return path;
   const serverPresenceAction = /^\/api\/v1\/servers\/([0-9a-f-]{36})\/presence\/(?:heartbeat|mode|policy)$/i.exec(path);
   if (serverPresenceAction?.[1] !== undefined && UUID.test(serverPresenceAction[1])) return path;
+  // ADR 0021: a server library, one sound in it, and the caller's own sound.
+  const library = /^\/api\/v1\/servers\/([0-9a-f-]{36})\/sounds(?:\/([0-9a-f-]{36})\/(?:import|remove))?$/i.exec(path);
+  if (library?.[1] !== undefined && UUID.test(library[1]) && (library[2] === undefined || UUID.test(library[2]))) return path;
+  const sound = /^\/api\/v1\/sounds\/([0-9a-f-]{36})(?:\/(?:rename|delete))?$/i.exec(path);
+  if (sound?.[1] !== undefined && UUID.test(sound[1])) return path;
   const image = /^\/api\/v1\/images\/([0-9a-f-]{36})$/i.exec(path);
   if (image?.[1] !== undefined && UUID.test(image[1])) return path;
   throw new PocInputError("invalid_api_base", "Request path is not part of the instance API");

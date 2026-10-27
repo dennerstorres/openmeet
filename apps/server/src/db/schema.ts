@@ -227,6 +227,47 @@ export const images = pgTable(
   ],
 );
 
+// ADR 0021. A sound belongs to its uploader; server_sounds lists it in each library that holds it.
+export const sounds = pgTable(
+  "sounds",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references((): AnyPgColumn => users.id),
+    name: text("name").notNull(),
+    bytes: bytea("bytes").notNull(),
+    byteSize: integer("byte_size").notNull(),
+    durationMs: integer("duration_ms").notNull(),
+    sha256: text("sha256").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("sounds_owner").on(table.ownerId),
+    check("sounds_name_safe", sql`openmeet_is_label(${table.name}) and char_length(${table.name}) <= 32`),
+    check("sounds_byte_size", sql`${table.byteSize} between 46 and 960044 and ${table.byteSize} = octet_length(${table.bytes})`),
+    check("sounds_duration", sql`${table.durationMs} between 1 and 20000`),
+    check("sounds_sha256", sql`${table.sha256} ~ '^[0-9a-f]{64}$'`),
+  ],
+);
+
+export const serverSounds = pgTable(
+  "server_sounds",
+  {
+    serverId: uuid("server_id")
+      .notNull()
+      .references((): AnyPgColumn => servers.id, { onDelete: "cascade" }),
+    soundId: uuid("sound_id")
+      .notNull()
+      .references((): AnyPgColumn => sounds.id, { onDelete: "cascade" }),
+    addedBy: uuid("added_by")
+      .notNull()
+      .references((): AnyPgColumn => users.id),
+    addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.serverId, table.soundId] }), index("server_sounds_sound").on(table.soundId)],
+);
+
 export const auditEvents = pgTable(
   "audit_events",
   {
@@ -319,6 +360,8 @@ export const identityTables = [
   serverInvites,
   rooms,
   images,
+  sounds,
+  serverSounds,
   memberships,
   invites,
   auditEvents,

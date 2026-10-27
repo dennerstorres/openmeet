@@ -27,7 +27,9 @@ export type RoomErrorCode =
   | "presence_unavailable"
   | "user_not_found"
   | "invalid_image"
-  | "image_not_found";
+  | "image_not_found"
+  | "invalid_sound"
+  | "sound_not_found";
 
 export class RoomError extends Error {
   readonly code: RoomErrorCode;
@@ -103,7 +105,7 @@ function isTrue(value: unknown): boolean {
   return value === true || value === "t" || value === "true" || value === 1;
 }
 
-function text(value: unknown): string | undefined {
+export function text(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
@@ -127,7 +129,7 @@ function parseName(value: string): string {
   return name;
 }
 
-async function audit(db: MigrationClient, actorId: string, action: string, targetType: string, targetId: string): Promise<void> {
+export async function audit(db: MigrationClient, actorId: string, action: string, targetType: string, targetId: string): Promise<void> {
   await db.query("insert into audit_events (actor_user_id, action, target_type, target_id) values ($1, $2, $3, $4)", [actorId, action, targetType, targetId]);
 }
 
@@ -813,7 +815,7 @@ async function issueRoomToken(env: AppEnv, room: string, userId: string, display
   return { url: url.toString(), token: await tokenBuilder.toJwt(), expiresIn: 600 };
 }
 
-async function loadServerAccess(db: MigrationClient, actor: PublicUser, id: string): Promise<ServerAccess> {
+export async function loadServerAccess(db: MigrationClient, actor: PublicUser, id: string): Promise<ServerAccess> {
   const found = await db.query("select id, name from servers where id = $1", [id]);
   const foundId = text(found.rows[0]?.id);
   const name = text(found.rows[0]?.name);
@@ -831,7 +833,7 @@ async function loadRoomAccess(db: MigrationClient, actor: PublicUser, id: string
   return { room, access: await loadServerAccess(db, actor, room.serverId) };
 }
 
-function requireMember(access: ServerAccess): void {
+export function requireMember(access: ServerAccess): void {
   if (!activeRole(access.membership)) throw new RoomError("server_not_found");
 }
 
@@ -839,7 +841,7 @@ function activeRole(membership: ServerMembership | undefined): string | undefine
   return membership !== undefined && !membership.removed ? membership.role : undefined;
 }
 
-function canManage(membership: ServerMembership | undefined): boolean {
+export function canManage(membership: ServerMembership | undefined): boolean {
   const role = activeRole(membership);
   return role === "owner" || role === "moderator";
 }

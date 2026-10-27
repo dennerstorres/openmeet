@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { IMAGE_MAX_BYTES } from "@openmeet/shared";
+import { IMAGE_MAX_BYTES, SOUND_MAX_BYTES } from "@openmeet/shared";
 import { createAttemptGate } from "../auth/limit.js";
 import { AuthError, type AuthErrorCode, currentUser, type PublicUser } from "../auth/service.js";
 import { readAccessToken } from "../auth/tokens.js";
@@ -44,6 +44,7 @@ import {
 } from "./service.js";
 import type { RoomMedia } from "./media.js";
 import { PlatformPresence } from "./platform-presence.js";
+import { deleteSound, importSound, listLibrary, listOwnSounds, readSound, removeFromLibrary, renameSound, uploadSound } from "./sounds.js";
 
 const AUTH_STATUS: Record<AuthErrorCode, number> = {
   auth_unconfigured: 503,
@@ -79,6 +80,8 @@ const ROOM_STATUS: Record<RoomErrorCode, number> = {
   user_not_found: 404,
   invalid_image: 400,
   image_not_found: 404,
+  invalid_sound: 400,
+  sound_not_found: 404,
 };
 
 function configuredSecret(env: AppEnv): string | undefined {
@@ -410,6 +413,134 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
   });
 
   // The id changes with every upload, so the bytes behind one id never change.
+  // ADR 0021: server sound libraries. Uploads share the image gate's idea with their own budget.
+  const soundUploads = createAttemptGate(20, 10 * 60_000);
+  const SOUND_BASE64_MAX = Math.ceil(SOUND_MAX_BYTES / 3) * 4;
+  const soundBody = { bodyLimit: SOUND_BASE64_MAX + 4096 };
+
+  function soundField(body: unknown): Uint8Array {
+    const value = typeof body === "object" && body !== null && !Array.isArray(body) ? (body as Record<string, unknown>).sound : undefined;
+    if (typeof value !== "string" || value.length === 0 || value.length > SOUND_BASE64_MAX || value.length % 4 !== 0 || !BASE64.test(value)) {
+      throw new RoomError("invalid_sound");
+    }
+    return new Uint8Array(Buffer.from(value, "base64"));
+  }
+
+  function nameField(body: unknown): unknown {
+    return typeof body === "object" && body !== null && !Array.isArray(body) ? (body as Record<string, unknown>).name : undefined;
+  }
+
+  app.get("/api/v1/servers/:id/sounds", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await listLibrary(db, actor, param(request, "id")));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/servers/:id/sounds", soundBody, async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const bytes = soundField(request.body);
+      if (!soundUploads.allow(actor.id, Date.now())) throw new AuthError("rate_limited");
+      return reply
+        .code(201)
+        .header("cache-control", "no-store")
+        .send(await uploadSound(db, actor, param(request, "id"), { name: nameField(request.body), bytes }));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/servers/:id/sounds/:sound/import", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await importSound(db, actor, param(request, "id"), param(request, "sound")));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/servers/:id/sounds/:sound/remove", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await removeFromLibrary(db, actor, param(request, "id"), param(request, "sound")));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.get("/api/v1/sounds/mine", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await listOwnSounds(db, actor));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  // A sound id never changes its bytes: renaming keeps them, a new upload gets a new id.
+  app.get("/api/v1/sounds/:id", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const bytes = await readSound(db, actor, param(request, "id"));
+      return reply
+        .code(200)
+        .header("content-type", "audio/wav")
+        .header("x-content-type-options", "nosniff")
+        .header("content-security-policy", "default-src 'none'; sandbox")
+        .header("cache-control", "private, max-age=31536000, immutable")
+        .send(Buffer.from(bytes));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/sounds/:id/rename", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await renameSound(db, actor, param(request, "id"), nameField(request.body)));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/sounds/:id/delete", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await deleteSound(db, actor, param(request, "id")));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
   app.get("/api/v1/images/:id", async (request, reply) => {
     try {
       const actor = await caller(request);
