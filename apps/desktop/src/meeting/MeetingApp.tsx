@@ -61,6 +61,7 @@ import {
   IconSpeaker,
   IconTrash,
   IconUsers,
+  IconChat,
 } from "./Icons";
 import { ShellConsent } from "../shell/ShellConsent";
 import {
@@ -85,6 +86,7 @@ import { prepareGoogleWindow } from "../web/google";
 import { createWebSession } from "../web/session";
 import { createChatFeed, createChatHub, createWebTransport, type ChatTransport } from "./chat-events";
 import { TextRoom, type ChatPerson } from "./TextRoom";
+import { DmChat, DmList, MemberCard, useDirectMessages } from "./DirectMessages";
 
 const idleSnapshot: PocSnapshot = {
   phase: "idle",
@@ -156,6 +158,10 @@ const ERROR_TEXT: Record<string, string> = {
   invalid_image: "Use uma imagem PNG, JPEG ou WebP de até 256 KB.",
   invalid_display_name: "O apelido não pode ter caracteres de controle e vai até 80 letras.",
   rate_limited: "Muitas trocas seguidas. Espere um minuto.",
+  dm_not_found: "A conversa não está disponível.",
+  dm_full: "O grupo chegou ao limite de 10 pessoas.",
+  blocked: "Não é possível conversar com esta pessoa.",
+  user_not_found: "A pessoa não está disponível.",
 };
 
 const PRESENCE_MS = 5000;
@@ -274,6 +280,10 @@ export function MeetingApp() {
   const [mentionCounts, setMentionCounts] = useState<Record<string, number>>({});
   const openTextRef = useRef<string | null>(null);
   openTextRef.current = textRoomId;
+  // ADR 0024: the DM entry above the servers swaps the room list for the conversations.
+  const [dmView, setDmView] = useState(false);
+  const [dmOpenId, setDmOpenId] = useState<string | null>(null);
+  const [memberCard, setMemberCard] = useState<string | null>(null);
   const brokerRef = useRef<SessionBroker | undefined>(undefined);
   const [serverName, setServerName] = useState("");
   const [pastedInvite, setPastedInvite] = useState("");
@@ -381,14 +391,16 @@ export function MeetingApp() {
     return () => feed.close();
   }, [chatHub, chatOrigin]);
   const selfId = state.userId;
+  const directMessages = useDirectMessages(model, chatHub.subscribe, selfId, chatOrigin);
   useEffect(
     () =>
       chatHub.subscribe({
         event(name, data) {
           if (name !== "message.created") return;
           const message = parseChatMessage(data);
-          if (!message || message.roomId === openTextRef.current || !mentionsUser(message, selfId)) return;
-          setMentionCounts((held) => ({ ...held, [message.roomId]: (held[message.roomId] ?? 0) + 1 }));
+          const roomId = message?.roomId;
+          if (!message || !roomId || roomId === openTextRef.current || !mentionsUser(message, selfId)) return;
+          setMentionCounts((held) => ({ ...held, [roomId]: (held[roomId] ?? 0) + 1 }));
         },
         reset() {},
       }),
@@ -570,6 +582,29 @@ export function MeetingApp() {
     const member = memberById.get(id);
     return member ? { label: member.label, avatarId: member.avatarId } : { label: "Ex-membro", avatarId: null };
   };
+  const openDm = directMessages.dms.find((dm) => dm.id === dmOpenId) ?? null;
+  // Who a group may call: the people of the browsed server and of every DM, never the caller.
+  const dmCandidates = [
+    ...new Map(
+      [...(state.serverPresence?.members ?? []), ...directMessages.dms.flatMap((dm) => dm.members)]
+        .filter((member) => member.id !== state.userId)
+        .map((member) => [member.id, { id: member.id, label: member.label, avatarId: member.avatarId }]),
+    ).values(),
+  ];
+  const showDm = (id: string) => {
+    setDmView(true);
+    setDmOpenId(id);
+    setTextRoomId(null);
+    setMemberCard(null);
+    setMobileRooms(false);
+    if (__WEB__ && window.innerWidth <= 900) setMembersOpen(false);
+  };
+  const messageMember = (userId: string) =>
+    void model.openDm([userId]).then((dm) => {
+      if (dm === null) return;
+      directMessages.keep(dm);
+      showDm(dm.id);
+    });
   const callMembers = inCall && state.activeServerId === state.selectedServerId ? memberById : new Map<string, ServerPresenceMember>();
   const browsingAway = inCall && state.activeServerId !== null && state.activeServerId !== state.selectedServerId;
   const caption = screenCaption(localScreenSurface(media.tiles), media.screen);
@@ -823,8 +858,8 @@ export function MeetingApp() {
             >
               Salas
             </button>
-            <button type="button" aria-pressed={!mobileRooms} disabled={!inCall && !kickTarget && !textRoom} onClick={() => setMobileRooms(false)}>
-              {textRoom ? `#${textRoom.name}` : inCall ? "Voltar à chamada" : "Chamada"}
+            <button type="button" aria-pressed={!mobileRooms} disabled={!inCall && !kickTarget && !textRoom && !openDm} onClick={() => setMobileRooms(false)}>
+              {textRoom ? `#${textRoom.name}` : openDm ? "Conversa" : inCall ? "Voltar à chamada" : "Chamada"}
             </button>
           </nav>
           {mobileRooms && notice ? (
@@ -836,15 +871,29 @@ export function MeetingApp() {
         </header>
       ) : null}
       <nav className="server-bar" aria-label="Servidores">
+        <button
+          type="button"
+          className={`server-pill dm-pill${dmView ? " selected" : ""}`}
+          title="Mensagens diretas"
+          aria-label="Mensagens diretas"
+          aria-current={dmView ? "true" : undefined}
+          onClick={() => setDmView(true)}
+        >
+          <IconChat size={22} />
+        </button>
+        <span className="server-separator" aria-hidden="true" />
         {state.servers.map((server) => (
           <button
             key={server.id}
             type="button"
-            className={`server-pill${server.id === state.selectedServerId ? " selected" : ""}${server.id === state.activeServerId ? " live" : ""}`}
+            className={`server-pill${!dmView && server.id === state.selectedServerId ? " selected" : ""}${server.id === state.activeServerId ? " live" : ""}`}
             title={server.name}
             aria-label={server.name}
-            aria-current={server.id === state.selectedServerId ? "true" : undefined}
-            onClick={() => void model.selectServer(server.id)}
+            aria-current={!dmView && server.id === state.selectedServerId ? "true" : undefined}
+            onClick={() => {
+              setDmView(false);
+              void model.selectServer(server.id);
+            }}
           >
             <Face origin={state.origin} imageId={server.iconId} label={server.name} />
           </button>
@@ -861,183 +910,201 @@ export function MeetingApp() {
       </nav>
 
       <aside className="room-bar">
-        <header className="room-bar-head">
-          <div>
-            <strong>{selectedServer?.name ?? state.instanceName ?? "OpenMeet"}</strong>
-            {selectedServer ? <span>{roleLabel(selectedServer.role)}</span> : null}
-          </div>
-          <div className="room-head-actions">
-            {selectedServer ? (
-              <button
-                type="button"
-                className="icon-btn mobile-members-button"
-                aria-label="Mostrar membros"
-                title="Mostrar membros"
-                onClick={() => setMembersOpen(true)}
-              >
-                <IconUsers size={18} />
-              </button>
-            ) : null}
-            {selectedServer && state.canCreate ? (
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label="Criar sala"
-                title="Criar sala"
-                onClick={() => setCreating(creating === "room" ? null : "room")}
-              >
-                <IconPlus size={18} />
-              </button>
-            ) : null}
-            {selectedServer && (selectedServer.role === "owner" || selectedServer.role === "moderator") ? (
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label="Configurações do servidor"
-                title="Configurações do servidor"
-                onClick={() => setServerSettingsOpen(true)}
-              >
-                <IconGear size={18} />
-              </button>
-            ) : null}
-          </div>
-        </header>
-        {state.servers.length === 0 ? (
-          <p className="hint">
-            {state.canCreateServer ? "Crie o primeiro servidor no botão + à esquerda." : "Você ainda não participa de nenhum servidor. Peça um convite."}
-          </p>
-        ) : null}
-        <ul className="room-list">
-          {state.rooms.map((room) => (
-            <li key={room.id} className="room-row">
-              <button
-                type="button"
-                className={`room-item${room.id === state.activeRoomId || room.id === textRoom?.id ? " active" : ""}`}
-                disabled={room.channel === "text" ? false : state.pending || room.ended || room.id === state.activeRoomId}
-                aria-current={room.id === textRoom?.id ? "page" : undefined}
-                onClick={() => {
-                  if (room.channel === "text") {
-                    setTextRoomId(room.id);
-                    setMobileRooms(false);
-                    return;
-                  }
-                  setTextRoomId(null);
-                  void model.enterRoom(room.id, "").then(() => {
-                    if (model.snapshot().activeRoomId === room.id) setMobileRooms(false);
-                  });
-                }}
-              >
-                {room.channel === "text" ? <IconHash /> : room.kind === "temporary" ? <IconClock /> : <IconSpeaker />}
-                <span className="room-name">{room.name}</span>
-                {(mentionCounts[room.id] ?? 0) > 0 ? (
-                  <span className="mention-count" aria-label={`${mentionCounts[room.id]} menções`}>
-                    {Math.min(mentionCounts[room.id] ?? 0, 99)}
-                  </span>
+        {dmView ? (
+          <DmList
+            model={model}
+            dms={directMessages.dms}
+            selfId={state.userId}
+            origin={state.origin}
+            openId={openDm?.id ?? null}
+            candidates={dmCandidates}
+            onOpen={(dm) => {
+              directMessages.keep(dm);
+              showDm(dm.id);
+            }}
+          />
+        ) : (
+          <>
+            <header className="room-bar-head">
+              <div>
+                <strong>{selectedServer?.name ?? state.instanceName ?? "OpenMeet"}</strong>
+                {selectedServer ? <span>{roleLabel(selectedServer.role)}</span> : null}
+              </div>
+              <div className="room-head-actions">
+                {selectedServer ? (
+                  <button
+                    type="button"
+                    className="icon-btn mobile-members-button"
+                    aria-label="Mostrar membros"
+                    title="Mostrar membros"
+                    onClick={() => setMembersOpen(true)}
+                  >
+                    <IconUsers size={18} />
+                  </button>
                 ) : null}
-                {room.ended ? <span className="badge">encerrada</span> : room.kind === "temporary" ? <span className="sr">temporária</span> : null}
-              </button>
-              {state.canCreate ? (
-                <button
-                  type="button"
-                  className="icon-btn danger-text room-remove"
-                  disabled={state.pending}
-                  aria-label={`Remover a sala ${room.name}`}
-                  title={`Remover a sala ${room.name}`}
-                  onClick={() => {
-                    setRemoveTarget({ kind: "room", id: room.id, label: room.name });
-                    setMobileRooms(false);
+                {selectedServer && state.canCreate ? (
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label="Criar sala"
+                    title="Criar sala"
+                    onClick={() => setCreating(creating === "room" ? null : "room")}
+                  >
+                    <IconPlus size={18} />
+                  </button>
+                ) : null}
+                {selectedServer && (selectedServer.role === "owner" || selectedServer.role === "moderator") ? (
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label="Configurações do servidor"
+                    title="Configurações do servidor"
+                    onClick={() => setServerSettingsOpen(true)}
+                  >
+                    <IconGear size={18} />
+                  </button>
+                ) : null}
+              </div>
+            </header>
+            {state.servers.length === 0 ? (
+              <p className="hint">
+                {state.canCreateServer ? "Crie o primeiro servidor no botão + à esquerda." : "Você ainda não participa de nenhum servidor. Peça um convite."}
+              </p>
+            ) : null}
+            <ul className="room-list">
+              {state.rooms.map((room) => (
+                <li key={room.id} className="room-row">
+                  <button
+                    type="button"
+                    className={`room-item${room.id === state.activeRoomId || room.id === textRoom?.id ? " active" : ""}`}
+                    disabled={room.channel === "text" ? false : state.pending || room.ended || room.id === state.activeRoomId}
+                    aria-current={room.id === textRoom?.id ? "page" : undefined}
+                    onClick={() => {
+                      if (room.channel === "text") {
+                        setTextRoomId(room.id);
+                        setDmOpenId(null);
+                        setMobileRooms(false);
+                        return;
+                      }
+                      setTextRoomId(null);
+                      void model.enterRoom(room.id, "").then(() => {
+                        if (model.snapshot().activeRoomId === room.id) setMobileRooms(false);
+                      });
+                    }}
+                  >
+                    {room.channel === "text" ? <IconHash /> : room.kind === "temporary" ? <IconClock /> : <IconSpeaker />}
+                    <span className="room-name">{room.name}</span>
+                    {(mentionCounts[room.id] ?? 0) > 0 ? (
+                      <span className="mention-count" aria-label={`${mentionCounts[room.id]} menções`}>
+                        {Math.min(mentionCounts[room.id] ?? 0, 99)}
+                      </span>
+                    ) : null}
+                    {room.ended ? <span className="badge">encerrada</span> : room.kind === "temporary" ? <span className="sr">temporária</span> : null}
+                  </button>
+                  {state.canCreate ? (
+                    <button
+                      type="button"
+                      className="icon-btn danger-text room-remove"
+                      disabled={state.pending}
+                      aria-label={`Remover a sala ${room.name}`}
+                      title={`Remover a sala ${room.name}`}
+                      onClick={() => {
+                        setRemoveTarget({ kind: "room", id: room.id, label: room.name });
+                        setMobileRooms(false);
+                      }}
+                    >
+                      <IconTrash size={16} />
+                    </button>
+                  ) : null}
+                  {(state.presence?.[room.id] ?? []).length > 0 ? (
+                    <ul className="occupants" aria-label={`Na sala ${room.name}`}>
+                      {(state.presence?.[room.id] ?? []).map((person) => {
+                        const speaking = room.id === state.activeRoomId && media.speakers.includes(person.id);
+                        return (
+                          <li key={person.id} className={speaking ? "speaking" : undefined}>
+                            <span className="avatar tiny" aria-hidden="true">
+                              <span>
+                                <Face origin={state.origin} imageId={memberById.get(person.id)?.avatarId ?? null} label={person.label} />
+                              </span>
+                            </span>
+                            <span className="room-name">{person.label}</span>
+                            {(state.canCreate || state.role === "admin") && !media.participants.some((p) => p.local && p.identity === person.id) ? (
+                              <button
+                                type="button"
+                                className="icon-btn danger-text"
+                                disabled={state.pending}
+                                aria-label={`Desconectar ${person.label} da sala`}
+                                title={`Desconectar ${person.label} da sala`}
+                                onClick={() => {
+                                  setKickTarget({ roomId: room.id, userId: person.id, label: person.label });
+                                  setMobileRooms(false);
+                                }}
+                              >
+                                <IconHangUp size={16} />
+                              </button>
+                            ) : null}
+                            {speaking ? <span className="sr"> falando</span> : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+            {selectedServer && state.rooms.length === 0 ? <p className="hint">Nenhuma sala neste servidor.</p> : null}
+            {state.canCreate ? (
+              creating === "room" ? (
+                <form
+                  className="inline-form"
+                  onSubmit={(event: FormEvent) => {
+                    event.preventDefault();
+                    void model.createRoom(roomName, roomSlug, roomChannel === "text" ? "persistent" : roomKind, roomChannel).then(() => {
+                      setRoomName("");
+                      setRoomSlug("");
+                      setCreating(null);
+                    });
                   }}
                 >
-                  <IconTrash size={16} />
-                </button>
-              ) : null}
-              {(state.presence?.[room.id] ?? []).length > 0 ? (
-                <ul className="occupants" aria-label={`Na sala ${room.name}`}>
-                  {(state.presence?.[room.id] ?? []).map((person) => {
-                    const speaking = room.id === state.activeRoomId && media.speakers.includes(person.id);
-                    return (
-                      <li key={person.id} className={speaking ? "speaking" : undefined}>
-                        <span className="avatar tiny" aria-hidden="true">
-                          <span>
-                            <Face origin={state.origin} imageId={memberById.get(person.id)?.avatarId ?? null} label={person.label} />
-                          </span>
-                        </span>
-                        <span className="room-name">{person.label}</span>
-                        {(state.canCreate || state.role === "admin") && !media.participants.some((p) => p.local && p.identity === person.id) ? (
-                          <button
-                            type="button"
-                            className="icon-btn danger-text"
-                            disabled={state.pending}
-                            aria-label={`Desconectar ${person.label} da sala`}
-                            title={`Desconectar ${person.label} da sala`}
-                            onClick={() => {
-                              setKickTarget({ roomId: room.id, userId: person.id, label: person.label });
-                              setMobileRooms(false);
-                            }}
-                          >
-                            <IconHangUp size={16} />
-                          </button>
-                        ) : null}
-                        {speaking ? <span className="sr"> falando</span> : null}
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-        {selectedServer && state.rooms.length === 0 ? <p className="hint">Nenhuma sala neste servidor.</p> : null}
-        {state.canCreate ? (
-          creating === "room" ? (
-            <form
-              className="inline-form"
-              onSubmit={(event: FormEvent) => {
-                event.preventDefault();
-                void model.createRoom(roomName, roomSlug, roomChannel === "text" ? "persistent" : roomKind, roomChannel).then(() => {
-                  setRoomName("");
-                  setRoomSlug("");
-                  setCreating(null);
-                });
-              }}
-            >
-              <label>
-                Nome
-                <input value={roomName} onChange={(event) => setRoomName(event.currentTarget.value)} maxLength={80} autoFocus />
-              </label>
-              <label>
-                Identificador
-                <input value={roomSlug} onChange={(event) => setRoomSlug(event.currentTarget.value)} spellCheck={false} maxLength={64} />
-              </label>
-              <label>
-                Canal
-                <select value={roomChannel} onChange={(event) => setRoomChannel(event.currentTarget.value === "text" ? "text" : "voice")}>
-                  <option value="voice">Voz</option>
-                  <option value="text">Texto</option>
-                </select>
-              </label>
-              {roomChannel === "voice" ? (
-                <label>
-                  Tipo
-                  <select value={roomKind} onChange={(event) => setRoomKind(event.currentTarget.value)}>
-                    <option value="persistent">Persistente</option>
-                    <option value="temporary">Temporária</option>
-                  </select>
-                </label>
-              ) : (
-                <p className="hint">Sala de texto guarda as mensagens e é sempre persistente.</p>
-              )}
-              <div className="row">
-                <button type="submit" disabled={state.pending}>
-                  Criar sala
-                </button>
-                <button type="button" className="ghost" onClick={() => setCreating(null)}>
-                  Cancelar
-                </button>
-              </div>
-            </form>
-          ) : null
-        ) : null}
+                  <label>
+                    Nome
+                    <input value={roomName} onChange={(event) => setRoomName(event.currentTarget.value)} maxLength={80} autoFocus />
+                  </label>
+                  <label>
+                    Identificador
+                    <input value={roomSlug} onChange={(event) => setRoomSlug(event.currentTarget.value)} spellCheck={false} maxLength={64} />
+                  </label>
+                  <label>
+                    Canal
+                    <select value={roomChannel} onChange={(event) => setRoomChannel(event.currentTarget.value === "text" ? "text" : "voice")}>
+                      <option value="voice">Voz</option>
+                      <option value="text">Texto</option>
+                    </select>
+                  </label>
+                  {roomChannel === "voice" ? (
+                    <label>
+                      Tipo
+                      <select value={roomKind} onChange={(event) => setRoomKind(event.currentTarget.value)}>
+                        <option value="persistent">Persistente</option>
+                        <option value="temporary">Temporária</option>
+                      </select>
+                    </label>
+                  ) : (
+                    <p className="hint">Sala de texto guarda as mensagens e é sempre persistente.</p>
+                  )}
+                  <div className="row">
+                    <button type="submit" disabled={state.pending}>
+                      Criar sala
+                    </button>
+                    <button type="button" className="ghost" onClick={() => setCreating(null)}>
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              ) : null
+            ) : null}
+          </>
+        )}
         {inCall ? (
           <section className="voice-panel" aria-label="Chamada atual">
             <div className="voice-row">
@@ -1164,14 +1231,30 @@ export function MeetingApp() {
           <ul>
             {state.serverPresence.members.map((member) => (
               <li key={member.id} title={member.globalName !== member.label ? `Conta: ${member.globalName}` : undefined}>
-                <span className="member-avatar" aria-hidden="true">
-                  <Face origin={state.origin} imageId={member.avatarId} label={member.label} />
-                  <span className={`presence-dot ${member.status}`} />
-                </span>
-                <span className="member-copy">
-                  <strong>{member.label}</strong>
-                  <span>{presenceLabel(member.status, member.activity)}</span>
-                </span>
+                <button
+                  type="button"
+                  className="member-open"
+                  aria-expanded={member.self ? undefined : memberCard === member.id}
+                  disabled={member.self}
+                  onClick={() => setMemberCard(memberCard === member.id ? null : member.id)}
+                >
+                  <span className="member-avatar" aria-hidden="true">
+                    <Face origin={state.origin} imageId={member.avatarId} label={member.label} />
+                    <span className={`presence-dot ${member.status}`} />
+                  </span>
+                  <span className="member-copy">
+                    <strong>{member.label}</strong>
+                    <span>{presenceLabel(member.status, member.activity)}</span>
+                  </span>
+                </button>
+                {memberCard === member.id && !member.self ? (
+                  <MemberCard
+                    label={member.label}
+                    blocked={directMessages.blocked.has(member.id)}
+                    onMessage={() => messageMember(member.id)}
+                    onBlock={(on) => void directMessages.block(member.id, on)}
+                  />
+                ) : null}
               </li>
             ))}
           </ul>
@@ -1245,7 +1328,13 @@ export function MeetingApp() {
         {textRoom ? (
           <TextRoom
             model={model}
-            room={textRoom}
+            chat={{
+              kind: "room",
+              id: textRoom.id,
+              name: textRoom.name,
+              closed: textRoom.ended ? "Esta sala foi encerrada. As mensagens ficam só para leitura." : null,
+              canPin: selectedServer?.role === "owner" || selectedServer?.role === "moderator",
+            }}
             origin={state.origin}
             userId={state.userId}
             manager={selectedServer?.role === "owner" || selectedServer?.role === "moderator"}
@@ -1254,6 +1343,28 @@ export function MeetingApp() {
             subscribe={chatHub.subscribe}
             onClose={() => {
               setTextRoomId(null);
+              if (!inCall) setMobileRooms(true);
+            }}
+          />
+        ) : openDm ? (
+          <DmChat
+            model={model}
+            dm={openDm}
+            selfId={state.userId}
+            origin={state.origin}
+            blocked={directMessages.blocked}
+            candidates={dmCandidates}
+            fallback={chatPerson}
+            subscribe={chatHub.subscribe}
+            onBlock={(userId, on) => void directMessages.block(userId, on)}
+            onChanged={directMessages.keep}
+            onLeft={() => {
+              directMessages.drop(openDm.id);
+              setDmOpenId(null);
+              if (!inCall) setMobileRooms(true);
+            }}
+            onClose={() => {
+              setDmOpenId(null);
               if (!inCall) setMobileRooms(true);
             }}
           />

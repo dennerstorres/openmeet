@@ -1,7 +1,19 @@
 import { PocInputError } from "./poc.js";
 import { inviteHost, inviteLink, parseInvite, type InviteLink } from "./invite.js";
 import { parseOwnSounds, parseSoundLibrary, type OwnSound, type SoundSummary } from "./sound.js";
-import { parseChatAttachment, parseChatMessage, parseChatPage, type ChatAttachment, type ChatMessage, type ChatPage } from "./chat.js";
+import {
+  chatPath,
+  parseChatAttachment,
+  parseChatMessage,
+  parseChatPage,
+  parseDm,
+  parseDmList,
+  type ChatAttachment,
+  type ChatMessage,
+  type ChatPage,
+  type ChatRef,
+  type DmSummary,
+} from "./chat.js";
 import {
   canonicalInstanceUrl,
   hasControlCharacter,
@@ -686,7 +698,7 @@ export class MeetingModel {
   }
 
   // ADR 0024: text room messages. Each call answers the message (or page) or null after showing the error.
-  async listMessages(roomId: string, cursor: { before?: string; after?: string; around?: string } = {}): Promise<ChatPage | null> {
+  async listMessages(chat: ChatRef, cursor: { before?: string; after?: string; around?: string } = {}): Promise<ChatPage | null> {
     const query =
       cursor.before !== undefined
         ? `?before=${cursor.before}`
@@ -695,19 +707,19 @@ export class MeetingModel {
           : cursor.around !== undefined
             ? `?around=${cursor.around}`
             : "";
-    const body = await this.memberCall("GET", `/api/v1/rooms/${roomId}/messages${query}`, null);
+    const body = await this.memberCall("GET", `${chatPath(chat)}/messages${query}`, null);
     return body === null ? null : (parseChatPage(body) ?? null);
   }
 
-  async sendMessage(roomId: string, body: string, replyToId?: string, attachmentIds: readonly string[] = []): Promise<ChatMessage | null> {
+  async sendMessage(chat: ChatRef, body: string, replyToId?: string, attachmentIds: readonly string[] = []): Promise<ChatMessage | null> {
     const payload = attachmentIds.length > 0 ? { body, replyToId, attachmentIds } : { body, replyToId };
-    const sent = await this.memberCall("POST", `/api/v1/rooms/${roomId}/messages`, payload, 201);
+    const sent = await this.memberCall("POST", `${chatPath(chat)}/messages`, payload, 201);
     return sent === null ? null : (parseChatMessage(sent) ?? null);
   }
 
   /** ADR 0024: one file, base64, before its message; the answer is what the API made of the bytes. */
-  async uploadAttachment(roomId: string, name: string, data: string): Promise<ChatAttachment | null> {
-    const stored = await this.memberCall("POST", `/api/v1/rooms/${roomId}/attachments`, { name, data }, 201);
+  async uploadAttachment(chat: ChatRef, name: string, data: string): Promise<ChatAttachment | null> {
+    const stored = await this.memberCall("POST", `${chatPath(chat)}/attachments`, { name, data }, 201);
     return stored === null ? null : (parseChatAttachment(stored) ?? null);
   }
 
@@ -731,24 +743,71 @@ export class MeetingModel {
     return changed === null ? null : (parseChatMessage(changed) ?? null);
   }
 
-  async listPins(roomId: string): Promise<ChatMessage[] | null> {
-    const body = await this.memberCall("GET", `/api/v1/rooms/${roomId}/pins`, null);
+  async listPins(chat: ChatRef): Promise<ChatMessage[] | null> {
+    const body = await this.memberCall("GET", `${chatPath(chat)}/pins`, null);
     if (body === null) return null;
     return parseChatPage({ ...(body as object), hasMore: false })?.messages ?? null;
   }
 
   /** The words travel in the body, never in the URL. */
-  async searchMessages(roomId: string, query: string, before?: string): Promise<ChatPage | null> {
-    const body = await this.memberCall("POST", `/api/v1/rooms/${roomId}/messages/search`, { query, before });
+  async searchMessages(chat: ChatRef, query: string, before?: string): Promise<ChatPage | null> {
+    const body = await this.memberCall("POST", `${chatPath(chat)}/messages/search`, { query, before });
     return body === null ? null : (parseChatPage(body) ?? null);
   }
 
   /** Best effort: a lost typing signal is not worth an error on screen. */
-  async signalTyping(roomId: string): Promise<void> {
+  async signalTyping(chat: ChatRef): Promise<void> {
     const origin = this.origin;
     const accessToken = this.accessToken;
     if (origin === null || accessToken === null) return;
-    await this.api.request(origin, "POST", `/api/v1/rooms/${roomId}/typing`, {}, accessToken).catch(() => undefined);
+    await this.api.request(origin, "POST", `${chatPath(chat)}/typing`, {}, accessToken).catch(() => undefined);
+  }
+
+  // ADR 0024: DMs. Each call answers the DM (or list) or null after showing the error.
+  async listDms(): Promise<DmSummary[] | null> {
+    const body = await this.memberCall("GET", "/api/v1/dms", null);
+    return body === null ? null : (parseDmList(body) ?? null);
+  }
+
+  /** One other person opens the direct DM with them (200 when it already existed); more make a group. */
+  async openDm(userIds: readonly string[], name?: string): Promise<DmSummary | null> {
+    const origin = this.origin;
+    const accessToken = this.accessToken;
+    if (origin === null || accessToken === null) return null;
+    const result = await this.api.request(origin, "POST", "/api/v1/dms", name === undefined ? { userIds } : { userIds, name }, accessToken);
+    if (result.status !== 200 && result.status !== 201) {
+      this.error = readErrorCode(result.body);
+      this.publish();
+      return null;
+    }
+    return parseDm(result.body) ?? null;
+  }
+
+  async addDmMember(dmId: string, userId: string): Promise<DmSummary | null> {
+    const body = await this.memberCall("POST", `/api/v1/dms/${dmId}/members`, { userId });
+    return body === null ? null : (parseDm(body) ?? null);
+  }
+
+  async leaveDm(dmId: string): Promise<boolean> {
+    return (await this.memberCall("POST", `/api/v1/dms/${dmId}/leave`, {})) !== null;
+  }
+
+  /** An empty name goes back to the list of people. */
+  async renameDm(dmId: string, name: string): Promise<DmSummary | null> {
+    const body = await this.memberCall("POST", `/api/v1/dms/${dmId}/rename`, { name: name.length === 0 ? null : name });
+    return body === null ? null : (parseDm(body) ?? null);
+  }
+
+  /** Who the caller blocked; who blocked the caller is never told. */
+  async listBlocks(): Promise<string[] | null> {
+    const body = await this.memberCall("GET", "/api/v1/blocks", null);
+    if (body === null) return null;
+    const ids = (body as { userIds?: unknown }).userIds;
+    return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : [];
+  }
+
+  async setBlock(userId: string, blocked: boolean): Promise<boolean> {
+    return (await this.memberCall("POST", `/api/v1/users/${userId}/block`, { blocked }, 204)) !== null;
   }
 
   private async memberCall(method: "GET" | "POST", path: string, body: unknown, ok = 200): Promise<unknown> {

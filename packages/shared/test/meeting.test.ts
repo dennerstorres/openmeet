@@ -16,6 +16,7 @@ const otherRoomId = "33333333-3333-4333-8333-333333333333";
 const serverId = "44444444-4444-4444-8444-444444444444";
 const otherServerId = "55555555-5555-4555-8555-555555555555";
 const userId = "22222222-2222-4222-8222-222222222222";
+const dmId = "66666666-6666-4666-8666-666666666666";
 const accessToken = "access-token-value";
 const refreshToken = "refresh-token-value";
 const nextRefresh = "refresh-token-rotated";
@@ -42,6 +43,8 @@ function room() {
 function apiFor(role: string): { api: InstanceApi; calls: string[]; bodies: unknown[] } {
   const calls: string[] = [];
   const bodies: unknown[] = [];
+  const blocks = new Set<string>();
+  let dmOpened = false;
   const api: InstanceApi = {
     async request(origin, method, path, body) {
       calls.push(`${method} ${origin}${path}`);
@@ -117,6 +120,36 @@ function apiFor(role: string): { api: InstanceApi; calls: string[]; bodies: unkn
       if (path === "/api/v1/profile/avatar") return { status: 200, body: { avatarId: roomId } };
       if (path.endsWith("/join")) return { status: 200, body: { url: "wss://sfu.example", token: joinToken } };
       if (path === "/api/v1/auth/logout") return { status: 204, body: null };
+      // ADR 0024: one direct DM with Grace; a block turns it read only and keeps a new one from opening.
+      const dmView = () => ({
+        id: dmId,
+        kind: "direct",
+        name: null,
+        createdBy: userId,
+        memberIds: [userId, otherRoomId],
+        members: [
+          { id: userId, label: "Ada", avatarId: null },
+          { id: otherRoomId, label: "Grace", avatarId: null },
+        ],
+        readOnly: blocks.has(otherRoomId),
+      });
+      if (path === "/api/v1/dms" && method === "POST") {
+        if (!dmOpened && blocks.has(otherRoomId)) return { status: 403, body: { error: "blocked" } };
+        const created = !dmOpened;
+        dmOpened = true;
+        return { status: created ? 201 : 200, body: dmView() };
+      }
+      if (path === "/api/v1/dms") return { status: 200, body: { dms: dmOpened ? [dmView()] : [] } };
+      if (path === "/api/v1/blocks") return { status: 200, body: { userIds: [...blocks] } };
+      if (path === `/api/v1/users/${otherRoomId}/block`) {
+        if ((body as { blocked?: boolean }).blocked === true) blocks.add(otherRoomId);
+        else blocks.delete(otherRoomId);
+        return { status: 204, body: null };
+      }
+      if (path === `/api/v1/dms/${dmId}/messages` && method === "GET") {
+        const message = { id: "5", roomId: null, dmId, authorId: otherRoomId, body: "oi", replyTo: null, pinned: false, edited: false, deleted: false };
+        return { status: 200, body: { messages: [{ ...message, createdAt: "2026-10-27T12:00:00.000Z" }], hasMore: false } };
+      }
       return { status: 404, body: { error: "room_not_found" } };
     },
   };
@@ -693,4 +726,43 @@ test("profile calls go to the selected server and surface a refusal", async () =
       );
     }
   }
+});
+
+test("a member's card opens the direct DM once, and a block leaves it read only (F13-12)", async () => {
+  const { api, calls, bodies } = apiFor("participant");
+  const model = new MeetingModel(api, mediaFor());
+  await model.confirmInstance("https://meet.example");
+  await model.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  const grace = otherRoomId;
+  const opened = await model.openDm([grace]);
+  assert.equal(opened?.id, dmId);
+  assert.deepEqual(
+    opened?.members.map((member) => member.label),
+    ["Ada", "Grace"],
+  );
+  assert.equal(opened?.readOnly, false);
+  assert.equal(
+    bodies.some((body) => JSON.stringify(body) === JSON.stringify({ userIds: [grace] })),
+    true,
+  );
+  assert.equal((await model.openDm([grace]))?.id, dmId, "the second open answers 200 with the same DM");
+  const page = await model.listMessages({ kind: "dm", id: dmId });
+  assert.equal(page?.messages[0]?.dmId, dmId);
+  assert.equal(calls.includes(`GET https://meet.example/api/v1/dms/${dmId}/messages`), true);
+
+  assert.equal(await model.setBlock(grace, true), true);
+  assert.deepEqual(await model.listBlocks(), [grace]);
+  assert.equal((await model.listDms())?.[0]?.readOnly, true);
+  assert.equal(await model.setBlock(grace, false), true);
+  assert.equal((await model.listDms())?.[0]?.readOnly, false);
+});
+
+test("a block refuses a new DM with the API's error", async () => {
+  const { api } = apiFor("participant");
+  const model = new MeetingModel(api, mediaFor());
+  await model.confirmInstance("https://meet.example");
+  await model.submitAccount({ mode: "login", username: "ada", password: "correct-horse-battery", displayName: "", token: "" });
+  await model.setBlock(otherRoomId, true);
+  assert.equal(await model.openDm([otherRoomId]), null);
+  assert.equal(model.snapshot().error, "blocked");
 });

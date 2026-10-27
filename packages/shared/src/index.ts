@@ -19,8 +19,16 @@ export type { AttachmentImageInfo, ImageInfo, ImageType } from "./image.js";
 export {
   ATTACHMENTS_PER_MESSAGE,
   ATTACHMENT_DEFAULT_MAX_BYTES,
+  DM_GROUP_MAX,
   MESSAGE_MAX_CHARS,
   attachmentIsImage,
+  bumpDm,
+  chatPath,
+  dmTitle,
+  inChat,
+  parseDm,
+  parseDmList,
+  upsertDm,
   parseChatAttachment,
   canDeleteMessage,
   canEditMessage,
@@ -37,7 +45,7 @@ export {
   plainBody,
   sendableBody,
 } from "./chat.js";
-export type { ChatAttachment, ChatMessage, ChatPage, ChatReaction, MentionCandidate } from "./chat.js";
+export type { ChatAttachment, ChatKind, ChatMessage, ChatPage, ChatReaction, ChatRef, DmMember, DmSummary, MentionCandidate } from "./chat.js";
 export { SOUND_MAX_BYTES, SOUND_MAX_MS, SOUND_NAME_MAX, SOUND_SAMPLE_RATE, encodeSound, parseOwnSounds, parseSoundLibrary, sniffSound } from "./sound.js";
 export type { OwnSound, SoundInfo, SoundSummary } from "./sound.js";
 export { inviteFromFragment, inviteLink, invitePageLink, isInviteCode, parseInvite } from "./invite.js";

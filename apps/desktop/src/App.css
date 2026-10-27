@@ -582,11 +582,44 @@ a {
 
 .members-panel > ul > li {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   min-height: 38px;
   padding: 4px 6px;
   border-radius: 4px;
+}
+
+/* F13-12: the member row opens a card with the DM and the block. */
+.member-open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.member-open:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.member-card {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0 2px 40px;
+}
+
+.member-card button {
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 13px;
 }
 
 .members-panel > ul > li:hover {
@@ -2223,6 +2256,7 @@ textarea {
 
 .text-room-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
@@ -2230,8 +2264,9 @@ textarea {
   color: var(--text-muted);
 }
 
+/* A narrow screen keeps the name readable: the buttons move to a second line instead. */
 .text-room-head h1 {
-  flex: 1;
+  flex: 1 1 120px;
   margin: 0;
   overflow: hidden;
   color: var(--text);
@@ -2427,6 +2462,109 @@ textarea {
 
 .text-room-closed {
   padding: 0 16px 16px;
+}
+
+/* F13-12: DMs. The entry sits above the servers; a DM says it is not end-to-end encrypted. */
+.server-separator {
+  flex: none;
+  width: 32px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--bg-active);
+}
+
+.dm-face {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--bg-active);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  overflow: hidden;
+}
+
+.dm-face .face {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dm-size {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.dm-notice {
+  margin: 0;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-panel);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.dm-people {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 50%;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  overflow-y: auto;
+}
+
+.dm-people ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dm-people li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-body);
+}
+
+.dm-people .member-avatar {
+  width: 24px;
+  height: 24px;
+  overflow: hidden;
+}
+
+.dm-people .row {
+  flex-wrap: wrap;
+}
+
+.dm-people input {
+  flex: 1;
+  min-width: 0;
+}
+
+.people-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.people-list label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
 }
 
 /* F13-07: markdown, reactions, pins, search and jumps. */
