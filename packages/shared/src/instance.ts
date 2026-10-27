@@ -329,11 +329,11 @@ function instancePath(path: string): string {
   ) {
     return path;
   }
-  const join = /^\/api\/v1\/rooms\/([0-9a-f-]{36})\/join$/i.exec(path);
+  const join = /^\/api\/v1\/rooms\/([0-9a-f-]{36})\/(?:join|delete)$/i.exec(path);
   if (join?.[1] !== undefined && UUID.test(join[1])) return path;
   const kick = /^\/api\/v1\/rooms\/([0-9a-f-]{36})\/participants\/([0-9a-f-]{36})\/kick$/i.exec(path);
   if (kick?.[1] !== undefined && kick[2] !== undefined && UUID.test(kick[1]) && UUID.test(kick[2])) return path;
-  const serverRooms = /^\/api\/v1\/servers\/([0-9a-f-]{36})\/(?:rooms|invites|presence|members|icon|profile)$/i.exec(path);
+  const serverRooms = /^\/api\/v1\/servers\/([0-9a-f-]{36})\/(?:rooms|invites|presence|members|icon|profile|delete)$/i.exec(path);
   if (serverRooms?.[1] !== undefined && UUID.test(serverRooms[1])) return path;
   const serverPresenceAction = /^\/api\/v1\/servers\/([0-9a-f-]{36})\/presence\/(?:heartbeat|mode|policy)$/i.exec(path);
   if (serverPresenceAction?.[1] !== undefined && UUID.test(serverPresenceAction[1])) return path;

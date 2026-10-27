@@ -18,6 +18,8 @@ import {
   createRoom,
   createServer,
   createServerInvite,
+  deleteRoom,
+  deleteServer,
   endRoom,
   getRoom,
   getServer,
@@ -267,6 +269,17 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
         .code(200)
         .header("cache-control", "no-store")
         .send(await getServer(db, actor, param(request, "id")));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/servers/:id/delete", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      await deleteServer(db, actor, param(request, "id"), media);
+      return reply.code(204).header("cache-control", "no-store").send();
     } catch (error) {
       return sendError(request, reply, error);
     }
@@ -650,6 +663,17 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
         throw new RoomError("invalid_body");
       }
       await endRoom(db, actor, param(request, "id"), media);
+      return reply.code(204).header("cache-control", "no-store").send();
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/rooms/:id/delete", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      await deleteRoom(db, actor, param(request, "id"), media);
       return reply.code(204).header("cache-control", "no-store").send();
     } catch (error) {
       return sendError(request, reply, error);

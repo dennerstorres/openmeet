@@ -478,6 +478,28 @@ a {
   text-align: left;
 }
 
+.room-row {
+  position: relative;
+}
+
+.room-row > .room-remove {
+  position: absolute;
+  top: 0;
+  right: 4px;
+  opacity: 0;
+}
+
+.room-row:hover > .room-remove,
+.room-row > .room-remove:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .room-row > .room-remove {
+    opacity: 1;
+  }
+}
+
 .room-item:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text-body);

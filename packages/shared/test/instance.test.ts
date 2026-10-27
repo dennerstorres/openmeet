@@ -77,6 +77,9 @@ test("room join and kick paths stay on the pinned origin with validated ids", ()
   assert.equal(prepared.url, `https://meet.example/api/v1/rooms/${roomId}/join`);
   assert.equal(prepared.headers.authorization, "Bearer access-token-value");
   const kick = `/api/v1/rooms/${roomId}/participants/${roomId}/kick`;
+  for (const remove of [`/api/v1/rooms/${roomId}/delete`, `/api/v1/servers/${roomId}/delete`]) {
+    assert.equal(prepareInstanceRequest("https://meet.example", "https://meet.example", "POST", remove, {}, "t").url, `https://meet.example${remove}`);
+  }
   assert.equal(prepareInstanceRequest("https://meet.example", "https://meet.example", "POST", kick, {}, "t").url, `https://meet.example${kick}`);
   for (const invalid of [kick + "?other=1", kick.replace("participants/", "participants/../"), kick.replace("/kick", "/delete")]) {
     assert.throws(() => prepareInstanceRequest("https://meet.example", "https://meet.example", "POST", invalid, {}, "t"), PocInputError);

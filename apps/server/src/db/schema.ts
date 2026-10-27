@@ -12,7 +12,6 @@ import {
   smallint,
   text,
   timestamp,
-  unique,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
@@ -80,6 +79,7 @@ export const servers = pgTable(
     allowInvisible: boolean("allow_invisible").notNull().default(false),
     managersSeeInvisible: boolean("managers_see_invisible").notNull().default(false),
     iconImageId: uuid("icon_image_id").references((): AnyPgColumn => images.id, { onDelete: "set null" }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "date" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -154,11 +154,14 @@ export const rooms = pgTable(
     endedAt: timestamp("ended_at", { withTimezone: true, mode: "date" }),
     mediaClosedAt: timestamp("media_closed_at", { withTimezone: true, mode: "date" }),
     lastJoinNbf: bigint("last_join_nbf", { mode: "bigint" }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "date" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (table) => [
-    unique("rooms_server_slug_unique").on(table.serverId, table.slug),
+    uniqueIndex("rooms_server_slug_unique")
+      .on(table.serverId, table.slug)
+      .where(sql`${table.deletedAt} is null`),
     check("rooms_name_safe", sql`openmeet_is_label(${table.name})`),
     check("rooms_slug_charset", sql`${table.slug} ~ '^[A-Za-z0-9_-]{1,64}$'`),
   ],

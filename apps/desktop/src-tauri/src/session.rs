@@ -183,6 +183,8 @@ fn allowed_call(method: &str, path: &str) -> bool {
         ("GET" | "POST", ["", "api", "v1", "servers"]) => true,
         ("POST", ["", "api", "v1", "invites", "accept"]) => true,
         ("POST", ["", "api", "v1", "rooms", id, "join"]) => is_id(id),
+        // ADR 0023: removing a room or a server.
+        ("POST", ["", "api", "v1", "rooms" | "servers", id, "delete"]) => is_id(id),
         ("POST", ["", "api", "v1", "rooms", id, "participants", user_id, "kick"]) => is_id(id) && is_id(user_id),
         ("GET" | "POST", ["", "api", "v1", "servers", id, "rooms"]) => is_id(id),
         ("POST", ["", "api", "v1", "servers", id, "invites"]) => is_id(id),
@@ -428,6 +430,8 @@ mod tests {
             ("GET", "/api/v1/sounds/mine".to_string()),
             ("POST", format!("/api/v1/sounds/{id}/rename")),
             ("POST", format!("/api/v1/sounds/{id}/delete")),
+            ("POST", format!("/api/v1/rooms/{id}/delete")),
+            ("POST", format!("/api/v1/servers/{id}/delete")),
         ] {
             assert!(allowed_call(method, &path), "{method} {path}");
         }

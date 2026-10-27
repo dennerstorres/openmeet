@@ -261,6 +261,7 @@ export async function listServers(db: MigrationClient, actor: PublicUser): Promi
     `select s.id, s.name, m.role, s.icon_image_id
      from servers s
      join server_members m on m.server_id = s.id and m.user_id = $1 and m.removed_at is null
+     where s.deleted_at is null
      order by s.created_at, s.id`,
     [actor.id],
   );
@@ -370,7 +371,7 @@ export async function listServerRooms(db: MigrationClient, actor: PublicUser, id
   const access = await loadServerAccess(db, actor, serverId(id));
   if (!activeRole(access.membership)) throw new RoomError("server_not_found");
   const listed = await db.query(
-    "select id, server_id, name, slug, kind, ended_at is not null as ended from rooms where server_id = $1 order by created_at, id",
+    "select id, server_id, name, slug, kind, ended_at is not null as ended from rooms where server_id = $1 and deleted_at is null order by created_at, id",
     [access.server.id],
   );
   return listed.rows.map(readRoom).filter((room): room is RoomRecord => room !== undefined);
@@ -591,6 +592,7 @@ async function defaultServer(tx: MigrationClient, actor: PublicUser): Promise<st
     `select s.id
      from servers s
      join server_members m on m.server_id = s.id and m.user_id = $1 and m.removed_at is null and m.role in ('owner', 'moderator')
+     where s.deleted_at is null
      order by s.created_at, s.id
      limit 1`,
     [actor.id],
@@ -605,7 +607,9 @@ export async function listRooms(db: MigrationClient, actor: PublicUser): Promise
   const listed = await db.query(
     `select r.id, r.server_id, r.name, r.slug, r.kind, r.ended_at is not null as ended
      from rooms r
+     join servers s on s.id = r.server_id and s.deleted_at is null
      join server_members m on m.server_id = r.server_id and m.user_id = $1 and m.removed_at is null
+     where r.deleted_at is null
      order by r.created_at, r.id`,
     [actor.id],
   );
@@ -643,6 +647,70 @@ export async function endRoom(db: MigrationClient, actor: PublicUser, id: string
   if (revokeAt === undefined) return;
   await disconnectMedia(() => media.closeRoom(room.id, revokeAt));
   await db.query("update rooms set media_closed_at = now() where id = $1 and media_closed_at is null", [room.id]);
+}
+
+// ADR 0023: removal ends the call and hides the room; the row stays for audit and invites.
+// S-04: the mark commits first and stays. A retry on a removed room only closes the media still open.
+export async function deleteRoom(db: MigrationClient, actor: PublicUser, id: string, media: RoomMedia | undefined): Promise<void> {
+  if (!media) throw new RoomError("room_unconfigured");
+  const target = roomId(id);
+  const found = await db.query("select server_id from rooms where id = $1", [target]);
+  const server = text(found.rows[0]?.server_id);
+  if (!server) throw new RoomError("room_not_found");
+  const access = await loadServerAccess(db, actor, server);
+  if (!activeRole(access.membership)) throw new RoomError("room_not_found");
+  if (!canManage(access.membership)) throw new RoomError("forbidden");
+  const revokeAt = await db.transaction(async (tx) => {
+    const locked = await tx.query(
+      "select deleted_at is not null as deleted, media_closed_at is not null as closed, last_join_nbf from rooms where id = $1 for update",
+      [target],
+    );
+    const row = locked.rows[0];
+    if (!row) throw new RoomError("room_not_found");
+    if (!isTrue(row.deleted)) {
+      await tx.query("update rooms set deleted_at = now(), ended_at = coalesce(ended_at, now()), updated_at = now() where id = $1", [target]);
+      await tx.query("update invites set revoked_at = now() where room_id = $1 and revoked_at is null", [target]);
+      await audit(tx, actor.id, "room_delete", "room", target);
+    } else if (isTrue(row.closed)) {
+      return undefined;
+    }
+    return revokeAfter(row.last_join_nbf);
+  });
+  if (revokeAt === undefined) return;
+  await disconnectMedia(() => media.closeRoom(target, revokeAt));
+  await db.query("update rooms set media_closed_at = now() where id = $1 and media_closed_at is null", [target]);
+}
+
+// ADR 0023: only the owner removes a server. Every room in it ends and every invite stops working.
+export async function deleteServer(db: MigrationClient, actor: PublicUser, id: string, media: RoomMedia | undefined): Promise<void> {
+  if (!media) throw new RoomError("room_unconfigured");
+  const target = serverId(id);
+  const member = await db.query("select role, removed_at is not null as removed from server_members where server_id = $1 and user_id = $2", [target, actor.id]);
+  const role = text(member.rows[0]?.role);
+  if (!role || isTrue(member.rows[0]?.removed)) throw new RoomError("server_not_found");
+  if (role !== "owner") throw new RoomError("forbidden");
+  const pending = await db.transaction(async (tx) => {
+    const locked = await tx.query("select deleted_at is not null as deleted from servers where id = $1 for update", [target]);
+    const row = locked.rows[0];
+    if (!row) throw new RoomError("server_not_found");
+    if (!isTrue(row.deleted)) {
+      await tx.query("update servers set deleted_at = now(), updated_at = now() where id = $1", [target]);
+      await tx.query("update server_invites set revoked_at = now() where server_id = $1 and revoked_at is null", [target]);
+      await audit(tx, actor.id, "server_delete", "server", target);
+    }
+    const open = await tx.query(
+      `update rooms set deleted_at = coalesce(deleted_at, now()), ended_at = coalesce(ended_at, now()), updated_at = now()
+       where id in (select id from rooms where server_id = $1 and media_closed_at is null order by created_at, id for update)
+       returning id, last_join_nbf`,
+      [target],
+    );
+    await tx.query("update invites set revoked_at = now() where room_id in (select id from rooms where server_id = $1) and revoked_at is null", [target]);
+    return open.rows.flatMap((room) => (text(room.id) ? [{ id: String(room.id), revokeAt: revokeAfter(room.last_join_nbf) }] : []));
+  });
+  for (const room of pending) {
+    await disconnectMedia(() => media.closeRoom(room.id, room.revokeAt));
+    await db.query("update rooms set media_closed_at = now() where id = $1 and media_closed_at is null", [room.id]);
+  }
 }
 
 // The room routes below predate servers. They act on the server that owns the room.
@@ -726,7 +794,10 @@ export async function joinRoom(
       if (!session.rows[0] || isTrue(session.rows[0].dead)) throw new AuthError("unauthorized");
     }
     if (isTrue(userRow.livekit_hold)) throw new RoomError("forbidden");
-    const found = await tx.query("select id, server_id, name, slug, kind, ended_at is not null as ended from rooms where id = $1 for update", [target]);
+    const found = await tx.query(
+      "select id, server_id, name, slug, kind, ended_at is not null as ended from rooms where id = $1 and deleted_at is null for update",
+      [target],
+    );
     const room = readRoom(found.rows[0]);
     if (!room) throw new RoomError("room_not_found");
     const membership = await tx.query(
@@ -816,7 +887,7 @@ async function issueRoomToken(env: AppEnv, room: string, userId: string, display
 }
 
 export async function loadServerAccess(db: MigrationClient, actor: PublicUser, id: string): Promise<ServerAccess> {
-  const found = await db.query("select id, name from servers where id = $1", [id]);
+  const found = await db.query("select id, name from servers where id = $1 and deleted_at is null", [id]);
   const foundId = text(found.rows[0]?.id);
   const name = text(found.rows[0]?.name);
   if (!foundId || !name) throw new RoomError("server_not_found");
@@ -827,7 +898,7 @@ export async function loadServerAccess(db: MigrationClient, actor: PublicUser, i
 
 // A missing room and a room in a server the caller is not part of look the same to the caller.
 async function loadRoomAccess(db: MigrationClient, actor: PublicUser, id: string): Promise<{ room: RoomRecord; access: ServerAccess }> {
-  const found = await db.query("select id, server_id, name, slug, kind, ended_at is not null as ended from rooms where id = $1", [id]);
+  const found = await db.query("select id, server_id, name, slug, kind, ended_at is not null as ended from rooms where id = $1 and deleted_at is null", [id]);
   const room = readRoom(found.rows[0]);
   if (!room) throw new RoomError("room_not_found");
   return { room, access: await loadServerAccess(db, actor, room.serverId) };
@@ -962,7 +1033,7 @@ export async function readImage(db: MigrationClient, actor: PublicUser, id: stri
     `select i.content_type, i.bytes from images i
      where i.id = $1 and (
        i.created_by = $2
-       or exists (select 1 from servers s join server_members me on me.server_id = s.id and me.user_id = $2 and me.removed_at is null where s.icon_image_id = i.id)
+       or exists (select 1 from servers s join server_members me on me.server_id = s.id and me.user_id = $2 and me.removed_at is null where s.icon_image_id = i.id and s.deleted_at is null)
        or exists (select 1 from server_members t join server_members me on me.server_id = t.server_id and me.user_id = $2 and me.removed_at is null
                   where t.avatar_image_id = i.id and t.removed_at is null)
        or exists (select 1 from users u join server_members t on t.user_id = u.id and t.removed_at is null

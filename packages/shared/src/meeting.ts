@@ -393,6 +393,57 @@ export class MeetingModel {
     });
   }
 
+  /** ADR 0023. A manager removes a room of the selected server; a call in it is closed by the server. */
+  async deleteRoom(roomId: string): Promise<void> {
+    await this.run(async (generation) => {
+      const origin = this.pinned();
+      const accessToken = this.accessToken;
+      if (origin === null || accessToken === null) {
+        await this.dropExpiredSession(generation);
+        return;
+      }
+      const server = this.servers.find((item) => item.id === this.selectedServerId);
+      if (server === undefined || (server.role !== "owner" && server.role !== "moderator")) {
+        this.error = "forbidden";
+        return;
+      }
+      const result = await this.api.request(origin, "POST", `/api/v1/rooms/${roomId}/delete`, {}, accessToken);
+      if (generation !== this.generation) return;
+      if (result.status !== 204) {
+        if (await this.dropIfUnauthorized(generation, result.body)) return;
+        this.error = readErrorCode(result.body);
+        return;
+      }
+      await this.loadRooms(generation);
+    });
+  }
+
+  /** ADR 0023. Only the owner removes a server; every room in it ends. */
+  async deleteServer(serverId: string): Promise<void> {
+    await this.run(async (generation) => {
+      const origin = this.pinned();
+      const accessToken = this.accessToken;
+      if (origin === null || accessToken === null) {
+        await this.dropExpiredSession(generation);
+        return;
+      }
+      const server = this.servers.find((item) => item.id === serverId);
+      if (server === undefined || server.role !== "owner") {
+        this.error = "forbidden";
+        return;
+      }
+      const result = await this.api.request(origin, "POST", `/api/v1/servers/${serverId}/delete`, {}, accessToken);
+      if (generation !== this.generation) return;
+      if (result.status !== 204) {
+        if (await this.dropIfUnauthorized(generation, result.body)) return;
+        this.error = readErrorCode(result.body);
+        return;
+      }
+      if (this.selectedServerId === serverId) this.selectedServerId = null;
+      await this.loadServers(generation);
+    });
+  }
+
   /** Shows the rooms of another server. The call, if any, keeps running. */
   async selectServer(serverId: string): Promise<void> {
     if (!this.servers.some((server) => server.id === serverId)) return;
@@ -819,7 +870,8 @@ export class MeetingModel {
     }
     this.servers = parseServerList(result.body);
     if (!this.servers.some((server) => server.id === this.selectedServerId)) {
-      this.selectedServerId = this.activeRoom?.serverId ?? this.servers[0]?.id ?? null;
+      const live = this.servers.find((server) => server.id === this.activeRoom?.serverId);
+      this.selectedServerId = live?.id ?? this.servers[0]?.id ?? null;
     }
     if (this.selectedServerId === null) {
       this.rooms = [];

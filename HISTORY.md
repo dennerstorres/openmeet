@@ -1,5 +1,10 @@
 # HISTORY — registro cronológico
 
+### 2026-10-27 — F04-13, remover salas e servidores — Claude
+Branch `task/F04-13-remover-salas-servidores`, a partir da `main` 95ba845. Pedido do usuário: opção de remover salas e servidores. ADR 0023 (proposto): remoção lógica com `deleted_at` (migração `0010_soft_delete.sql`, slug único só entre salas ativas). `deleteRoom`/`deleteServer` no service, rotas `POST .../delete`, métodos no modelo compartilhado, lixeira na lista de salas e seção no modal do servidor, com confirmação. Todas as consultas de sala/servidor filtram `deleted_at is null`.
+Comandos (Windows 11, 2026-10-27): `pnpm typecheck`, `npx eslint .`, `pnpm test` e `cargo test` em `src-tauri` — todos passaram; novo `apps/server/test/delete.test.ts` cobre permissão, ocultação, slug reaproveitado, convite revogado e nova tentativa após falha do SFU. Na web local (API PGlite com SFU falso, portas 3012/1430): sala e servidor removidos pela interface, `closeRoom` chamado para cada sala.
+Riscos: não testado com LiveKit real nem no `.exe`; não há restauração pela interface. Próximo passo: aceite do ADR 0023 e teste com pessoas numa sala que é removida.
+
 ### 2026-10-27 — F04-12, configurações globais — Claude
 Branch `task/F04-12-ajustes-globais`, a partir da `main` 5e17aa5. Pedido do usuário: ajustes da chamada grandes demais. Saída, câmera, blur, atualizar dispositivos e diagnóstico foram para Configurações, que passa a existir também na web; a página quebra em uma coluna pela própria largura (container query). Escolha de dispositivo salva no aparelho e aplicada ao conectar; fora da chamada a lista vem de `enumerateDevices`.
 Windows 11: `pnpm typecheck`, `pnpm lint`, testes (shared 53, media 77, server 82, desktop 22), builds desktop e web e prettier nos arquivos tocados passaram. Um teste do servidor falhou na primeira rodada paralela e passou ao repetir, sem mudança no servidor. Configurações vista no navegador com API local, sem erro no console; o navegador do teste não listou aparelhos (sem permissão). Não vista numa chamada nem no `.exe`.
