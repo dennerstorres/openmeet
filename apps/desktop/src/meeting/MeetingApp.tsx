@@ -9,6 +9,7 @@ import {
   describeMediaError,
   emptyStats,
   formatElapsed,
+  isVoiceEffect,
   keepPin,
   LiveKitPocSession,
   localScreenSurface,
@@ -26,6 +27,7 @@ import {
   type DeviceOption,
   type PlaybackLevel,
   type PocSnapshot,
+  type VoiceEffect,
 } from "@openmeet/media";
 import {
   inviteFromFragment,
@@ -91,7 +93,23 @@ const idleSnapshot: PocSnapshot = {
   backgroundBlurSupported: false,
   backgroundBlur: false,
   backgroundBlurRadius: BLUR_RADIUS_DEFAULT,
+  voiceEffects: ["off"],
+  voiceEffect: "off",
+  voiceMonitor: false,
   screenAudio: "off",
+};
+
+// ADR 0020: names shown in the voice effect picker.
+const VOICE_EFFECT_LABEL: Record<VoiceEffect, string> = {
+  off: "Sem efeito",
+  robot: "Robô",
+  radio: "Rádio",
+  telephone: "Telefone",
+  echo: "Eco",
+  cave: "Caverna",
+  deep: "Grave",
+  chipmunk: "Esquilo",
+  monster: "Monstro",
 };
 
 const ERROR_TEXT: Record<string, string> = {
@@ -1445,7 +1463,13 @@ export function MeetingApp() {
                   Sair da tela cheia
                 </button>
               ) : (
-                <details className="more">
+                <details
+                  className="more"
+                  onToggle={(event) => {
+                    // "Ouvir minha voz" only lives while the panel is open.
+                    if (!event.currentTarget.open && media.voiceMonitor) session().setVoiceMonitor(false);
+                  }}
+                >
                   <summary className="ctl" aria-label="Dispositivos e diagnóstico" title="Dispositivos e diagnóstico">
                     <IconGear size={22} />
                   </summary>
@@ -1482,6 +1506,31 @@ export function MeetingApp() {
                       />
                     </label>
                     <p className="hint">100% mantém o nível original. Acima disso, o som pode distorcer. 0% corta sua voz.</p>
+                    <label>
+                      Efeito de voz
+                      <select
+                        value={media.voiceEffect}
+                        disabled={controlPending}
+                        onChange={(event) => {
+                          const value = event.currentTarget.value;
+                          if (!isVoiceEffect(value)) return;
+                          session()
+                            .setVoiceEffect(value)
+                            .catch(() => setMediaError("Não foi possível aplicar o efeito de voz. Sua voz segue sem efeito."));
+                        }}
+                      >
+                        {media.voiceEffects.map((effect) => (
+                          <option key={effect} value={effect}>
+                            {VOICE_EFFECT_LABEL[effect]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="effect-toggle">
+                      <input type="checkbox" checked={media.voiceMonitor} onChange={(event) => session().setVoiceMonitor(event.currentTarget.checked)} />
+                      Ouvir minha voz
+                    </label>
+                    <p className="hint">Todos na sala ouvem o efeito. Para se ouvir, use fone: no alto-falante a voz volta para o microfone.</p>
                     {session().browser.outputSelection ? (
                       <DeviceSelect
                         label="Saída"

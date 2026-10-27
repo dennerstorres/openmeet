@@ -14,6 +14,7 @@ import {
 import { describeMediaError, mediaActionError, sanitizeDiagnostic, type DiagnosticEvent } from "./diagnostics.js";
 import { HANDS_FREE_HINT, isHandsFree, playbackOutput, type AudioDevice } from "./bluetooth-output.js";
 import { InputGain } from "./input-gain.js";
+import { readAudioWorkletSupport, voiceEffectsFor, type VoiceEffect } from "./voice-effects.js";
 import { VideoBackground, type VideoBackgroundOptions } from "./video-background.js";
 import { browserLabel, readBrowserMedia, type BrowserMedia } from "./browser.js";
 import { buildDiagnosticExport, dropOpenReconnect, pushReconnect, summarizeReconnect, type ReconnectMark, type ReconnectSummary } from "./report.js";
@@ -99,6 +100,10 @@ export interface PocSnapshot {
   backgroundBlurSupported: boolean;
   backgroundBlur: boolean;
   backgroundBlurRadius: number;
+  /** ADR 0020: effects this client can run, the one in use and the local monitor. */
+  voiceEffects: VoiceEffect[];
+  voiceEffect: VoiceEffect;
+  voiceMonitor: boolean;
 }
 
 type Listener = (snapshot: PocSnapshot) => void;
@@ -141,6 +146,7 @@ export class LiveKitPocSession {
   private readonly client: "desktop" | "web" | null;
   /** ADR 0014: what this browser gives; the screen hides what is missing. */
   readonly browser: BrowserMedia;
+  private readonly audioWorklet: boolean;
   private phase: ConnectionPhase = "idle";
   private disconnectReason: string | null = null;
   private explicitLeave = false;
@@ -154,12 +160,20 @@ export class LiveKitPocSession {
   private stats: RtcSnapshot;
   private marks: ReconnectMark[] = [];
 
-  constructor(options?: { appVersion?: string; room?: Room; client?: "desktop" | "web"; browser?: BrowserMedia; videoBackground?: VideoBackgroundOptions }) {
+  constructor(options?: {
+    appVersion?: string;
+    room?: Room;
+    client?: "desktop" | "web";
+    browser?: BrowserMedia;
+    videoBackground?: VideoBackgroundOptions;
+    audioWorklet?: boolean;
+  }) {
     this.room = options?.room ?? new Room();
     this.videoBackground = new VideoBackground(options?.videoBackground);
     this.appVersion = options?.appVersion ?? null;
     this.client = options?.client ?? null;
     this.browser = options?.browser ?? readBrowserMedia();
+    this.audioWorklet = options?.audioWorklet ?? readAudioWorkletSupport();
     this.stats = { ...emptyStats(), userAgent: readUserAgent(), appVersion: this.appVersion };
     this.room.on(RoomEvent.Reconnecting, () => {
       this.phase = nextPhase(this.phase, "reconnecting");
@@ -186,6 +200,9 @@ export class LiveKitPocSession {
       this.disconnectReason = outcome.reason;
       this.tiles.clear();
       this.speakers = [];
+      // ADR 0020: every room entry starts with the plain voice.
+      this.inputGain.setMonitor(false);
+      void this.inputGain.setEffect("off").catch(() => undefined);
       this.note("info", `disconnected: ${outcome.reason}`);
     });
     this.room.on(RoomEvent.MediaDevicesError, (error: Error) => {
@@ -278,6 +295,9 @@ export class LiveKitPocSession {
       backgroundBlurSupported: this.videoBackground.isSupported,
       backgroundBlur: this.videoBackground.isEnabled,
       backgroundBlurRadius: this.videoBackground.blurRadius,
+      voiceEffects: voiceEffectsFor(this.audioWorklet),
+      voiceEffect: this.inputGain.effect,
+      voiceMonitor: this.inputGain.monitor,
     };
   }
 
@@ -361,6 +381,23 @@ export class LiveKitPocSession {
 
   setMicrophoneVolume(value: number): void {
     this.inputGain.setVolume(value);
+  }
+
+  /** Switches the effect in the live graph without republishing; on failure the voice goes out plain. */
+  async setVoiceEffect(effect: VoiceEffect): Promise<void> {
+    try {
+      await this.inputGain.setEffect(effect);
+    } catch (error) {
+      this.note("error", `voice effect unavailable: ${describeMediaError(error)}`);
+      throw error;
+    } finally {
+      this.emit();
+    }
+  }
+
+  setVoiceMonitor(enabled: boolean): void {
+    this.inputGain.setMonitor(enabled);
+    this.emit();
   }
 
   async setCamera(enabled: boolean): Promise<void> {

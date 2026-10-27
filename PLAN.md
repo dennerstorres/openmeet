@@ -2,7 +2,7 @@
 
 Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, `VERIFIED`, `DONE`, `BLOCKED`.
 
-F04-09 — Efeitos de voz no microfone: READY. Pedido pelo usuário em 2026-10-26; ADR 0020 aceito no mesmo dia, RF-24 na SPEC. Depende de F04-05 (processor de ganho). Escopo e testes em `plans/phase-04-meeting-ui.md`.
+F04-09 — Efeitos de voz no microfone: WAITING_VALIDATION. ADR 0020 aceito em 2026-10-26; implementada na branch `task/F04-09-efeitos-de-voz`. Oito efeitos no mesmo processor do ganho, pitch por worklet do bundle, "Ouvir minha voz" local. Testes, typecheck, lint e builds passaram; falta ouvir os efeitos com microfone real em dois PCs e revisão independente. Escopo e testes em `plans/phase-04-meeting-ui.md`.
 
 F09-10 — Ícone do servidor, avatar e perfil por servidor: WAITING_VALIDATION. ADR 0019 aceito em 2026-10-25; implementada na branch `task/F09-10-imagens-perfil`. Migration 0008, rotas com testes de permissão e de tipo falso, comando Rust `instance_image`, UI na barra, membros, cards e modal de perfil. Testes, typecheck, lint, format:check e build passaram; web vista localmente com PGlite. Falta o `.exe` contra a instância real, migration 0008 em implantação real e revisão independente. Escopo em `plans/phase-09-servidores.md`.
 
@@ -45,7 +45,7 @@ F09-08 — Presença dos membros do servidor: WAITING_VALIDATION. Implementada e
 | F04-04 | Reuniões | E2E 5 participantes e persistência | F04-02,F04-03 | WAITING_VALIDATION | Codex review | G4 |
 | F04-06 | Reuniões | Blur local opcional do fundo da câmera | F04-02 | WAITING_VALIDATION | Codex | G4,G10,G12 |
 | F04-08 | Reuniões | Intensidade ajustável do blur de fundo | F04-06 | WAITING_VALIDATION | Claude | G4,G10 |
-| F04-09 | Reuniões | Efeitos de voz no microfone (ADR 0020) | F04-05 | READY | Claude | G4,G10,G12 |
+| F04-09 | Reuniões | Efeitos de voz no microfone (ADR 0020) | F04-05 | WAITING_VALIDATION | Claude | G4,G10,G12 |
 | F05-01 | Desktop | Bandeja, atalhos, notificações, sessão | F04-04 | IMPLEMENTED | Grok | G5 |
 | F06-01 | Resiliência | Stats WebRTC/logs/reconexão/export | F05-01 | IMPLEMENTED | Grok | G6 |
 | F07-01 | Infra | Compose/TLS/TURN/backup/restauração | F06-01 | IMPLEMENTED | Grok | G7 |

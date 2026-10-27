@@ -16,7 +16,7 @@ READY → IN_PROGRESS → WAITING_VALIDATION em 2026-10-25. Alterados `video-bac
 Roteiro pendente: abrir web e instalador; conferir ambos os ícones e menus por teclado; falar entre dois PCs com volume em 0/50/100/200%; trocar microfone, mutar/desmutar, sair/entrar e reconectar; verificar ausência de eco local e áudio da tela inalterado. Como admin membro do servidor, desconectar participante pela sidebar, conferir encerramento da mídia remota e novo ingresso permitido; como participante, chamada direta deve retornar 403. SFU indisponível deve mostrar erro e permitir repetir. Nada disso foi marcado PASS por mock.
 
 ## F04-09 — efeitos de voz no microfone
-READY em 2026-10-26 com o aceite do ADR 0020. Depende de F04-05.
+READY → IN_PROGRESS → WAITING_VALIDATION em 2026-10-26, branch `task/F04-09-efeitos-de-voz`. Entregue: `voice-effects.ts` (grafo por efeito), `InputGain` com efeito → ganho e monitor, worklet em `apps/desktop/public/media/pitch-shift-worklet.js`, `setVoiceEffect`/`setVoiceMonitor` na sessão, seletor e "Ouvir minha voz" nos ajustes; o monitor desliga ao fechar o painel e o efeito volta a "Sem efeito" ao desconectar. Teste do worklet em tom de 440 Hz confere o pitch com tolerância de 8%: o crossfade gera bandas laterais na taxa do grão, o que pode soar levemente trêmulo na voz real.
 
 Arquivos previstos: `input-gain.ts` vira cadeia de áudio (efeito → ganho) ou ganha um módulo `voice-effects.ts` chamado por ele; worklet de pitch em `packages/media/src/worklets/`; `session.ts` e `index.ts` de mídia; painel em `MeetingApp.tsx`; testes em `packages/media/test/`.
 

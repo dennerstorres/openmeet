@@ -87,7 +87,8 @@ test("input gain applies levels, rebuilds on device change and releases only own
     await gain.destroy();
     await gain.destroy();
     assert.equal(stopped, 2);
-    assert.equal(disconnected, 6);
+    // Each build unplugs the source once before wiring the (empty) effect.
+    assert.equal(disconnected, 8);
     assert.equal(gain.processedTrack, undefined);
   } finally {
     if (original) Object.defineProperty(globalThis, "MediaStream", original);

@@ -1,5 +1,9 @@
 # HISTORY — registro cronológico
 
+### 2026-10-26 — F04-09, efeitos de voz — Claude
+Branch `task/F04-09-efeitos-de-voz`, a partir da `main` b19a338. `voice-effects.ts` monta Robô (modulação em anel), Rádio, Telefone, Eco, Caverna (impulso fixo) e, por `AudioWorklet`, Grave, Esquilo e Monstro. `InputGain` passa a ligar fonte → efeito → ganho, troca o efeito sem trocar a faixa publicada, carrega o worklet uma vez por contexto e cai para "Sem efeito" se o módulo falhar. Monitor local liga o ganho ao `destination`. Sessão: `voiceEffects`, `voiceEffect`, `voiceMonitor`, reset ao desconectar. CSP intacta: worklet em `public/media`, servido por `'self'`.
+Windows 11: `pnpm test` (shared 49, media 66, server 78, desktop 22), `pnpm typecheck`, `pnpm lint`, `pnpm build` e `pnpm build:web` passaram; `pitch-shift-worklet.js` presente em `dist` e `dist-web`. `pnpm format:check` acusa só `apps/desktop/.impeccable/hook.cache.json`, que já falhava antes desta branch. Teste do worklet com tom sintético: 440 Hz vira ~704/330/264 Hz dentro de 8%. Nenhum efeito foi ouvido com microfone real; UI não inspecionada numa reunião. Riscos: leve trêmulo nos efeitos de pitch (bandas laterais do crossfade) e microfonia se "Ouvir minha voz" for usado sem fone.
+
 ### 2026-10-26 — F04-09, desenho dos efeitos de voz — Claude
 Branch `main`, só documentação. Pedido do usuário: painel de efeitos de voz ouvidos pela sala. ADR 0020 proposto, item 20 e RF-24 na SPEC, F04-09 `PENDING` no PLAN e escopo/testes em `plans/phase-04-meeting-ui.md`. Efeito entra no mesmo processor do `InputGain`, depois do cancelamento de eco; pitch por `AudioWorklet` próprio servido por `'self'`, sem mudar CSP. Nenhum código nem teste executado. ADR 0020 aceito pelo usuário no mesmo dia; F04-09 passa a `READY`.
 
