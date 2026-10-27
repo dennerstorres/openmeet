@@ -1,7 +1,7 @@
 import { PocInputError } from "./poc.js";
 import { inviteHost, inviteLink, parseInvite, type InviteLink } from "./invite.js";
 import { parseOwnSounds, parseSoundLibrary, type OwnSound, type SoundSummary } from "./sound.js";
-import { parseChatMessage, parseChatPage, type ChatMessage, type ChatPage } from "./chat.js";
+import { parseChatAttachment, parseChatMessage, parseChatPage, type ChatAttachment, type ChatMessage, type ChatPage } from "./chat.js";
 import {
   canonicalInstanceUrl,
   hasControlCharacter,
@@ -699,9 +699,16 @@ export class MeetingModel {
     return body === null ? null : (parseChatPage(body) ?? null);
   }
 
-  async sendMessage(roomId: string, body: string, replyToId?: string): Promise<ChatMessage | null> {
-    const sent = await this.memberCall("POST", `/api/v1/rooms/${roomId}/messages`, { body, replyToId }, 201);
+  async sendMessage(roomId: string, body: string, replyToId?: string, attachmentIds: readonly string[] = []): Promise<ChatMessage | null> {
+    const payload = attachmentIds.length > 0 ? { body, replyToId, attachmentIds } : { body, replyToId };
+    const sent = await this.memberCall("POST", `/api/v1/rooms/${roomId}/messages`, payload, 201);
     return sent === null ? null : (parseChatMessage(sent) ?? null);
+  }
+
+  /** ADR 0024: one file, base64, before its message; the answer is what the API made of the bytes. */
+  async uploadAttachment(roomId: string, name: string, data: string): Promise<ChatAttachment | null> {
+    const stored = await this.memberCall("POST", `/api/v1/rooms/${roomId}/attachments`, { name, data }, 201);
+    return stored === null ? null : (parseChatAttachment(stored) ?? null);
   }
 
   async editMessage(messageId: string, body: string): Promise<ChatMessage | null> {

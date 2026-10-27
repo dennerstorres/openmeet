@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { IMAGE_MAX_BYTES, sniffImage } from "../src/image.js";
+import { IMAGE_MAX_BYTES, sniffAttachmentImage, sniffImage } from "../src/image.js";
 
 function u32be(value: number): number[] {
   return [(value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff];
@@ -77,4 +77,14 @@ test("the size and side limits hold", () => {
   const padded = new Uint8Array(IMAGE_MAX_BYTES + 1);
   padded.set(png(16, 16));
   assert.equal(sniffImage(padded), undefined);
+});
+
+test("attachments also take GIF and large pictures, and still judge by the bytes", () => {
+  const gif = new Uint8Array([...Array.from("GIF89a", (char) => char.charCodeAt(0)), 0x40, 0x01, 0xf0, 0x00, 0, 0, 0, 0x2c, 0x3b]);
+  assert.deepEqual(sniffAttachmentImage(gif), { type: "image/gif", width: 320, height: 240 });
+  assert.equal(sniffImage(gif), undefined);
+  assert.equal(sniffAttachmentImage(gif.subarray(0, gif.length - 1)), undefined);
+  assert.deepEqual(sniffAttachmentImage(png(4000, 3000)), { type: "image/png", width: 4000, height: 3000 });
+  assert.equal(sniffAttachmentImage(new TextEncoder().encode("<svg xmlns='http://www.w3.org/2000/svg'/>")), undefined);
+  assert.equal(sniffAttachmentImage(new TextEncoder().encode("<html>GIF89a</html>")), undefined);
 });

@@ -48,6 +48,15 @@ import type { RoomMedia } from "./media.js";
 import { PlatformPresence } from "./platform-presence.js";
 import { ChatEvents, type ChatEventName } from "./events.js";
 import {
+  attachmentMaxBytes,
+  contentDisposition,
+  createUploadBudget,
+  parseAttachmentIds,
+  purgeOrphanAttachments,
+  readAttachment,
+  storeAttachment,
+} from "./attachments.js";
+import {
   deleteMessage,
   editMessage,
   listMessages,
@@ -55,6 +64,7 @@ import {
   pinMessage,
   publicMessage,
   reactMessage,
+  requireReadableMessage,
   searchMessages,
   sendMessage,
   typingRoom,
@@ -106,6 +116,9 @@ const ROOM_STATUS: Record<RoomErrorCode, number> = {
   dm_not_found: 404,
   dm_full: 409,
   blocked: 403,
+  invalid_attachment: 400,
+  attachment_too_large: 413,
+  attachment_not_found: 404,
 };
 
 function configuredSecret(env: AppEnv): string | undefined {
@@ -850,6 +863,7 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
       const message = await sendMessage(db, actor, param(request, "id"), {
         body: bodyField(request.body, "body"),
         replyToId: textField(request.body, "replyToId"),
+        attachmentIds: parseAttachmentIds(bodyField(request.body, "attachmentIds")),
       });
       await publishMessage(request, "message.created", message);
       return reply.code(201).header("cache-control", "no-store").send(message);
@@ -857,6 +871,67 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
       return sendError(request, reply, error);
     }
   });
+
+  // ADR 0024: a file goes up before its message, as base64 in JSON like images and sounds, so the .exe
+  // sends it through instance_call. The name only travels in the body; the log sees the room id.
+  const attachmentLimit = attachmentMaxBytes(env);
+  const ATTACHMENT_BASE64_MAX = Math.ceil(attachmentLimit / 3) * 4;
+  const uploadBudget = createUploadBudget();
+  const attachmentBody = { bodyLimit: ATTACHMENT_BASE64_MAX + 4096 };
+
+  // The same upload for a text room and a DM: the chat must be one the caller may write in now.
+  const uploadTo = (kind: "room" | "dm") => async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      await typingRoom(db, actor, param(request, "id"), kind);
+      const data = bodyField(request.body, "data");
+      if (typeof data !== "string" || data.length === 0 || data.length % 4 !== 0) throw new RoomError("invalid_attachment");
+      if (data.length > ATTACHMENT_BASE64_MAX) throw new RoomError("attachment_too_large");
+      if (!BASE64.test(data)) throw new RoomError("invalid_attachment");
+      const bytes = new Uint8Array(Buffer.from(data, "base64"));
+      if (bytes.length > attachmentLimit) throw new RoomError("attachment_too_large");
+      if (!uploadBudget.allow(actor.id, bytes.length, Date.now())) throw new AuthError("rate_limited");
+      const stored = await storeAttachment(db, actor, { name: bodyField(request.body, "name"), bytes, maxBytes: attachmentLimit });
+      return reply.code(201).header("cache-control", "no-store").send(stored);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  };
+  app.post("/api/v1/rooms/:id/attachments", attachmentBody, uploadTo("room"));
+  app.post("/api/v1/dms/:id/attachments", attachmentBody, uploadTo("dm"));
+
+  // Always a download: the type is the one the bytes proved, nosniff and a sandbox CSP keep the browser
+  // from guessing, and the bytes behind one id never change.
+  app.get("/api/v1/attachments/:id", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const file = await readAttachment(db, param(request, "id"), (message) => requireReadableMessage(db, actor, message));
+      return reply
+        .code(200)
+        .header("content-type", file.view.contentType)
+        .header("content-disposition", contentDisposition(file.view.name))
+        .header("x-content-type-options", "nosniff")
+        .header("content-security-policy", "default-src 'none'; sandbox")
+        .header("cache-control", "private, max-age=31536000, immutable")
+        .send(Buffer.from(file.bytes));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  if (db) {
+    const purge = (): void => {
+      purgeOrphanAttachments(db).catch((error: unknown) => {
+        const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "error";
+        app.log.error({ code }, "attachment purge failed");
+      });
+    };
+    const timer = setInterval(purge, 60 * 60_000);
+    timer.unref();
+    app.addHook("onClose", async () => clearInterval(timer));
+  }
 
   app.get("/api/v1/rooms/:id/pins", async (request, reply) => {
     try {
@@ -1044,7 +1119,11 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
       const actor = await caller(request);
       if (!db) throw new AuthError("auth_unconfigured");
       if (!sending.allow(actor.id, Date.now())) throw new AuthError("rate_limited");
-      const input = { body: bodyField(request.body, "body"), replyToId: textField(request.body, "replyToId") };
+      const input = {
+        body: bodyField(request.body, "body"),
+        replyToId: textField(request.body, "replyToId"),
+        attachmentIds: parseAttachmentIds(bodyField(request.body, "attachmentIds")),
+      };
       const message = await sendMessage(db, actor, param(request, "id"), input, "dm");
       await publishMessage(request, "message.created", message);
       return reply.code(201).header("cache-control", "no-store").send(message);

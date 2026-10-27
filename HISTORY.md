@@ -606,3 +606,15 @@ Testes manuais (máquina/rede):
 Pendências e riscos:
 Próxima tarefa:
 ```
+
+## F13-09 — anexos (2026-10-27, branch `task/F13-09-anexos`)
+- API: `POST /api/v1/rooms/:id/attachments` (base64 em JSON, tipo pelos bytes: PNG/JPEG/GIF/WebP com medidas, resto `application/octet-stream`), `GET /api/v1/attachments/:id` sempre `Content-Disposition: attachment` + nosniff + CSP sandbox; `attachmentIds` no envio (transação, só upload próprio não enviado < 24 h); órfãos purgados a cada hora; `ATTACHMENT_MAX_BYTES` (padrão 10 MiB, 413 acima); 20 MiB/min e 30 pendentes por pessoa. `src/rooms/attachments.ts`, `test/attachments.test.ts`.
+- Rust: `attachments.rs` (`instance_attachment` para prévia, `instance_attachment_save` grava em Downloads com nome seguro, Zone.Identifier e mostra no Explorer); rota de upload em `allowed_call` com timeout 120 s.
+- Cliente: `ChatFiles.tsx` (prévia, visualizador, download), clipe/colar/arrastar na `TextRoom.tsx`, stubs web em `web/native.ts`, `instancePath`.
+- Validação (Windows 11): `pnpm typecheck`, `pnpm lint`, `prettier --check`, `pnpm test` (shared 60, media 77, server 101, desktop 32, scripts 27), `cargo test` (31), `pnpm --filter ./apps/desktop build` e `build:web` passam. Web local (PGlite, Ana no navegador + Dono pela API): upload de PNG real com prévia, PNG falso e SVG viraram arquivo, envio, visualizador, mensagem do Dono com anexo ao vivo, cabeçalhos de download conferidos com a outra conta.
+- 375 px (web local, 2026-10-27): composer com dois arquivos, mensagem com imagem 1600×900 e arquivo, sem rolagem horizontal. Defeito achado e corrigido: a prévia encolhia na largura e mantinha a altura (faixas); agora usa `aspect-ratio` (285×160, 16:9).
+- Clique real em "Baixar" na web (autorizado pelo usuário, 2026-10-27, navegador do app): `GET /api/v1/attachments/:id` 200 e aviso "Baixado: relatorio.txt". Depois da confirmação do usuário no navegador, `relatorio.txt` ficou em `%USERPROFILE%\Downloads` com 19 bytes, idêntico ao enviado.
+- Falta: `.exe` real (prévia e salvar em Downloads). DM (F13-11) precisa estender `readAttachment` para `dm_id`. Estado: WAITING_VALIDATION.
+
+## Integração F13-07/08/09/11 (2026-10-27, branch `task/F13-integracao`)
+- F13-09 juntada na integração (que já tinha F13-07, F13-08 e F13-11), mantendo os dois lados em 13 arquivos. Anexos valem também em DM: `POST /api/v1/dms/:id/attachments` e `attachmentIds` no envio da DM; o download confere a leitura pela mensagem (`requireReadableMessage`), então só membros da DM baixam (dono do servidor recebe 404). Novo teste em `test/attachments.test.ts`. A tela de DM (F13-12) ainda não tem o clipe; ela deve reaproveitar `ChatFiles.tsx`.

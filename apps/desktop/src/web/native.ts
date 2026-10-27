@@ -64,6 +64,38 @@ export const fetchSound: typeof Native.fetchSound = async (origin, id) => {
   return new Uint8Array(await response.arrayBuffer());
 };
 
+async function attachmentBytes(origin: string, id: string): Promise<Blob> {
+  const prepared = prepareInstanceRequest(origin, origin, "GET", `/api/v1/attachments/${id}`, null, null);
+  const response = await fetch(prepared.url, {
+    headers: { "x-openmeet-web": "1" },
+    credentials: "same-origin",
+    redirect: "error",
+  });
+  if (response.status !== 200) throw new Error("attachment_not_found");
+  return response.blob();
+}
+
+/** ADR 0024: same-origin read of a sent picture; the page checks the bytes before showing them. */
+export const fetchAttachment: typeof Native.fetchAttachment = async (origin, id) => new Uint8Array(await (await attachmentBytes(origin, id)).arrayBuffer());
+
+/**
+ * ADR 0024: the browser saves it as a download. The blob is re-typed as octet-stream so the browser
+ * neither guesses nor opens it, whatever the name says.
+ */
+export const saveAttachment: typeof Native.saveAttachment = async (origin, id, name) => {
+  const blob = new Blob([await (await attachmentBytes(origin, id)).arrayBuffer()], { type: "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.rel = "noopener";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  return name;
+};
+
 // ADR 0024: the web reads the chat stream with fetch (meeting/chat-events.ts); there is no native one.
 export const createDesktopChatTransport: typeof Native.createDesktopChatTransport = () => ({
   open: (_lastEventId, _event, closed) => {

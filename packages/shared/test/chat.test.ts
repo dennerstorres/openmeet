@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  attachmentIsImage,
   canDeleteMessage,
   canEditMessage,
   mentionCandidates,
@@ -35,6 +36,7 @@ function message(id: string, body = `m${id}`, extra: Partial<ChatMessage> = {}):
     reactions: [],
     mentions: [],
     mentionsEveryone: false,
+    attachments: [],
     ...extra,
   };
 }
@@ -127,6 +129,8 @@ test("the message routes pass the instance path check, with only the cursor as q
     `/api/v1/dms/${roomId}/rename`,
     "/api/v1/blocks",
     `/api/v1/users/${roomId}/block`,
+    `/api/v1/rooms/${roomId}/attachments`,
+    `/api/v1/attachments/${roomId}`,
   ]) {
     assert.equal(prepareInstanceRequest(origin, origin, "GET", path, undefined, null).url, `${origin}${path}`);
   }
@@ -140,6 +144,8 @@ test("the message routes pass the instance path check, with only the cursor as q
     "/api/v1/dms/not-an-id/leave",
     `/api/v1/dms/${roomId}/members/${roomId}`,
     "/api/v1/users/not-an-id/block",
+    "/api/v1/attachments/foto.png",
+    `/api/v1/attachments/${roomId}?name=foto.png`,
   ]) {
     assert.throws(() => prepareInstanceRequest(origin, origin, "GET", path, undefined, null));
   }
@@ -188,4 +194,22 @@ test("a message calls whoever it names, never its author", () => {
   assert.equal(mentionsUser(message("1", "x", { mentionsEveryone: true }), ana), false);
   assert.equal(mentionsUser(message("1", "x", { mentions: [ana] }), bia), false);
   assert.deepEqual(parseChatMessage({ ...message("1"), mentions: ["nope"] }), undefined);
+});
+
+test("attachments parse as the API writes them and only a measured picture gets a preview", () => {
+  const picture = { id: bia, name: "foto.png", contentType: "image/png", size: 45, width: 3, height: 2 };
+  const file = { id: ana, name: "foto.png", contentType: "application/octet-stream", size: 40, width: null, height: null };
+  const parsed = parseChatMessage({ ...message("8"), attachments: [picture, file] });
+  assert.deepEqual(parsed?.attachments, [picture, file]);
+  assert.equal(attachmentIsImage(picture), true);
+  assert.equal(attachmentIsImage(file), false);
+  assert.equal(attachmentIsImage({ ...picture, contentType: "image/svg+xml" }), false);
+  assert.equal(attachmentIsImage({ ...file, contentType: "image/png" }), false);
+  assert.equal(parseChatMessage({ ...message("8"), attachments: [{ ...picture, height: null }] }), undefined);
+  assert.equal(parseChatMessage({ ...message("8"), attachments: [{ ...picture, id: "x" }] }), undefined);
+  assert.equal(parseChatMessage({ ...message("8"), attachments: Array.from({ length: 11 }, () => file) }), undefined);
+  assert.deepEqual(parseChatMessage({ ...message("8"), deleted: true, attachments: [picture] })?.attachments, []);
+  // A message with files may go without text.
+  assert.equal(sendableBody("   "), undefined);
+  assert.equal(sendableBody("", true), "");
 });

@@ -1,5 +1,6 @@
 import type { MigrationClient } from "../db/migrate.js";
 import type { PublicUser } from "../auth/service.js";
+import { ATTACHMENTS_SELECT, claimAttachments, readAttachments, type AttachmentView } from "./attachments.js";
 import { RoomError, canManage, loadRoomAccess, requireMember, roomId, text, type RoomRecord } from "./service.js";
 import { loadDm } from "./dms.js";
 
@@ -50,6 +51,8 @@ export interface MessageView {
   mentions: string[];
   /** `@everyone` or `@here` from an owner or moderator; from anyone else it is only text. */
   mentionsEveryone: boolean;
+  /** ADR 0024: files sent with the message, in upload order; gone with the message. */
+  attachments: AttachmentView[];
   canEdit: boolean;
   canDelete: boolean;
 }
@@ -83,11 +86,12 @@ export function messageId(value: string): string {
   return value;
 }
 
-/** Newlines are kept and CRLF becomes LF; anything hidden is refused, never cleaned in silence. */
-export function parseBody(value: unknown): string {
+/** Newlines are kept and CRLF becomes LF; anything hidden is refused, never cleaned in silence. Blank only with files. */
+export function parseBody(value: unknown, blankAllowed = false): string {
+  if (blankAllowed && (value === undefined || value === "")) return "";
   if (typeof value !== "string") throw new RoomError("invalid_message");
   const body = value.replace(/\r\n?/g, "\n");
-  if (body.trim().length === 0 || [...body].length > MESSAGE_MAX_CHARS || hidden(body)) throw new RoomError("invalid_message");
+  if ((body.trim().length === 0 && !blankAllowed) || [...body].length > MESSAGE_MAX_CHARS || hidden(body)) throw new RoomError("invalid_message");
   return body;
 }
 
@@ -132,6 +136,7 @@ export function publicMessage(view: MessageView): Omit<MessageView, "canEdit" | 
     reactions: view.reactions,
     mentions: view.mentions,
     mentionsEveryone: view.mentionsEveryone,
+    attachments: view.attachments,
     id: view.id,
     roomId: view.roomId,
     dmId: view.dmId,
@@ -156,7 +161,8 @@ const SELECT = `
              select emoji, array_agg(user_id::text order by created_at, user_id) as users, min(created_at) as first
              from message_reactions where message_id = m.id group by emoji
            ) x
-         ), '[]'::json) as reactions
+         ), '[]'::json) as reactions,
+         ${ATTACHMENTS_SELECT} as attachments
   from messages m
   left join messages r on r.id = m.reply_to_id`;
 
@@ -187,6 +193,7 @@ function readMessage(row: Record<string, unknown>, actor: PublicUser, chat: Chat
     reactions: readReactions(row.reactions),
     mentions: deleted || !Array.isArray(row.mentions) ? [] : row.mentions.filter((user): user is string => typeof user === "string"),
     mentionsEveryone: !deleted && row.mentions_everyone === true,
+    attachments: deleted ? [] : readAttachments(row.attachments),
     canEdit: mine && !deleted,
     canDelete: !deleted && (mine || chat.moderator),
   };
@@ -299,10 +306,11 @@ export async function sendMessage(
   db: MigrationClient,
   actor: PublicUser,
   id: string,
-  input: { body: unknown; replyToId: string | undefined },
+  input: { body: unknown; replyToId: string | undefined; attachmentIds?: readonly string[] },
   kind: ChatKind = "room",
 ): Promise<MessageView> {
-  const body = parseBody(input.body);
+  const attachmentIds = input.attachmentIds ?? [];
+  const body = parseBody(input.body, attachmentIds.length > 0);
   const replyTo = input.replyToId === undefined ? undefined : messageId(input.replyToId);
   const chat = await loadChat(db, actor, id, kind);
   requireOpen(chat);
@@ -311,6 +319,7 @@ export async function sendMessage(
     if (!target.rows[0]) throw new RoomError("message_not_found");
   }
   const mentions = await resolveMentions(db, chat, body);
+  // The message and its files land together: a file someone else owns or already sent rolls it all back.
   const created = await db.transaction(async (tx) => {
     const inserted = await tx.query(
       `insert into messages (${chat.column}, author_id, body, reply_to_id, mentions_everyone) values ($1, $2, $3, $4::bigint, $5) returning id::text as id`,
@@ -319,6 +328,7 @@ export async function sendMessage(
     const id = text(inserted.rows[0]?.id);
     if (!id) throw new RoomError("conflict");
     await saveMentions(tx, id, mentions);
+    await claimAttachments(tx, actor, id, attachmentIds);
     return id;
   });
   return readOne(db, actor, chat, created);
@@ -339,6 +349,12 @@ async function messageChat(db: MigrationClient, actor: PublicUser, id: string): 
     throw error;
   }
   return { chat, authorId: text(row.author_id) ?? "", deleted: row.deleted === true };
+}
+
+/** ADR 0024: whoever may read the message may read its files; anything else is not found. */
+export async function requireReadableMessage(db: MigrationClient, actor: PublicUser, id: string): Promise<void> {
+  const { deleted } = await messageChat(db, actor, id);
+  if (deleted) throw new RoomError("message_not_found");
 }
 
 export async function editMessage(db: MigrationClient, actor: PublicUser, id: string, input: { body: unknown }): Promise<MessageView> {

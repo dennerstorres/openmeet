@@ -14,6 +14,16 @@ description = "Enables the instance_sound command without any pre-configured sco
 commands.allow = ["instance_sound"]
 
 [[permission]]
+identifier = "allow-instance-attachment"
+description = "Enables the instance_attachment command without any pre-configured scope."
+commands.allow = ["instance_attachment"]
+
+[[permission]]
+identifier = "allow-instance-attachment-save"
+description = "Enables the instance_attachment_save command without any pre-configured scope."
+commands.allow = ["instance_attachment_save"]
+
+[[permission]]
 identifier = "allow-session-login"
 description = "Enables the session_login command without any pre-configured scope."
 commands.allow = ["session_login"]

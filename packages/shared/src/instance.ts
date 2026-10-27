@@ -357,6 +357,11 @@ function instancePath(path: string): string {
   if (dm?.[1] !== undefined && UUID.test(dm[1])) return path;
   const block = /^\/api\/v1\/users\/([0-9a-f-]{36})\/block$/i.exec(path);
   if (block?.[1] !== undefined && UUID.test(block[1])) return path;
+  // ADR 0024: a file goes up to a text room or a DM and comes back by its own id.
+  const upload = /^\/api\/v1\/(?:rooms|dms)\/([0-9a-f-]{36})\/attachments$/i.exec(path);
+  if (upload?.[1] !== undefined && UUID.test(upload[1])) return path;
+  const attachment = /^\/api\/v1\/attachments\/([0-9a-f-]{36})$/i.exec(path);
+  if (attachment?.[1] !== undefined && UUID.test(attachment[1])) return path;
   throw new PocInputError("invalid_api_base", "Request path is not part of the instance API");
 }
 

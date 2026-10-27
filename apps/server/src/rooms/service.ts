@@ -36,7 +36,10 @@ export type RoomErrorCode =
   | "invalid_message"
   | "dm_not_found"
   | "dm_full"
-  | "blocked";
+  | "blocked"
+  | "invalid_attachment"
+  | "attachment_too_large"
+  | "attachment_not_found";
 
 export class RoomError extends Error {
   readonly code: RoomErrorCode;

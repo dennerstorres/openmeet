@@ -1,3 +1,4 @@
+mod attachments;
 mod events;
 mod google;
 mod invite;
@@ -104,6 +105,8 @@ pub fn run() {
             session::instance_call,
             session::instance_image,
             session::instance_sound,
+            attachments::instance_attachment,
+            attachments::instance_attachment_save,
             events::instance_events_open,
             events::instance_events_close,
             shell::shell_status,
