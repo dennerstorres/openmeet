@@ -26,6 +26,16 @@ Testes automatizados: grafo montado por efeito; troca sem novo processor; reiní
 
 Prova humana antes de DONE: dois PCs, cada efeito ouvido do outro lado no `.exe` e na web (Chrome, Edge, Firefox); latência percebida nos efeitos de pitch; sem eco com alto-falante; mute, troca de microfone e reconexão mantêm o efeito; áudio da tela sem efeito; CPU aceitável em 10 min com efeito ligado.
 
+## F04-10 — biblioteca de sons do servidor
+READY em 2026-10-26 com o aceite do ADR 0021. Depende de F04-09. Grande: dividir em commits de API, ponte nativa, mídia e UI.
+
+Arquivos previstos: migration `0009` (`sound`, `server_sound`); rotas de sons no servidor com testes de permissão; leitor/validador WAV em `packages/shared`; rotas na lista fechada do Rust (F10-18) e no cliente web; `packages/media/src/sound-board.ts` (conversão para WAV 24 kHz mono, tocar/parar, ganho do painel); `input-gain.ts` com a entrada dos sons e a voz em zero para tocar mutado; painel em `MeetingApp.tsx`.
+
+Escopo: listar a biblioteca do servidor, subir, renomear o próprio som, tocar, parar, importar o próprio som para outro servidor, tirar da biblioteca (dono do som, dono e moderadores do servidor) e apagar de vez (dono do som). Volume do painel salvo neste aparelho. Mutado, a faixa abre só durante o som com a voz em zero.
+
+Testes automatizados: WAV fora do formato, cabeçalho mentiroso, dados truncados, mais de 20 s e nome com controle/bidi recusados; não membro não lista nem baixa; importar som alheio ou para servidor sem membership dá 403; moderador tira mas não apaga de vez; apagar de vez some das duas bibliotecas; limite de upload por tempo; conversão no cliente gera WAV válido e corta acima de 20 s com erro; tocar corta o anterior; som fora do efeito e do ganho do mic; mutado desmuta, zera a voz e remuta ao fim e ao Parar; troca de dispositivo não deixa som órfão. Typecheck, lint, format:check, `cargo test`, builds desktop e web; CSP sem mudança.
+
+Prova humana antes de DONE: migration em implantação real; dois PCs no `.exe` e na web; som ouvido do outro lado com mic aberto e mutado; voz não vaza durante som mutado; indicador de mic volta ao estado anterior; importar para outro servidor e tocar lá; moderador remove; alto-falante sem eco do próprio som.
 ## Execução
 Consultar as tarefas `F04-*` em `PLAN.md`, seus pré-requisitos e os quality gates. Dividir implementações em pequenos commits e evidenciar testes.
 
