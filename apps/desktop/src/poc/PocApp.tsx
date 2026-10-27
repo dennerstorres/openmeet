@@ -34,6 +34,8 @@ const idleSnapshot: PocSnapshot = {
   voiceEffects: ["off"],
   voiceEffect: "off",
   voiceMonitor: false,
+  soundPlaying: null,
+  soundVolume: 1,
 };
 
 export function PocApp() {

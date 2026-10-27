@@ -27,13 +27,41 @@ test("anything off the canonical layout is refused", () => {
     change(copy, new DataView(copy.buffer));
     return sniffSound(copy);
   };
-  assert.equal(broken((_, view) => view.setUint16(22, 2, true)), undefined, "stereo");
-  assert.equal(broken((_, view) => view.setUint32(24, 48000, true)), undefined, "48 kHz");
-  assert.equal(broken((_, view) => view.setUint16(34, 8, true)), undefined, "8 bits");
-  assert.equal(broken((_, view) => view.setUint16(20, 3, true)), undefined, "float");
-  assert.equal(broken((_, view) => view.setUint32(40, 9999, true)), undefined, "lying data size");
-  assert.equal(broken((_, view) => view.setUint32(4, 1, true)), undefined, "lying RIFF size");
-  assert.equal(broken((bytes) => bytes.set([0x4c, 0x49, 0x53, 0x54], 36)), undefined, "extra chunk");
+  assert.equal(
+    broken((_, view) => view.setUint16(22, 2, true)),
+    undefined,
+    "stereo",
+  );
+  assert.equal(
+    broken((_, view) => view.setUint32(24, 48000, true)),
+    undefined,
+    "48 kHz",
+  );
+  assert.equal(
+    broken((_, view) => view.setUint16(34, 8, true)),
+    undefined,
+    "8 bits",
+  );
+  assert.equal(
+    broken((_, view) => view.setUint16(20, 3, true)),
+    undefined,
+    "float",
+  );
+  assert.equal(
+    broken((_, view) => view.setUint32(40, 9999, true)),
+    undefined,
+    "lying data size",
+  );
+  assert.equal(
+    broken((_, view) => view.setUint32(4, 1, true)),
+    undefined,
+    "lying RIFF size",
+  );
+  assert.equal(
+    broken((bytes) => bytes.set([0x4c, 0x49, 0x53, 0x54], 36)),
+    undefined,
+    "extra chunk",
+  );
   assert.equal(sniffSound(good.subarray(0, good.length - 2)), undefined, "truncated");
   assert.equal(sniffSound(new Uint8Array(SOUND_MAX_BYTES + 2)), undefined, "too big");
   assert.equal(sniffSound(new Uint8Array(0)), undefined);

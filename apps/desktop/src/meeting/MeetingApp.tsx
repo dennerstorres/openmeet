@@ -43,6 +43,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { holdMeetingLock } from "../shell/background";
 import { CardStage } from "./Cards";
 import { Face, ImagePicker } from "./images";
+import { SoundPanel, storedSoundVolume } from "./sounds";
 import {
   IconCamera,
   IconClock,
@@ -96,6 +97,8 @@ const idleSnapshot: PocSnapshot = {
   voiceEffects: ["off"],
   voiceEffect: "off",
   voiceMonitor: false,
+  soundPlaying: null,
+  soundVolume: 1,
   screenAudio: "off",
 };
 
@@ -235,11 +238,14 @@ export function MeetingApp() {
   mediaRef.current = media;
 
   function session(): LiveKitPocSession {
-    sessionRef.current ??= new LiveKitPocSession({
-      appVersion: desktopPackage.version,
-      client: __WEB__ ? "web" : "desktop",
-      videoBackground: { blurRadius: storedBlurRadius() },
-    });
+    if (sessionRef.current === null) {
+      sessionRef.current = new LiveKitPocSession({
+        appVersion: desktopPackage.version,
+        client: __WEB__ ? "web" : "desktop",
+        videoBackground: { blurRadius: storedBlurRadius() },
+      });
+      sessionRef.current.setSoundVolume(storedSoundVolume());
+    }
     return sessionRef.current;
   }
 
@@ -1457,6 +1463,18 @@ export function MeetingApp() {
                   />
                   Incluir áudio do PC
                 </label>
+              ) : null}
+              {!isFullscreen ? (
+                <SoundPanel
+                  model={model}
+                  session={session}
+                  origin={state.origin}
+                  serverId={state.activeServerId}
+                  servers={state.servers}
+                  playing={media.soundPlaying}
+                  volume={media.soundVolume}
+                  onError={setMediaError}
+                />
               ) : null}
               {isFullscreen ? (
                 <button type="button" className="ghost" onClick={() => setFullscreen(false)}>

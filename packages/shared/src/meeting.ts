@@ -597,24 +597,18 @@ export class MeetingModel {
     return done;
   }
 
-  /** ADR 0021: the library of the selected server, or null when it could not be read. */
-  async listSounds(): Promise<SoundSummary[] | null> {
-    const serverId = this.selectedServerId;
-    if (serverId === null) return null;
+  /** ADR 0021: one server library, or null when it could not be read. The call's server, not the browsed one. */
+  async listSounds(serverId: string): Promise<SoundSummary[] | null> {
     const body = await this.soundCall("GET", `/api/v1/servers/${serverId}/sounds`, null);
     return body === null ? null : parseSoundLibrary(body);
   }
 
   /** `sound` is base64 of the canonical WAV; the API judges it again. */
-  async uploadSound(name: string, sound: string): Promise<boolean> {
-    const serverId = this.selectedServerId;
-    if (serverId === null) return false;
+  async uploadSound(serverId: string, name: string, sound: string): Promise<boolean> {
     return (await this.soundCall("POST", `/api/v1/servers/${serverId}/sounds`, { name, sound }, 201)) !== null;
   }
 
-  async removeSound(soundId: string): Promise<boolean> {
-    const serverId = this.selectedServerId;
-    if (serverId === null) return false;
+  async removeSound(serverId: string, soundId: string): Promise<boolean> {
     return (await this.soundCall("POST", `/api/v1/servers/${serverId}/sounds/${soundId}/remove`, {})) !== null;
   }
 
