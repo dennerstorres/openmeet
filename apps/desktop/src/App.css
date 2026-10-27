@@ -2672,3 +2672,127 @@ button.message-reply:hover span {
     background: transparent;
   }
 }
+
+/* ADR 0024: files on messages and in the composer. */
+.text-room.dragging {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.composer textarea {
+  padding-left: 46px;
+}
+
+.composer-attach {
+  position: absolute;
+  left: 22px;
+  bottom: 22px;
+}
+
+.chat-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 6px;
+}
+
+.chat-picture {
+  max-width: 100%;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  overflow: hidden;
+  cursor: zoom-in;
+}
+
+.chat-picture img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.chat-file,
+.composer-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: min(360px, 100%);
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-panel);
+}
+
+.chat-file-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-file-size {
+  flex: none;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.composer-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.composer-file img {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.composer-file.failed .chat-file-size {
+  color: var(--danger-text);
+}
+
+.composer-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.picture-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  background: rgb(0 0 0 / 80%);
+}
+
+.picture-viewer img {
+  max-width: 100%;
+  max-height: calc(100% - 64px);
+  object-fit: contain;
+}
+
+.picture-viewer .row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}

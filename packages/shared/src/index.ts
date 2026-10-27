@@ -14,10 +14,14 @@ export {
   prepareInstanceRequest,
   readErrorCode,
 } from "./instance.js";
-export { IMAGE_MAX_BYTES, IMAGE_MAX_SIDE, IMAGE_TYPES, sniffImage } from "./image.js";
-export type { ImageInfo, ImageType } from "./image.js";
+export { ATTACHMENT_IMAGE_TYPES, IMAGE_MAX_BYTES, IMAGE_MAX_SIDE, IMAGE_TYPES, sniffAttachmentImage, sniffImage } from "./image.js";
+export type { AttachmentImageInfo, ImageInfo, ImageType } from "./image.js";
 export {
+  ATTACHMENTS_PER_MESSAGE,
+  ATTACHMENT_DEFAULT_MAX_BYTES,
   MESSAGE_MAX_CHARS,
+  attachmentIsImage,
+  parseChatAttachment,
   canDeleteMessage,
   canEditMessage,
   compareMessageIds,
@@ -26,7 +30,7 @@ export {
   parseChatPage,
   sendableBody,
 } from "./chat.js";
-export type { ChatMessage, ChatPage, ChatReaction } from "./chat.js";
+export type { ChatAttachment, ChatMessage, ChatPage, ChatReaction } from "./chat.js";
 export { SOUND_MAX_BYTES, SOUND_MAX_MS, SOUND_NAME_MAX, SOUND_SAMPLE_RATE, encodeSound, parseOwnSounds, parseSoundLibrary, sniffSound } from "./sound.js";
 export type { OwnSound, SoundInfo, SoundSummary } from "./sound.js";
 export { inviteFromFragment, inviteLink, invitePageLink, isInviteCode, parseInvite } from "./invite.js";

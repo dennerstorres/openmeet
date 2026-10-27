@@ -1,19 +1,24 @@
 import {
+  ATTACHMENTS_PER_MESSAGE,
+  ATTACHMENT_DEFAULT_MAX_BYTES,
   MESSAGE_MAX_CHARS,
+  attachmentIsImage,
   canDeleteMessage,
   canEditMessage,
   mergeMessages,
   parseChatMessage,
   sendableBody,
+  type ChatAttachment,
   type ChatMessage,
   type MeetingModel,
   type RoomSummary,
 } from "@openmeet/shared";
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
-import { openChatLink } from "../shell/native";
+import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from "react";
+import { isTauri, openChatLink } from "../shell/native";
 import type { ChatListener } from "./chat-events";
-import { IconHash, IconPencil, IconPin, IconReply, IconSearch, IconSmile, IconTrash } from "./Icons";
-import { Face } from "./images";
+import { MessageFiles, PictureViewer, fileSize } from "./ChatFiles";
+import { IconHash, IconPaperclip, IconPencil, IconPin, IconReply, IconSearch, IconSmile, IconTrash } from "./Icons";
+import { Face, base64 } from "./images";
 import { Markdown } from "./Markdown";
 
 // ADR 0024: one text room on screen. History comes in pages, live changes through the session feed; the
@@ -58,6 +63,17 @@ function stamp(createdAt: string): string {
   return date.toDateString() === today.toDateString() ? timeFormat.format(date) : `${dayFormat.format(date)} ${timeFormat.format(date)}`;
 }
 
+/** A file on its way up: the API's answer replaces the local guess once it is stored. */
+interface PendingFile {
+  key: string;
+  name: string;
+  size: number;
+  state: "uploading" | "ready" | "failed";
+  attachment: ChatAttachment | null;
+  /** Local blob: URL, only once the API has called the bytes a picture. */
+  preview: string | null;
+}
+
 function typingLine(names: string[]): string {
   if (names.length === 1) return `${names[0]} está digitando…`;
   if (names.length === 2) return `${names[0]} e ${names[1]} estão digitando…`;
@@ -83,6 +99,13 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
   const [highlight, setHighlight] = useState<string | null>(null);
   // After a jump the list is a window in the past: live messages wait until the person returns to the end.
   const [detached, setDetached] = useState(false);
+  const [files, setFiles] = useState<PendingFile[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [viewer, setViewer] = useState<{ attachment: ChatAttachment; url: string } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const filesRef = useRef<PendingFile[]>([]);
+  filesRef.current = files;
   const detachedRef = useRef(false);
   const listRef = useRef<HTMLOListElement | null>(null);
   const stickRef = useRef(true);
@@ -271,17 +294,88 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
     setHasMore(page.hasMore);
   }
 
+  // A file leaves the screen with its local preview.
+  useEffect(() => () => filesRef.current.forEach((file) => file.preview && URL.revokeObjectURL(file.preview)), []);
+
+  function dropFile(key: string): void {
+    setFiles((list) => {
+      const gone = list.find((file) => file.key === key);
+      if (gone?.preview) URL.revokeObjectURL(gone.preview);
+      return list.filter((file) => file.key !== key);
+    });
+  }
+
+  function addFiles(picked: readonly File[]): void {
+    if (picked.length === 0 || room.ended) return;
+    const target = room.id;
+    const free = ATTACHMENTS_PER_MESSAGE - filesRef.current.length;
+    if (picked.length > free) setNotice(`Até ${ATTACHMENTS_PER_MESSAGE} arquivos por mensagem.`);
+    for (const file of picked.slice(0, Math.max(0, free))) {
+      if (file.size === 0 || file.size > ATTACHMENT_DEFAULT_MAX_BYTES) {
+        setNotice(`${file.name}: cada arquivo vai até ${fileSize(ATTACHMENT_DEFAULT_MAX_BYTES)}.`);
+        continue;
+      }
+      const key = `${Date.now()}-${Math.random()}`;
+      setFiles((list) => [...list, { key, name: file.name, size: file.size, state: "uploading", attachment: null, preview: null }]);
+      void (async () => {
+        let bytes: Uint8Array<ArrayBuffer> | null = null;
+        let stored: ChatAttachment | null = null;
+        try {
+          bytes = new Uint8Array(await file.arrayBuffer());
+          stored = await model.uploadAttachment(target, file.name, base64(bytes));
+        } catch {
+          stored = null;
+        }
+        const preview = stored && bytes && attachmentIsImage(stored) ? URL.createObjectURL(new Blob([bytes], { type: stored.contentType })) : null;
+        setFiles((list) => {
+          if (!list.some((item) => item.key === key)) {
+            if (preview) URL.revokeObjectURL(preview);
+            return list;
+          }
+          return list.map((item) => (item.key === key ? { ...item, state: stored ? "ready" : "failed", attachment: stored, preview } : item));
+        });
+      })();
+    }
+  }
+
+  function onPaste(event: ClipboardEvent<HTMLTextAreaElement>): void {
+    const pasted = [...event.clipboardData.files];
+    if (pasted.length === 0) return;
+    event.preventDefault();
+    addFiles(pasted);
+  }
+
+  function onDrop(event: DragEvent<HTMLElement>): void {
+    setDragging(false);
+    if (!event.dataTransfer.types.includes("Files")) return;
+    event.preventDefault();
+    addFiles([...event.dataTransfer.files]);
+  }
+
+  function onSaved(name: string | null): void {
+    setNotice(name === null ? "Não foi possível baixar o arquivo." : isTauri() ? `Salvo em Downloads: ${name}` : `Baixado: ${name}`);
+  }
+
   async function send(): Promise<void> {
-    const body = sendableBody(draft);
-    if (body === undefined || sending) return;
+    const ready = files.filter((file) => file.state === "ready" && file.attachment !== null);
+    const body = sendableBody(draft, ready.length > 0);
+    if (body === undefined || sending || files.some((file) => file.state === "uploading")) return;
     setSending(true);
-    const sent = await model.sendMessage(room.id, body, replyTo?.id);
+    const sent = await model.sendMessage(
+      room.id,
+      body,
+      replyTo?.id,
+      ready.map((file) => file.attachment?.id ?? ""),
+    );
     setSending(false);
     if (sent === null) return;
     stickRef.current = true;
     apply([sent]);
     setDraft("");
     setReplyTo(null);
+    files.forEach((file) => file.preview && URL.revokeObjectURL(file.preview));
+    setFiles([]);
+    setNotice(null);
     composerRef.current?.focus();
   }
 
@@ -332,7 +426,20 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
   const remaining = MESSAGE_MAX_CHARS - [...draft].length;
 
   return (
-    <section className="text-room" aria-labelledby="text-room-title">
+    <section
+      className={`text-room${dragging ? " dragging" : ""}`}
+      aria-labelledby="text-room-title"
+      onDragOver={(event) => {
+        if (readOnly || !event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={(event) => {
+        if (event.currentTarget === event.target) setDragging(false);
+      }}
+      onDrop={onDrop}
+    >
+      {viewer ? <PictureViewer origin={origin} attachment={viewer.attachment} url={viewer.url} onSaved={onSaved} onClose={() => setViewer(null)} /> : null}
       <header className="text-room-head">
         <IconHash size={20} />
         <h1 id="text-room-title">{room.name}</h1>
@@ -476,6 +583,14 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
                       <Markdown source={message.body} onLink={setPendingLink} />
                       {message.edited ? <span className="message-edited"> (editada)</span> : null}
                     </div>
+                  )}
+                  {message.deleted ? null : (
+                    <MessageFiles
+                      origin={origin}
+                      attachments={message.attachments}
+                      onOpen={(attachment, url) => setViewer({ attachment, url })}
+                      onSaved={onSaved}
+                    />
                   )}
                   {message.reactions.length > 0 ? (
                     <div className="reactions">
@@ -671,8 +786,55 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
               </button>
             </p>
           ) : null}
+          {files.length > 0 ? (
+            <ul className="composer-files" aria-label="Arquivos para enviar">
+              {files.map((file) => (
+                <li key={file.key} className={`composer-file ${file.state}`}>
+                  {file.preview ? <img src={file.preview} alt="" /> : null}
+                  <span className="chat-file-name" title={file.name}>
+                    {file.name}
+                  </span>
+                  <span className="chat-file-size">
+                    {file.state === "uploading" ? "enviando…" : file.state === "failed" ? "falhou" : fileSize(file.attachment?.size ?? file.size)}
+                  </span>
+                  <button type="button" className="icon-btn" aria-label={`Tirar ${file.name}`} title="Tirar" onClick={() => dropFile(file.key)}>
+                    <IconTrash size={16} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {notice ? (
+            <p className="composer-notice" role="status">
+              {notice}
+              <button type="button" className="ghost" onClick={() => setNotice(null)}>
+                Ok
+              </button>
+            </p>
+          ) : null}
+          <button
+            type="button"
+            className="icon-btn composer-attach"
+            aria-label="Anexar arquivos"
+            title="Anexar arquivos"
+            disabled={files.length >= ATTACHMENTS_PER_MESSAGE}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <IconPaperclip size={18} />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            hidden
+            onChange={(event) => {
+              addFiles([...(event.currentTarget.files ?? [])]);
+              event.currentTarget.value = "";
+            }}
+          />
           <textarea
             ref={composerRef}
+            onPaste={onPaste}
             value={draft}
             rows={1}
             placeholder={`Conversar em #${room.name}`}

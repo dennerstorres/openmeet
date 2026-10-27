@@ -210,3 +210,21 @@ export function IconPencil({ size }: { size?: number }) {
     </Icon>
   );
 }
+
+export function IconPaperclip({ size }: { size?: number }) {
+  return (
+    <Icon size={size}>
+      <path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4L15.5 7" />
+    </Icon>
+  );
+}
+
+export function IconDownload({ size }: { size?: number }) {
+  return (
+    <Icon size={size}>
+      <path d="M12 4v11" />
+      <path d="m7 10 5 5 5-5" />
+      <path d="M5 20h14" />
+    </Icon>
+  );
+}

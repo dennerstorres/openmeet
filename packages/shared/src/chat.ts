@@ -3,6 +3,9 @@
 // client, so both are computed here from the author and the caller's role.
 
 export const MESSAGE_MAX_CHARS = 4000;
+export const ATTACHMENTS_PER_MESSAGE = 10;
+/** The API's default for ATTACHMENT_MAX_BYTES; the composer warns early, the API has the last word. */
+export const ATTACHMENT_DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
 
 export interface ChatMessage {
   id: string;
@@ -15,6 +18,17 @@ export interface ChatMessage {
   deleted: boolean;
   createdAt: string;
   reactions: ChatReaction[];
+  attachments: ChatAttachment[];
+}
+
+/** Width and height only for a picture the API recognised by its bytes; anything else is a download. */
+export interface ChatAttachment {
+  id: string;
+  name: string;
+  contentType: string;
+  size: number;
+  width: number | null;
+  height: number | null;
 }
 
 export interface ChatReaction {
@@ -60,6 +74,50 @@ function parseReactions(value: unknown): ChatReaction[] | undefined {
   return reactions;
 }
 
+const PREVIEW_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+
+export function attachmentIsImage(attachment: ChatAttachment): boolean {
+  return PREVIEW_TYPES.has(attachment.contentType) && attachment.width !== null && attachment.height !== null;
+}
+
+function dimension(value: unknown): number | null | undefined {
+  if (value === null) return null;
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 16384 ? value : undefined;
+}
+
+export function parseChatAttachment(value: unknown): ChatAttachment | undefined {
+  const attachment = record(value);
+  if (!attachment) return undefined;
+  const { id, name, contentType, size } = attachment;
+  const width = dimension(attachment.width ?? null);
+  const height = dimension(attachment.height ?? null);
+  if (
+    typeof id !== "string" ||
+    !UUID.test(id) ||
+    typeof name !== "string" ||
+    name.length === 0 ||
+    name.length > 510 ||
+    typeof contentType !== "string" ||
+    contentType.length > 127 ||
+    typeof size !== "number" ||
+    !Number.isInteger(size) ||
+    size < 1 ||
+    width === undefined ||
+    height === undefined ||
+    (width === null) !== (height === null)
+  ) {
+    return undefined;
+  }
+  return { id, name, contentType, size, width, height };
+}
+
+function parseAttachments(value: unknown): ChatAttachment[] | undefined {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > ATTACHMENTS_PER_MESSAGE) return undefined;
+  const attachments = value.map(parseChatAttachment);
+  return attachments.some((attachment) => attachment === undefined) ? undefined : (attachments as ChatAttachment[]);
+}
+
 /** Undefined for anything that is not a message as the API writes it. */
 export function parseChatMessage(value: unknown): ChatMessage | undefined {
   const item = record(value);
@@ -67,6 +125,7 @@ export function parseChatMessage(value: unknown): ChatMessage | undefined {
   const { id, roomId, authorId, body, pinned, edited, deleted, createdAt } = item;
   const replyTo = parseReply(item.replyTo ?? null);
   const reactions = parseReactions(item.reactions);
+  const attachments = parseAttachments(item.attachments);
   if (
     typeof id !== "string" ||
     !MESSAGE_ID.test(id) ||
@@ -82,11 +141,24 @@ export function parseChatMessage(value: unknown): ChatMessage | undefined {
     typeof createdAt !== "string" ||
     Number.isNaN(Date.parse(createdAt)) ||
     replyTo === undefined ||
-    reactions === undefined
+    reactions === undefined ||
+    attachments === undefined
   ) {
     return undefined;
   }
-  return { id, roomId, authorId, body: deleted ? "" : body, replyTo, pinned, edited, deleted, createdAt, reactions: deleted ? [] : reactions };
+  return {
+    id,
+    roomId,
+    authorId,
+    body: deleted ? "" : body,
+    replyTo,
+    pinned,
+    edited,
+    deleted,
+    createdAt,
+    reactions: deleted ? [] : reactions,
+    attachments: deleted ? [] : attachments,
+  };
 }
 
 export function parseChatPage(value: unknown): ChatPage | undefined {
@@ -119,9 +191,9 @@ export function canDeleteMessage(message: ChatMessage, userId: string | null, ma
   return !message.deleted && (manager || (userId !== null && message.authorId === userId));
 }
 
-/** What the composer may send: CRLF as LF, not blank, within the API's limit counted in code points. */
-export function sendableBody(value: string): string | undefined {
+/** What the composer may send: CRLF as LF, not blank unless files go with it, within the API's limit counted in code points. */
+export function sendableBody(value: string, withAttachments = false): string | undefined {
   const body = value.replace(/\r\n?/g, "\n");
-  if (body.trim().length === 0 || [...body].length > MESSAGE_MAX_CHARS) return undefined;
+  if ((body.trim().length === 0 && !withAttachments) || [...body].length > MESSAGE_MAX_CHARS) return undefined;
   return body;
 }

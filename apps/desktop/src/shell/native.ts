@@ -108,6 +108,16 @@ export async function fetchImage(origin: string, id: string): Promise<Uint8Array
   return new Uint8Array(await invoke<ArrayBuffer>("instance_image", { origin, id }));
 }
 
+/** ADR 0024: one sent picture for the preview through the native session. The page checks the bytes again. */
+export async function fetchAttachment(origin: string, id: string): Promise<Uint8Array> {
+  return new Uint8Array(await invoke<ArrayBuffer>("instance_attachment", { origin, id }));
+}
+
+/** ADR 0024: Rust writes the file into Downloads under a safe name and shows it; the answer is that name. */
+export function saveAttachment(origin: string, id: string, name: string): Promise<string> {
+  return invoke<string>("instance_attachment_save", { origin, id, name });
+}
+
 /** ADR 0021: one library sound through the native session. The page checks the WAV again. */
 export async function fetchSound(origin: string, id: string): Promise<Uint8Array> {
   return new Uint8Array(await invoke<ArrayBuffer>("instance_sound", { origin, id }));

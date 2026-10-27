@@ -108,3 +108,30 @@ export function sniffImage(bytes: Uint8Array): ImageInfo | undefined {
   if (info.width < 1 || info.height < 1 || info.width > IMAGE_MAX_SIDE || info.height > IMAGE_MAX_SIDE) return undefined;
   return info;
 }
+
+// ADR 0024: chat attachments. Same signatures plus GIF, larger pictures, and no size cap here: the API
+// applies ATTACHMENT_MAX_BYTES. Anything that does not parse is a plain file and is only ever downloaded.
+export const ATTACHMENT_IMAGE_MAX_SIDE = 16384;
+export const ATTACHMENT_IMAGE_TYPES = [...IMAGE_TYPES, "image/gif"] as const;
+
+export interface AttachmentImageInfo {
+  type: (typeof ATTACHMENT_IMAGE_TYPES)[number];
+  width: number;
+  height: number;
+}
+
+function gif(bytes: Uint8Array): AttachmentImageInfo | undefined {
+  if (bytes.length < 14 || bytes[bytes.length - 1] !== 0x3b) return undefined;
+  return { type: "image/gif", width: u16le(bytes, 6), height: u16le(bytes, 8) };
+}
+
+export function sniffAttachmentImage(bytes: Uint8Array): AttachmentImageInfo | undefined {
+  let info: AttachmentImageInfo | undefined;
+  if (startsWith(bytes, PNG_SIGNATURE)) info = png(bytes);
+  else if (startsWith(bytes, [0xff, 0xd8, 0xff])) info = jpeg(bytes);
+  else if (ascii(bytes, 0, 4) === "RIFF") info = webp(bytes);
+  else if (ascii(bytes, 0, 6) === "GIF87a" || ascii(bytes, 0, 6) === "GIF89a") info = gif(bytes);
+  if (!info) return undefined;
+  if (info.width < 1 || info.height < 1 || info.width > ATTACHMENT_IMAGE_MAX_SIDE || info.height > ATTACHMENT_IMAGE_MAX_SIDE) return undefined;
+  return info;
+}

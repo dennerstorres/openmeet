@@ -167,7 +167,7 @@ pub async fn session_logout(held: tauri::State<'_, NativeSession>, origin: Strin
     Ok(reply)
 }
 
-fn is_id(value: &str) -> bool {
+pub(crate) fn is_id(value: &str) -> bool {
     value.len() == 36
         && value.char_indices().all(|(index, char)| match index {
             8 | 13 | 18 | 23 => char == '-',
@@ -225,6 +225,8 @@ fn allowed_call(method: &str, path: &str) -> bool {
         ("POST", ["", "api", "v1", "rooms", id, "messages", "search"]) => is_id(id),
         ("POST", ["", "api", "v1", "rooms", id, "typing"]) => is_id(id),
         ("POST", ["", "api", "v1", "messages", message, "edit" | "delete" | "pin" | "reactions"]) => is_message_id(message),
+        // A file goes up here as base64; it comes back through instance_attachment(_save).
+        ("POST", ["", "api", "v1", "rooms", id, "attachments"]) => is_id(id),
         _ => false,
     }
 }
@@ -237,9 +239,11 @@ pub async fn instance_call(held: tauri::State<'_, NativeSession>, origin: String
         return Err("invalid_path".to_string());
     }
     let access = held.access_for(&origin).ok_or("unauthorized")?;
+    // Up to 10 MB of file goes up in one call; everything else answers in seconds.
+    let wait = if path.ends_with("/attachments") { 120 } else { 10 };
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
-        .timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(wait))
         .build()
         .map_err(|_| "request_failed".to_string())?;
     let url = format!("{origin}{path}");
@@ -471,6 +475,7 @@ mod tests {
             ("POST", "/api/v1/messages/42/pin".to_string()),
             ("POST", "/api/v1/messages/42/reactions".to_string()),
             ("GET", format!("/api/v1/rooms/{id}/messages?around=7")),
+            ("POST", format!("/api/v1/rooms/{id}/attachments")),
         ] {
             assert!(allowed_call(method, &path), "{method} {path}");
         }
@@ -507,6 +512,9 @@ mod tests {
             ("POST", format!("/api/v1/messages/{id}/edit")),
             ("GET", "/api/v1/messages/42/edit".to_string()),
             ("GET", "/api/v1/events".to_string()),
+            ("GET", format!("/api/v1/attachments/{id}")),
+            ("GET", format!("/api/v1/rooms/{id}/attachments")),
+            ("POST", "/api/v1/rooms/not-an-id/attachments".to_string()),
         ] {
             assert!(!allowed_call(method, &path), "{method} {path}");
         }

@@ -596,3 +596,10 @@ Testes manuais (máquina/rede):
 Pendências e riscos:
 Próxima tarefa:
 ```
+
+## F13-09 — anexos (2026-10-27, branch `task/F13-09-anexos`)
+- API: `POST /api/v1/rooms/:id/attachments` (base64 em JSON, tipo pelos bytes: PNG/JPEG/GIF/WebP com medidas, resto `application/octet-stream`), `GET /api/v1/attachments/:id` sempre `Content-Disposition: attachment` + nosniff + CSP sandbox; `attachmentIds` no envio (transação, só upload próprio não enviado < 24 h); órfãos purgados a cada hora; `ATTACHMENT_MAX_BYTES` (padrão 10 MiB, 413 acima); 20 MiB/min e 30 pendentes por pessoa. `src/rooms/attachments.ts`, `test/attachments.test.ts`.
+- Rust: `attachments.rs` (`instance_attachment` para prévia, `instance_attachment_save` grava em Downloads com nome seguro, Zone.Identifier e mostra no Explorer); rota de upload em `allowed_call` com timeout 120 s.
+- Cliente: `ChatFiles.tsx` (prévia, visualizador, download), clipe/colar/arrastar na `TextRoom.tsx`, stubs web em `web/native.ts`, `instancePath`.
+- Validação (Windows 11): `pnpm typecheck`, `pnpm lint`, `prettier --check`, `pnpm test` (shared 60, media 77, server 101, desktop 32, scripts 27), `cargo test` (31), `pnpm --filter ./apps/desktop build` e `build:web` passam. Web local (PGlite, Ana no navegador + Dono pela API): upload de PNG real com prévia, PNG falso e SVG viraram arquivo, envio, visualizador, mensagem do Dono com anexo ao vivo, cabeçalhos de download conferidos com a outra conta.
+- Falta: `.exe` real (prévia e salvar em Downloads), clique real em "Baixar" na web, olhar 375 px. DM (F13-11) precisa estender `readAttachment` para `dm_id`. Estado: WAITING_VALIDATION.

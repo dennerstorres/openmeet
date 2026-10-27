@@ -1,5 +1,6 @@
 import type { MigrationClient } from "../db/migrate.js";
 import type { PublicUser } from "../auth/service.js";
+import { ATTACHMENTS_SELECT, claimAttachments, readAttachments, type AttachmentView } from "./attachments.js";
 import { RoomError, canManage, loadRoomAccess, requireMember, roomId, text, type RoomRecord } from "./service.js";
 
 // ADR 0024: messages of text rooms. A removed message keeps its row with an empty body, so replies and
@@ -36,6 +37,8 @@ export interface MessageView {
   createdAt: string;
   /** Who reacted is public in the room, so the same list serves every viewer and the live events. */
   reactions: { emoji: string; userIds: string[] }[];
+  /** ADR 0024: files sent with the message, in upload order; gone with the message. */
+  attachments: AttachmentView[];
   canEdit: boolean;
   canDelete: boolean;
 }
@@ -57,11 +60,12 @@ export function messageId(value: string): string {
   return value;
 }
 
-/** Newlines are kept and CRLF becomes LF; anything hidden is refused, never cleaned in silence. */
-export function parseBody(value: unknown): string {
+/** Newlines are kept and CRLF becomes LF; anything hidden is refused, never cleaned in silence. Blank only with files. */
+export function parseBody(value: unknown, blankAllowed = false): string {
+  if (blankAllowed && (value === undefined || value === "")) return "";
   if (typeof value !== "string") throw new RoomError("invalid_message");
   const body = value.replace(/\r\n?/g, "\n");
-  if (body.trim().length === 0 || [...body].length > MESSAGE_MAX_CHARS || hidden(body)) throw new RoomError("invalid_message");
+  if ((body.trim().length === 0 && !blankAllowed) || [...body].length > MESSAGE_MAX_CHARS || hidden(body)) throw new RoomError("invalid_message");
   return body;
 }
 
@@ -90,6 +94,7 @@ export async function typingRoom(db: MigrationClient, actor: PublicUser, id: str
 export function publicMessage(view: MessageView): Omit<MessageView, "canEdit" | "canDelete"> {
   return {
     reactions: view.reactions,
+    attachments: view.attachments,
     id: view.id,
     roomId: view.roomId,
     authorId: view.authorId,
@@ -112,7 +117,8 @@ const SELECT = `
              select emoji, array_agg(user_id::text order by created_at, user_id) as users, min(created_at) as first
              from message_reactions where message_id = m.id group by emoji
            ) x
-         ), '[]'::json) as reactions
+         ), '[]'::json) as reactions,
+         ${ATTACHMENTS_SELECT} as attachments
   from messages m
   left join messages r on r.id = m.reply_to_id`;
 
@@ -140,6 +146,7 @@ function readMessage(row: Record<string, unknown>, actor: PublicUser, chat: Chat
     deleted,
     createdAt: new Date(String(row.created_at)).toISOString(),
     reactions: readReactions(row.reactions),
+    attachments: deleted ? [] : readAttachments(row.attachments),
     canEdit: mine && !deleted,
     canDelete: !deleted && (mine || chat.moderator),
   };
@@ -214,9 +221,10 @@ export async function sendMessage(
   db: MigrationClient,
   actor: PublicUser,
   id: string,
-  input: { body: unknown; replyToId: string | undefined },
+  input: { body: unknown; replyToId: string | undefined; attachmentIds?: readonly string[] },
 ): Promise<MessageView> {
-  const body = parseBody(input.body);
+  const attachmentIds = input.attachmentIds ?? [];
+  const body = parseBody(input.body, attachmentIds.length > 0);
   const replyTo = input.replyToId === undefined ? undefined : messageId(input.replyToId);
   const chat = await textRoom(db, actor, id);
   if (chat.room.ended) throw new RoomError("room_ended");
@@ -224,14 +232,19 @@ export async function sendMessage(
     const target = await db.query("select 1 from messages where id = $1::bigint and room_id = $2", [replyTo, chat.room.id]);
     if (!target.rows[0]) throw new RoomError("message_not_found");
   }
-  const inserted = await db.query("insert into messages (room_id, author_id, body, reply_to_id) values ($1, $2, $3, $4::bigint) returning id::text as id", [
-    chat.room.id,
-    actor.id,
-    body,
-    replyTo ?? null,
-  ]);
-  const created = text(inserted.rows[0]?.id);
-  if (!created) throw new RoomError("conflict");
+  // The message and its files land together: a file someone else owns or already sent rolls it all back.
+  const created = await db.transaction(async (tx) => {
+    const inserted = await tx.query("insert into messages (room_id, author_id, body, reply_to_id) values ($1, $2, $3, $4::bigint) returning id::text as id", [
+      chat.room.id,
+      actor.id,
+      body,
+      replyTo ?? null,
+    ]);
+    const id = text(inserted.rows[0]?.id);
+    if (!id) throw new RoomError("conflict");
+    await claimAttachments(tx, actor, id, attachmentIds);
+    return id;
+  });
   return readOne(db, actor, chat, created);
 }
 

@@ -15,6 +15,8 @@
     "allow-instance-call",
     "allow-instance-image",
     "allow-instance-sound",
+    "allow-instance-attachment",
+    "allow-instance-attachment-save",
     "allow-instance-events-open",
     "allow-instance-events-close",
     "allow-shell-status",

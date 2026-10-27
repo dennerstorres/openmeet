@@ -123,7 +123,7 @@ F09-08 — Presença dos membros do servidor: WAITING_VALIDATION. Implementada e
 | F13-06 | Chat | UI base das salas de texto | F13-04,F13-05 | WAITING_VALIDATION | Claude | G4 |
 | F13-07 | Chat | Markdown, resposta, edição, reações, fixar, busca | F13-06 | WAITING_VALIDATION | Claude | G4,G10 |
 | F13-08 | Chat | Menções | F13-06 | PENDING | Claude | G4,G10 |
-| F13-09 | Chat | Anexos | F13-06 | PENDING | Claude | G4,G10 |
+| F13-09 | Chat | Anexos | F13-06 | WAITING_VALIDATION | Claude | G4,G10 |
 | F13-10 | Chat | Emoji próprio do servidor | F13-07 | PENDING | Claude | G4,G10 |
 | F13-11 | Chat | DM na API | F13-03 | PENDING | Claude | G4,G10 |
 | F13-12 | Chat | DM na UI | F13-06,F13-11 | PENDING | Claude | G4 |
