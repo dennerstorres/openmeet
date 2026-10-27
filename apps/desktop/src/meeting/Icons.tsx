@@ -174,6 +174,34 @@ export function IconReply({ size }: { size?: number }) {
   );
 }
 
+export function IconPin({ size }: { size?: number }) {
+  return (
+    <Icon size={size}>
+      <path d="M12 17v5" />
+      <path d="M9 3h6l-1 6 4 4v2H6v-2l4-4z" />
+    </Icon>
+  );
+}
+
+export function IconSearch({ size }: { size?: number }) {
+  return (
+    <Icon size={size}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M20 20l-4-4" />
+    </Icon>
+  );
+}
+
+export function IconSmile({ size }: { size?: number }) {
+  return (
+    <Icon size={size}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8.5 14.5a4.5 4.5 0 0 0 7 0" />
+      <path d="M9 9.5h.01M15 9.5h.01" />
+    </Icon>
+  );
+}
+
 export function IconPencil({ size }: { size?: number }) {
   return (
     <Icon size={size}>

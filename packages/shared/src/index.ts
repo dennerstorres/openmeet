@@ -26,7 +26,7 @@ export {
   parseChatPage,
   sendableBody,
 } from "./chat.js";
-export type { ChatMessage, ChatPage } from "./chat.js";
+export type { ChatMessage, ChatPage, ChatReaction } from "./chat.js";
 export { SOUND_MAX_BYTES, SOUND_MAX_MS, SOUND_NAME_MAX, SOUND_SAMPLE_RATE, encodeSound, parseOwnSounds, parseSoundLibrary, sniffSound } from "./sound.js";
 export type { OwnSound, SoundInfo, SoundSummary } from "./sound.js";
 export { inviteFromFragment, inviteLink, invitePageLink, isInviteCode, parseInvite } from "./invite.js";

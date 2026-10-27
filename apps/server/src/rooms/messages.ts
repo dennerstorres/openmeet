@@ -11,6 +11,9 @@ const AFTER_PAGE_SIZE = 100;
 const SEARCH_MAX_CHARS = 100;
 const SEARCH_PAGE_SIZE = 25;
 const REPLY_PREVIEW_CHARS = 200;
+const AROUND_SIDE = 25;
+/** Like Discord: at most 20 different reactions on one message. */
+export const REACTIONS_PER_MESSAGE = 20;
 const MESSAGE_ID = /^[1-9][0-9]{0,17}$/;
 // C0 controls other than tab and newline, DEL, and bidi overrides that can disguise a link.
 function hidden(value: string): boolean {
@@ -31,6 +34,8 @@ export interface MessageView {
   edited: boolean;
   deleted: boolean;
   createdAt: string;
+  /** Who reacted is public in the room, so the same list serves every viewer and the live events. */
+  reactions: { emoji: string; userIds: string[] }[];
   canEdit: boolean;
   canDelete: boolean;
 }
@@ -38,6 +43,8 @@ export interface MessageView {
 export interface MessagePage {
   messages: MessageView[];
   hasMore: boolean;
+  /** Only with `around`: newer messages exist past this page. */
+  hasNewer?: boolean;
 }
 
 interface Chat {
@@ -82,6 +89,7 @@ export async function typingRoom(db: MigrationClient, actor: PublicUser, id: str
 /** What every member receives: the flags that depend on the viewer are left to each client. */
 export function publicMessage(view: MessageView): Omit<MessageView, "canEdit" | "canDelete"> {
   return {
+    reactions: view.reactions,
     id: view.id,
     roomId: view.roomId,
     authorId: view.authorId,
@@ -97,7 +105,14 @@ export function publicMessage(view: MessageView): Omit<MessageView, "canEdit" | 
 const SELECT = `
   select m.id::text as id, m.room_id, m.author_id, m.body, m.pinned_at is not null as pinned, m.edited_at is not null as edited,
          m.deleted_at is not null as deleted, m.created_at,
-         r.id::text as reply_id, r.author_id as reply_author, left(r.body, ${REPLY_PREVIEW_CHARS}) as reply_body, r.deleted_at is not null as reply_deleted
+         r.id::text as reply_id, r.author_id as reply_author, left(r.body, ${REPLY_PREVIEW_CHARS}) as reply_body, r.deleted_at is not null as reply_deleted,
+         coalesce((
+           select json_agg(json_build_object('emoji', x.emoji, 'userIds', x.users) order by x.first, x.emoji)
+           from (
+             select emoji, array_agg(user_id::text order by created_at, user_id) as users, min(created_at) as first
+             from message_reactions where message_id = m.id group by emoji
+           ) x
+         ), '[]'::json) as reactions
   from messages m
   left join messages r on r.id = m.reply_to_id`;
 
@@ -124,22 +139,54 @@ function readMessage(row: Record<string, unknown>, actor: PublicUser, chat: Chat
     edited: row.edited === true,
     deleted,
     createdAt: new Date(String(row.created_at)).toISOString(),
+    reactions: readReactions(row.reactions),
     canEdit: mine && !deleted,
     canDelete: !deleted && (mine || chat.moderator),
   };
 }
 
-/** Newest page with no cursor, older with `before`, newer with `after` (oldest first, as the client catches up). */
+function readReactions(value: unknown): MessageView["reactions"] {
+  const list: unknown = typeof value === "string" ? JSON.parse(value) : value;
+  if (!Array.isArray(list)) return [];
+  return list.flatMap((item: unknown) => {
+    if (typeof item !== "object" || item === null) return [];
+    const { emoji, userIds } = item as { emoji?: unknown; userIds?: unknown };
+    if (typeof emoji !== "string" || !Array.isArray(userIds)) return [];
+    return [{ emoji, userIds: userIds.filter((user): user is string => typeof user === "string") }];
+  });
+}
+
+/**
+ * Newest page with no cursor, older with `before`, newer with `after` (oldest first, as the client catches up),
+ * and with `around` the message itself between up to 25 older and 25 newer, to jump to it.
+ */
 export async function listMessages(
   db: MigrationClient,
   actor: PublicUser,
   id: string,
-  query: { before?: string | undefined; after?: string | undefined },
+  query: { before?: string | undefined; after?: string | undefined; around?: string | undefined },
 ): Promise<MessagePage> {
   const before = cursor(query.before);
   const after = cursor(query.after);
-  if (before !== undefined && after !== undefined) throw new RoomError("invalid_body");
+  const around = cursor(query.around);
+  if ([before, after, around].filter((value) => value !== undefined).length > 1) throw new RoomError("invalid_body");
   const chat = await textRoom(db, actor, id);
+  if (around !== undefined) {
+    const older = await db.query(`${SELECT} where m.room_id = $1 and m.id <= $2::bigint order by m.id desc limit ${AROUND_SIDE + 2}`, [chat.room.id, around]);
+    if (text(older.rows[0]?.id) !== around) throw new RoomError("message_not_found");
+    const newer = await db.query(`${SELECT} where m.room_id = $1 and m.id > $2::bigint order by m.id limit ${AROUND_SIDE + 1}`, [chat.room.id, around]);
+    return {
+      messages: [
+        ...older.rows
+          .slice(0, AROUND_SIDE + 1)
+          .reverse()
+          .map((row) => readMessage(row, actor, chat)),
+        ...newer.rows.slice(0, AROUND_SIDE).map((row) => readMessage(row, actor, chat)),
+      ],
+      hasMore: older.rows.length > AROUND_SIDE + 1,
+      hasNewer: newer.rows.length > AROUND_SIDE,
+    };
+  }
   if (after !== undefined) {
     const rows = await db.query(`${SELECT} where m.room_id = $1 and m.id > $2::bigint order by m.id limit ${AFTER_PAGE_SIZE + 1}`, [chat.room.id, after]);
     const page = rows.rows.slice(0, AFTER_PAGE_SIZE).map((row) => readMessage(row, actor, chat));
@@ -241,6 +288,44 @@ export async function pinMessage(db: MigrationClient, actor: PublicUser, id: str
     await db.query("update messages set pinned_at = null, pinned_by = null where id = $1::bigint", [id]);
   }
   return readOne(db, actor, chat, id);
+}
+
+/** One reaction per person and emoji; `on` adds it, otherwise it is taken back. Custom emojis come with F13-10. */
+export async function reactMessage(db: MigrationClient, actor: PublicUser, id: string, input: { emoji: unknown; on: boolean }): Promise<MessageView> {
+  const emoji = parseEmoji(input.emoji);
+  const { chat, deleted } = await messageChat(db, actor, id);
+  if (deleted) throw new RoomError("message_not_found");
+  if (chat.room.ended) throw new RoomError("room_ended");
+  if (input.on) {
+    await db.transaction(async (tx) => {
+      // The lock keeps two people from both adding the 21st emoji.
+      await tx.query("select 1 from messages where id = $1::bigint for update", [id]);
+      const distinct = await tx.query(
+        "select count(distinct emoji)::int as total, bool_or(emoji = $2) as present from message_reactions where message_id = $1::bigint",
+        [id, emoji],
+      );
+      if (distinct.rows[0]?.present !== true && Number(distinct.rows[0]?.total ?? 0) >= REACTIONS_PER_MESSAGE) throw new RoomError("conflict");
+      await tx.query("insert into message_reactions (message_id, user_id, emoji) values ($1::bigint, $2, $3) on conflict do nothing", [id, actor.id, emoji]);
+    });
+  } else {
+    await db.query("delete from message_reactions where message_id = $1::bigint and user_id = $2 and emoji = $3", [id, actor.id, emoji]);
+  }
+  return readOne(db, actor, chat, id);
+}
+
+/** A Unicode emoji as typed: up to 16 UTF-16 units, no letters, digits, spaces, controls or markup. */
+export function parseEmoji(value: unknown): string {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > 16 ||
+    hidden(value) ||
+    /[\s<>:A-Za-z0-9]/.test(value) ||
+    !/\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(value)
+  ) {
+    throw new RoomError("invalid_body");
+  }
+  return value;
 }
 
 export async function listPinned(db: MigrationClient, actor: PublicUser, id: string): Promise<MessageView[]> {

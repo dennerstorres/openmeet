@@ -84,6 +84,11 @@ description = "Enables the update_install command without any pre-configured sco
 commands.allow = ["update_install"]
 
 [[permission]]
+identifier = "allow-open-chat-link"
+description = "Enables the open_chat_link command without any pre-configured scope."
+commands.allow = ["open_chat_link"]
+
+[[permission]]
 identifier = "allow-instance-events-open"
 description = "Enables the instance_events_open command without any pre-configured scope."
 commands.allow = ["instance_events_open"]

@@ -2429,6 +2429,223 @@ textarea {
   padding: 0 16px 16px;
 }
 
+/* F13-07: markdown, reactions, pins, search and jumps. */
+.text-room-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.chat-panel {
+  display: flex;
+  flex: 0 0 300px;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  padding: 12px;
+  overflow-y: auto;
+  border-left: 1px solid var(--line);
+  background: var(--bg-panel);
+}
+
+.chat-panel h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.chat-panel ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-hit {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-body);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-hit:hover,
+.chat-hit:focus-visible {
+  background: var(--bg-hover);
+}
+
+.chat-hit span {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 13px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  white-space: pre-wrap;
+}
+
+.chat-hit time {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.message.highlight {
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  box-shadow: inset 2px 0 0 var(--warn);
+}
+
+button.message-reply {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.message-reply:hover span {
+  color: var(--text-body);
+}
+
+.message-pinned {
+  color: var(--warn);
+  font-size: 12px;
+}
+
+.reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-panel);
+  color: var(--text-body);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.reaction.mine {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg-panel));
+}
+
+.emoji-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  max-width: 340px;
+  margin-top: 6px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-panel);
+}
+
+.emoji-picker button:not(.ghost) {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.emoji-picker button:not(.ghost):hover,
+.emoji-picker button:not(.ghost):focus-visible {
+  background: var(--bg-hover);
+}
+
+.back-to-latest {
+  align-self: center;
+  margin: 4px 0 0;
+}
+
+.link-confirm {
+  margin: 8px 16px 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-panel);
+}
+
+.link-confirm p {
+  margin: 0 0 6px;
+  color: var(--text-body);
+}
+
+.link-full {
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.md-text {
+  white-space: pre-wrap;
+}
+
+.message-body code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--bg-input);
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 13px;
+}
+
+.md-code {
+  margin: 4px 0;
+  padding: 10px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg-input);
+  white-space: pre;
+}
+
+.md-code code {
+  padding: 0;
+  background: transparent;
+}
+
+.md-quote {
+  margin: 2px 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--text-faint);
+}
+
+.md-spoiler {
+  border-radius: 4px;
+  background: var(--text-faint);
+  color: transparent;
+  cursor: pointer;
+}
+
+.md-spoiler.shown {
+  background: var(--bg-active);
+  color: inherit;
+  cursor: auto;
+}
+
+.message-body a {
+  color: var(--glow);
+}
+
 @media (max-width: 900px) {
   .text-room {
     inset: 0 8px 8px;
@@ -2436,6 +2653,13 @@ textarea {
 
   .message {
     padding-inline: 10px;
+  }
+
+  .chat-panel {
+    position: absolute;
+    inset: 52px 0 0 auto;
+    z-index: 2;
+    width: min(320px, 100%);
   }
 
   /* No hover on touch: the actions stay visible but quiet. */

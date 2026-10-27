@@ -185,7 +185,7 @@ fn split_query(path: &str) -> Option<(&str, bool)> {
         None => Some((path, false)),
         Some((route, query)) => {
             let (key, value) = query.split_once('=')?;
-            (matches!(key, "before" | "after") && is_message_id(value)).then_some((route, true))
+            (matches!(key, "before" | "after" | "around") && is_message_id(value)).then_some((route, true))
         }
     }
 }
@@ -224,7 +224,7 @@ fn allowed_call(method: &str, path: &str) -> bool {
         ("GET", ["", "api", "v1", "rooms", id, "pins"]) => is_id(id),
         ("POST", ["", "api", "v1", "rooms", id, "messages", "search"]) => is_id(id),
         ("POST", ["", "api", "v1", "rooms", id, "typing"]) => is_id(id),
-        ("POST", ["", "api", "v1", "messages", message, "edit" | "delete" | "pin"]) => is_message_id(message),
+        ("POST", ["", "api", "v1", "messages", message, "edit" | "delete" | "pin" | "reactions"]) => is_message_id(message),
         _ => false,
     }
 }
@@ -469,6 +469,8 @@ mod tests {
             ("POST", "/api/v1/messages/42/edit".to_string()),
             ("POST", "/api/v1/messages/42/delete".to_string()),
             ("POST", "/api/v1/messages/42/pin".to_string()),
+            ("POST", "/api/v1/messages/42/reactions".to_string()),
+            ("GET", format!("/api/v1/rooms/{id}/messages?around=7")),
         ] {
             assert!(allowed_call(method, &path), "{method} {path}");
         }

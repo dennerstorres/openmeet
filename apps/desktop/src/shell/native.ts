@@ -172,3 +172,8 @@ export async function openGoogleLogin(url: string): Promise<void> {
   }
   window.open(url, "_blank", "noopener,noreferrer");
 }
+
+/** ADR 0024: a chat link the person confirmed, opened by the native side in the system browser. */
+export function openChatLink(url: string): Promise<void> {
+  return invoke("open_chat_link", { url });
+}

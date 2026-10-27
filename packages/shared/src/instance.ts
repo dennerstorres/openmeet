@@ -347,9 +347,9 @@ function instancePath(path: string): string {
   const image = /^\/api\/v1\/images\/([0-9a-f-]{36})$/i.exec(path);
   if (image?.[1] !== undefined && UUID.test(image[1])) return path;
   // ADR 0024: text room messages; the only query is the message cursor.
-  const roomChat = /^\/api\/v1\/rooms\/([0-9a-f-]{36})\/(?:messages(?:\?(?:before|after)=[1-9][0-9]{0,17}|\/search)?|pins|typing)$/i.exec(path);
+  const roomChat = /^\/api\/v1\/rooms\/([0-9a-f-]{36})\/(?:messages(?:\?(?:before|after|around)=[1-9][0-9]{0,17}|\/search)?|pins|typing)$/i.exec(path);
   if (roomChat?.[1] !== undefined && UUID.test(roomChat[1])) return path;
-  if (/^\/api\/v1\/messages\/[1-9][0-9]{0,17}\/(?:edit|delete|pin)$/.test(path)) return path;
+  if (/^\/api\/v1\/messages\/[1-9][0-9]{0,17}\/(?:edit|delete|pin|reactions)$/.test(path)) return path;
   throw new PocInputError("invalid_api_base", "Request path is not part of the instance API");
 }
 

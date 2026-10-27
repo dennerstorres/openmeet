@@ -14,11 +14,19 @@ export interface ChatMessage {
   edited: boolean;
   deleted: boolean;
   createdAt: string;
+  reactions: ChatReaction[];
+}
+
+export interface ChatReaction {
+  emoji: string;
+  userIds: string[];
 }
 
 export interface ChatPage {
   messages: ChatMessage[];
   hasMore: boolean;
+  /** Only after a jump: newer messages exist past this page. */
+  hasNewer: boolean;
 }
 
 const MESSAGE_ID = /^[1-9][0-9]{0,17}$/;
@@ -38,12 +46,27 @@ function parseReply(value: unknown): ChatMessage["replyTo"] | undefined {
   return { id, authorId, body, deleted };
 }
 
+function parseReactions(value: unknown): ChatReaction[] | undefined {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 20) return undefined;
+  const reactions: ChatReaction[] = [];
+  for (const item of value) {
+    const reaction = record(item);
+    if (!reaction || typeof reaction.emoji !== "string" || reaction.emoji.length > 64 || !Array.isArray(reaction.userIds)) return undefined;
+    const userIds = reaction.userIds.filter((id): id is string => typeof id === "string" && UUID.test(id));
+    if (userIds.length !== reaction.userIds.length || userIds.length === 0) return undefined;
+    reactions.push({ emoji: reaction.emoji, userIds });
+  }
+  return reactions;
+}
+
 /** Undefined for anything that is not a message as the API writes it. */
 export function parseChatMessage(value: unknown): ChatMessage | undefined {
   const item = record(value);
   if (!item) return undefined;
   const { id, roomId, authorId, body, pinned, edited, deleted, createdAt } = item;
   const replyTo = parseReply(item.replyTo ?? null);
+  const reactions = parseReactions(item.reactions);
   if (
     typeof id !== "string" ||
     !MESSAGE_ID.test(id) ||
@@ -58,11 +81,12 @@ export function parseChatMessage(value: unknown): ChatMessage | undefined {
     typeof deleted !== "boolean" ||
     typeof createdAt !== "string" ||
     Number.isNaN(Date.parse(createdAt)) ||
-    replyTo === undefined
+    replyTo === undefined ||
+    reactions === undefined
   ) {
     return undefined;
   }
-  return { id, roomId, authorId, body: deleted ? "" : body, replyTo, pinned, edited, deleted, createdAt };
+  return { id, roomId, authorId, body: deleted ? "" : body, replyTo, pinned, edited, deleted, createdAt, reactions: deleted ? [] : reactions };
 }
 
 export function parseChatPage(value: unknown): ChatPage | undefined {
@@ -70,7 +94,7 @@ export function parseChatPage(value: unknown): ChatPage | undefined {
   if (!page || !Array.isArray(page.messages) || typeof page.hasMore !== "boolean") return undefined;
   const messages = page.messages.map(parseChatMessage);
   if (messages.some((message) => message === undefined)) return undefined;
-  return { messages: messages as ChatMessage[], hasMore: page.hasMore };
+  return { messages: messages as ChatMessage[], hasMore: page.hasMore, hasNewer: page.hasNewer === true };
 }
 
 export function compareMessageIds(a: string, b: string): number {

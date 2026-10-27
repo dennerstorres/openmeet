@@ -322,3 +322,62 @@ test("search finds words in live messages, and sending is rate limited", async (
     await w.app.close();
   }
 });
+
+test("reactions are one per person and emoji, capped at 20 kinds, and refuse anything but an emoji", async () => {
+  const w = await world();
+  try {
+    const sent = (await send(w, w.member, "reaja")).json() as Message;
+    const react = (token: string, emoji: unknown, on = true) => act(w, token, sent.id, "reactions", { emoji, on });
+    assert.equal((await react(w.member, "👍")).statusCode, 200);
+    assert.equal((await react(w.member, "👍")).statusCode, 200);
+    const both = (await react(w.owner, "👍")).json() as Message & { reactions: { emoji: string; userIds: string[] }[] };
+    assert.deepEqual(
+      both.reactions.map((reaction) => [reaction.emoji, reaction.userIds.length]),
+      [["👍", 2]],
+    );
+    await react(w.owner, "🎉");
+    const taken = (await react(w.member, "👍", false)).json() as Message & { reactions: { emoji: string; userIds: string[] }[] };
+    assert.deepEqual(
+      taken.reactions.map((reaction) => [reaction.emoji, reaction.userIds.length]),
+      [
+        ["👍", 1],
+        ["🎉", 1],
+      ],
+    );
+    for (const bad of ["a", "<b>", ":ok:", " ", "1", "👍👍👍👍👍👍👍👍👍", 3]) assert.equal((await react(w.owner, bad)).statusCode, 400, String(bad));
+    assert.equal((await react(w.outsider, "👍")).statusCode, 404);
+
+    const kinds = ["😀", "😂", "😍", "😎", "🤔", "😢", "😡", "👏", "🙏", "🔥", "💯", "❤️", "💔", "✨", "🚀", "🍕", "⚽", "🎵"];
+    for (const emoji of kinds) assert.equal((await react(w.moderator, emoji)).statusCode, 200);
+    assert.equal((await react(w.moderator, "🐱")).statusCode, 409);
+    assert.equal((await react(w.member, "😀")).statusCode, 200);
+  } finally {
+    await w.app.close();
+  }
+});
+
+test("around brings the message between its neighbours, without gaps, to jump to it", async () => {
+  const w = await world();
+  try {
+    for (let index = 1; index <= 80; index += 1) {
+      await w.db.query("insert into messages (room_id, author_id, body) values ($1, $2, $3)", [w.roomId, w.memberId, `m${index}`]);
+    }
+    const target = await w.db.query("select id::text as id from messages where body = 'm40'");
+    const around = await page(w, w.member, `?around=${String(target.rows[0]?.id)}`);
+    assert.equal(around.status, 200);
+    assert.deepEqual(
+      around.page.messages.map((message) => message.body),
+      Array.from({ length: 51 }, (_, index) => `m${index + 15}`),
+    );
+    assert.equal(around.page.hasMore, true);
+    assert.equal((around.page as Page & { hasNewer?: boolean }).hasNewer, true);
+    const first = await w.db.query("select id::text as id from messages where body = 'm1'");
+    const start = await page(w, w.member, `?around=${String(first.rows[0]?.id)}`);
+    assert.equal(start.page.messages[0]?.body, "m1");
+    assert.equal(start.page.hasMore, false);
+    assert.equal((await page(w, w.member, "?around=999999")).status, 404);
+    assert.equal((await page(w, w.member, "?around=1&after=2")).status, 400);
+  } finally {
+    await w.app.close();
+  }
+});

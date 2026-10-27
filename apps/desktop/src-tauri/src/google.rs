@@ -24,6 +24,25 @@ pub fn accept_google_url(raw: &str) -> Option<String> {
     Some(url.to_string())
 }
 
+/// ADR 0024: a link in a chat message, after the person confirmed the address. Only http and https, no
+/// credentials in the address, nothing hidden: the system browser opens it, never this window.
+pub fn accept_chat_link(raw: &str) -> Option<String> {
+    if raw.len() > MAX_URL || raw.chars().any(char::is_control) {
+        return None;
+    }
+    let url = tauri::Url::parse(raw).ok()?;
+    if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() || !url.username().is_empty() || url.password().is_some() {
+        return None;
+    }
+    Some(url.to_string())
+}
+
+#[tauri::command]
+pub fn open_chat_link(app: AppHandle, url: String) -> Result<(), String> {
+    let url = accept_chat_link(&url).ok_or_else(|| "invalid_link".to_string())?;
+    app.opener().open_url(url, None::<&str>).map_err(|_| "open_failed".to_string())
+}
+
 #[tauri::command]
 pub fn open_google_login(app: AppHandle, url: String) -> Result<(), String> {
     let url = accept_google_url(&url).ok_or_else(|| "invalid_google_url".to_string())?;
@@ -32,7 +51,23 @@ pub fn open_google_login(app: AppHandle, url: String) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::accept_google_url;
+    use super::{accept_chat_link, accept_google_url};
+
+    #[test]
+    fn chat_links_open_only_as_plain_web_addresses() {
+        assert_eq!(accept_chat_link("https://example.com/a?b=1#c").as_deref(), Some("https://example.com/a?b=1#c"));
+        assert!(accept_chat_link("http://example.com").is_some());
+        for raw in [
+            "javascript:alert(1)",
+            "file:///C:/Windows/System32/calc.exe",
+            "openmeet://convite/x",
+            "https://user:pass@example.com",
+            "https://example.com/\nx",
+            "ms-settings:",
+        ] {
+            assert!(accept_chat_link(raw).is_none(), "{raw}");
+        }
+    }
 
     #[test]
     fn opens_only_google_authorization() {

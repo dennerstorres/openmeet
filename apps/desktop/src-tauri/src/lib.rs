@@ -113,6 +113,7 @@ pub fn run() {
             shell::shell_show,
             invite::invite_take,
             google::open_google_login,
+            google::open_chat_link,
             updater::update_check,
             updater::update_install
         ])

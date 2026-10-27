@@ -8,7 +8,19 @@ const ana = "22222222-2222-4222-8222-222222222222";
 const bia = "33333333-3333-4333-8333-333333333333";
 
 function message(id: string, body = `m${id}`, extra: Partial<ChatMessage> = {}): ChatMessage {
-  return { id, roomId, authorId: ana, body, replyTo: null, pinned: false, edited: false, deleted: false, createdAt: "2026-10-27T12:00:00.000Z", ...extra };
+  return {
+    id,
+    roomId,
+    authorId: ana,
+    body,
+    replyTo: null,
+    pinned: false,
+    edited: false,
+    deleted: false,
+    createdAt: "2026-10-27T12:00:00.000Z",
+    reactions: [],
+    ...extra,
+  };
 }
 
 test("a message parses only in the shape the API writes", () => {
@@ -34,7 +46,11 @@ test("a message parses only in the shape the API writes", () => {
     assert.equal(parseChatMessage(broken), undefined);
   }
   assert.equal(parseChatPage({ messages: [wire, { ...wire, id: "x" }], hasMore: false }), undefined);
-  assert.deepEqual(parseChatPage({ messages: [wire], hasMore: true }), { messages: [message("7")], hasMore: true });
+  assert.deepEqual(parseChatPage({ messages: [wire], hasMore: true }), { messages: [message("7")], hasMore: true, hasNewer: false });
+  const reacted = parseChatMessage({ ...wire, reactions: [{ emoji: "👍", userIds: [ana, bia] }] });
+  assert.deepEqual(reacted?.reactions, [{ emoji: "👍", userIds: [ana, bia] }]);
+  assert.equal(parseChatMessage({ ...wire, reactions: [{ emoji: "👍", userIds: ["x"] }] }), undefined);
+  assert.equal(parseChatMessage({ ...wire, reactions: [{ emoji: "👍", userIds: [] }] }), undefined);
 });
 
 test("merging orders by numeric id and lets the newer copy win", () => {
@@ -81,6 +97,8 @@ test("the message routes pass the instance path check, with only the cursor as q
     "/api/v1/messages/42/edit",
     "/api/v1/messages/42/delete",
     "/api/v1/messages/42/pin",
+    "/api/v1/messages/42/reactions",
+    `/api/v1/rooms/${roomId}/messages?around=9`,
   ]) {
     assert.equal(prepareInstanceRequest(origin, origin, "GET", path, undefined, null).url, `${origin}${path}`);
   }

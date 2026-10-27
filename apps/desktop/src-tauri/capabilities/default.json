@@ -24,6 +24,7 @@
     "allow-shell-show",
     "allow-invite-take",
     "allow-open-google-login",
+    "allow-open-chat-link",
     "allow-update-check",
     "allow-update-install"
   ]

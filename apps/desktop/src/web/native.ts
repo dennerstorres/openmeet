@@ -73,3 +73,8 @@ export const createDesktopChatTransport: typeof Native.createDesktopChatTranspor
 });
 
 export const renewDesktopSession: typeof Native.renewDesktopSession = async () => false;
+
+// A new tab without access back to this page; the address was already limited to http and https.
+export const openChatLink: typeof Native.openChatLink = async (url) => {
+  window.open(url, "_blank", "noopener,noreferrer");
+};

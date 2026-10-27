@@ -54,6 +54,7 @@ import {
   listPinned,
   pinMessage,
   publicMessage,
+  reactMessage,
   searchMessages,
   sendMessage,
   typingRoom,
@@ -760,6 +761,7 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
   const sending = createAttemptGate(10, 10_000);
   const searching = createAttemptGate(10, 10_000);
   const typing = createAttemptGate(1, 2_000);
+  const reacting = createAttemptGate(20, 10_000);
   const events = db ? new ChatEvents(db) : undefined;
   // preClose: open streams would otherwise hold the shutdown until each client hangs up.
   app.addHook("preClose", async () => events?.closeAll());
@@ -824,7 +826,11 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
     try {
       const actor = await caller(request);
       if (!db) throw new AuthError("auth_unconfigured");
-      const page = await listMessages(db, actor, param(request, "id"), { before: queryText(request, "before"), after: queryText(request, "after") });
+      const page = await listMessages(db, actor, param(request, "id"), {
+        before: queryText(request, "before"),
+        after: queryText(request, "after"),
+        around: queryText(request, "around"),
+      });
       return reply.code(200).header("cache-control", "no-store").send(page);
     } catch (error) {
       return sendError(request, reply, error);
@@ -894,6 +900,19 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
       if (!db) throw new AuthError("auth_unconfigured");
       const message = await deleteMessage(db, actor, param(request, "id"));
       await publishMessage(request, "message.deleted", message);
+      return reply.code(200).header("cache-control", "no-store").send(message);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/messages/:id/reactions", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      if (!reacting.allow(actor.id, Date.now())) throw new AuthError("rate_limited");
+      const message = await reactMessage(db, actor, param(request, "id"), { emoji: bodyField(request.body, "emoji"), on: booleanField(request.body, "on") });
+      await publishMessage(request, "message.updated", message);
       return reply.code(200).header("cache-control", "no-store").send(message);
     } catch (error) {
       return sendError(request, reply, error);

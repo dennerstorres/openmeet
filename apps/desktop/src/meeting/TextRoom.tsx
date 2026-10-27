@@ -10,9 +10,11 @@ import {
   type RoomSummary,
 } from "@openmeet/shared";
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { openChatLink } from "../shell/native";
 import type { ChatListener } from "./chat-events";
-import { IconHash, IconPencil, IconReply, IconTrash } from "./Icons";
+import { IconHash, IconPencil, IconPin, IconReply, IconSearch, IconSmile, IconTrash } from "./Icons";
 import { Face } from "./images";
+import { Markdown } from "./Markdown";
 
 // ADR 0024: one text room on screen. History comes in pages, live changes through the session feed; the
 // text is always rendered as text (markdown arrives in F13-07).
@@ -20,6 +22,16 @@ import { Face } from "./images";
 const TYPING_SEND_MS = 3_000;
 const TYPING_SHOW_MS = 6_000;
 const NEAR_BOTTOM_PX = 80;
+/** The quick picker. Any Unicode emoji the API accepts works; these are the ones a click away. */
+const QUICK_EMOJIS = ["👍", "👎", "😂", "❤️", "🎉", "😮", "😢", "😡", "🔥", "👏", "🙏", "💯", "✅", "❌", "👀", "🤔", "😍", "😎", "🚀", "⭐"];
+
+function linkHost(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
 
 export interface ChatPerson {
   label: string;
@@ -62,6 +74,16 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
   const [removing, setRemoving] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [typing, setTyping] = useState<Record<string, number>>({});
+  const [picker, setPicker] = useState<string | null>(null);
+  const [pendingLink, setPendingLink] = useState<string | null>(null);
+  const [panel, setPanel] = useState<"pins" | "search" | null>(null);
+  const [pins, setPins] = useState<ChatMessage[] | null>(null);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<{ messages: ChatMessage[]; hasMore: boolean } | null>(null);
+  const [highlight, setHighlight] = useState<string | null>(null);
+  // After a jump the list is a window in the past: live messages wait until the person returns to the end.
+  const [detached, setDetached] = useState(false);
+  const detachedRef = useRef(false);
   const listRef = useRef<HTMLOListElement | null>(null);
   const stickRef = useRef(true);
   const keepRef = useRef<{ height: number; top: number } | null>(null);
@@ -78,12 +100,17 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
     setReplyTo(null);
     setEditing(null);
     setTyping({});
+    setPanel(null);
+    setHighlight(null);
+    setDetached(false);
+    detachedRef.current = false;
     stickRef.current = true;
     const load = async () => {
       const page = await model.listMessages(room.id);
       if (!live) return;
       setLoading(false);
       if (page === null) return;
+      if (detachedRef.current) return;
       setMessages((held) => mergeMessages(held, page.messages));
       setHasMore(page.hasMore);
     };
@@ -101,7 +128,8 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
         if (name !== "message.created" && name !== "message.updated" && name !== "message.deleted") return;
         const message = parseChatMessage(data);
         if (!message || message.roomId !== room.id) return;
-        setMessages((held) => mergeMessages(held, [message]));
+        setMessages((held) => (detachedRef.current && !held.some((item) => item.id === message.id) ? held : mergeMessages(held, [message])));
+        setPins((held) => (held === null ? held : message.pinned ? mergeMessages(held, [message]).reverse() : held.filter((item) => item.id !== message.id)));
         if (name === "message.created") {
           setTyping((held) => {
             if (!(message.authorId in held)) return held;
@@ -134,18 +162,101 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
     return () => window.clearInterval(timer);
   }, [typing]);
 
-  // New messages keep the view at the bottom while the person is there; an older page keeps the place.
+  // New messages keep the view at the bottom while the person is there; an older page keeps the place;
+  // a jump centres the message it went to.
   useLayoutEffect(() => {
     const list = listRef.current;
     if (!list) return;
     const kept = keepRef.current;
+    const target = highlight === null ? null : list.querySelector<HTMLElement>(`[data-message="${highlight}"]`);
     if (kept) {
       list.scrollTop = kept.top + (list.scrollHeight - kept.height);
       keepRef.current = null;
+    } else if (target) {
+      target.scrollIntoView({ block: "center" });
     } else if (stickRef.current) {
       list.scrollTop = list.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, highlight]);
+
+  function setWindow(next: boolean): void {
+    detachedRef.current = next;
+    setDetached(next);
+  }
+
+  async function jumpTo(id: string): Promise<void> {
+    const held = messages.some((message) => message.id === id);
+    if (!held) {
+      setLoading(true);
+      const page = await model.listMessages(room.id, { around: id });
+      setLoading(false);
+      if (page === null) return;
+      stickRef.current = false;
+      setMessages(page.messages);
+      setHasMore(page.hasMore);
+      setWindow(page.hasNewer);
+    }
+    setHighlight(null);
+    window.requestAnimationFrame(() => setHighlight(id));
+    if (window.innerWidth <= 900) setPanel(null);
+  }
+
+  async function backToLatest(): Promise<void> {
+    setLoading(true);
+    const page = await model.listMessages(room.id);
+    setLoading(false);
+    if (page === null) return;
+    stickRef.current = true;
+    setHighlight(null);
+    setWindow(false);
+    setMessages(page.messages);
+    setHasMore(page.hasMore);
+  }
+
+  async function loadNewer(): Promise<void> {
+    const last = messages[messages.length - 1];
+    if (!last || loading) return;
+    setLoading(true);
+    const page = await model.listMessages(room.id, { after: last.id });
+    setLoading(false);
+    if (page === null) return;
+    apply(page.messages);
+    if (!page.hasMore) setWindow(false);
+  }
+
+  async function react(message: ChatMessage, emoji: string): Promise<void> {
+    setPicker(null);
+    const mine = message.reactions.some((reaction) => reaction.emoji === emoji && userId !== null && reaction.userIds.includes(userId));
+    const changed = await model.reactMessage(message.id, emoji, !mine);
+    if (changed !== null) apply([changed]);
+  }
+
+  async function togglePin(message: ChatMessage): Promise<void> {
+    const changed = await model.pinMessage(message.id, !message.pinned);
+    if (changed === null) return;
+    apply([changed]);
+    setPins((held) =>
+      held === null ? held : changed.pinned ? [changed, ...held.filter((item) => item.id !== changed.id)] : held.filter((item) => item.id !== changed.id),
+    );
+  }
+
+  async function openPanel(next: "pins" | "search"): Promise<void> {
+    if (panel === next) {
+      setPanel(null);
+      return;
+    }
+    setPanel(next);
+    if (next === "pins") setPins(await model.listPins(room.id));
+  }
+
+  async function search(more: boolean): Promise<void> {
+    const words = query.trim();
+    if (words === "") return;
+    const before = more ? results?.messages[results.messages.length - 1]?.id : undefined;
+    const page = await model.searchMessages(room.id, words, before);
+    if (page === null) return;
+    setResults({ messages: more ? [...(results?.messages ?? []), ...page.messages] : page.messages, hasMore: page.hasMore });
+  }
 
   async function loadOlder(): Promise<void> {
     const first = messages[0];
@@ -225,145 +336,318 @@ export function TextRoom({ model, room, origin, userId, manager, person, subscri
       <header className="text-room-head">
         <IconHash size={20} />
         <h1 id="text-room-title">{room.name}</h1>
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label="Mensagens fixadas"
+          title="Mensagens fixadas"
+          aria-pressed={panel === "pins"}
+          onClick={() => void openPanel("pins")}
+        >
+          <IconPin size={18} />
+        </button>
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label="Buscar nesta sala"
+          title="Buscar nesta sala"
+          aria-pressed={panel === "search"}
+          onClick={() => void openPanel("search")}
+        >
+          <IconSearch size={18} />
+        </button>
         <button type="button" className="ghost" onClick={onClose}>
           Fechar
         </button>
       </header>
-      <ol
-        ref={listRef}
-        className="message-list"
-        aria-label={`Mensagens de ${room.name}`}
-        aria-busy={loading}
-        onScroll={(event) => {
-          const list = event.currentTarget;
-          stickRef.current = list.scrollHeight - list.scrollTop - list.clientHeight < NEAR_BOTTOM_PX;
-          if (list.scrollTop < 40 && hasMore && !loading) void loadOlder();
-        }}
-      >
-        {hasMore ? (
-          <li className="message-more">
-            <button type="button" className="ghost" disabled={loading} onClick={() => void loadOlder()}>
-              Carregar mensagens anteriores
+      {pendingLink ? (
+        <div className="link-confirm" role="alertdialog" aria-label="Abrir link externo">
+          <p>
+            Abrir <strong>{linkHost(pendingLink)}</strong> no navegador?
+          </p>
+          <p className="link-full">{pendingLink}</p>
+          <div className="row">
+            <button
+              type="button"
+              onClick={() => {
+                const url = pendingLink;
+                setPendingLink(null);
+                void openChatLink(url).catch(() => undefined);
+              }}
+            >
+              Abrir link
             </button>
-          </li>
-        ) : !loading ? (
-          <li className="message-start">
-            <IconHash size={28} />
-            <p>Este é o começo de #{room.name}.</p>
-          </li>
-        ) : null}
-        {messages.map((message, index) => {
-          const author = person(message.authorId);
-          const previous = messages[index - 1];
-          const grouped =
-            previous !== undefined &&
-            !previous.deleted &&
-            previous.authorId === message.authorId &&
-            message.replyTo === null &&
-            Date.parse(message.createdAt) - Date.parse(previous.createdAt) < 5 * 60_000;
-          const isEditing = editing?.id === message.id;
-          return (
-            <li key={message.id} className={`message${grouped ? " grouped" : ""}${message.deleted ? " removed" : ""}`}>
-              {message.replyTo ? (
-                <p className="message-reply">
-                  <IconReply size={14} />
-                  <strong>{person(message.replyTo.authorId).label}</strong>
-                  <span>{message.replyTo.deleted ? "mensagem removida" : message.replyTo.body}</span>
-                </p>
-              ) : null}
-              {grouped ? null : (
-                <span className="avatar small" aria-hidden="true">
-                  <span>
-                    <Face origin={origin} imageId={author.avatarId} label={author.label} />
-                  </span>
-                </span>
-              )}
-              <div className="message-main">
-                {grouped ? null : (
-                  <p className="message-meta">
-                    <strong>{author.label}</strong>
-                    <time dateTime={message.createdAt}>{stamp(message.createdAt)}</time>
-                  </p>
-                )}
-                {message.deleted ? (
-                  <p className="message-body removed">mensagem removida</p>
-                ) : isEditing ? (
-                  <form
-                    className="message-edit"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void saveEdit();
-                    }}
-                  >
-                    <textarea
-                      value={editing.body}
-                      autoFocus
-                      aria-label="Editar mensagem"
-                      onChange={(event) => setEditing({ id: message.id, body: event.currentTarget.value })}
-                      onKeyDown={(event) => {
-                        if (event.key === "Escape") setEditing(null);
-                        if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                          event.preventDefault();
-                          void saveEdit();
-                        }
-                      }}
-                    />
-                    <p className="hint">Enter salva · Esc cancela</p>
-                  </form>
-                ) : (
-                  <p className="message-body">
-                    {message.body}
-                    {message.edited ? <span className="message-edited"> (editada)</span> : null}
-                  </p>
-                )}
-                {removing === message.id ? (
-                  <div className="message-confirm" role="alertdialog" aria-label="Remover mensagem">
-                    <span>Remover esta mensagem? Não dá para desfazer.</span>
-                    <button type="button" className="danger-text" onClick={() => void remove(message.id)}>
-                      Remover
-                    </button>
-                    <button type="button" className="ghost" onClick={() => setRemoving(null)}>
-                      Cancelar
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-              {!message.deleted && !isEditing && !readOnly ? (
-                <div className="message-actions">
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    aria-label="Responder"
-                    title="Responder"
-                    onClick={() => {
-                      setReplyTo(message);
-                      composerRef.current?.focus();
-                    }}
-                  >
-                    <IconReply size={16} />
+            <button type="button" className="ghost" onClick={() => setPendingLink(null)}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      ) : null}
+      <div className={`text-room-body${panel ? " with-panel" : ""}`}>
+        <ol
+          ref={listRef}
+          className="message-list"
+          aria-label={`Mensagens de ${room.name}`}
+          aria-busy={loading}
+          onScroll={(event) => {
+            const list = event.currentTarget;
+            stickRef.current = list.scrollHeight - list.scrollTop - list.clientHeight < NEAR_BOTTOM_PX;
+            if (list.scrollTop < 40 && hasMore && !loading) void loadOlder();
+            if (detached && stickRef.current && !loading) void loadNewer();
+          }}
+        >
+          {hasMore ? (
+            <li className="message-more">
+              <button type="button" className="ghost" disabled={loading} onClick={() => void loadOlder()}>
+                Carregar mensagens anteriores
+              </button>
+            </li>
+          ) : !loading ? (
+            <li className="message-start">
+              <IconHash size={28} />
+              <p>Este é o começo de #{room.name}.</p>
+            </li>
+          ) : null}
+          {messages.map((message, index) => {
+            const author = person(message.authorId);
+            const previous = messages[index - 1];
+            const grouped =
+              previous !== undefined &&
+              !previous.deleted &&
+              previous.authorId === message.authorId &&
+              message.replyTo === null &&
+              Date.parse(message.createdAt) - Date.parse(previous.createdAt) < 5 * 60_000;
+            const isEditing = editing?.id === message.id;
+            return (
+              <li
+                key={message.id}
+                data-message={message.id}
+                className={`message${grouped ? " grouped" : ""}${message.deleted ? " removed" : ""}${highlight === message.id ? " highlight" : ""}`}
+              >
+                {message.replyTo ? (
+                  <button type="button" className="message-reply" onClick={() => void jumpTo(message.replyTo?.id ?? message.id)}>
+                    <IconReply size={14} />
+                    <strong>{person(message.replyTo.authorId).label}</strong>
+                    <span>{message.replyTo.deleted ? "mensagem removida" : message.replyTo.body}</span>
                   </button>
-                  {canEditMessage(message, userId) ? (
+                ) : null}
+                {grouped ? null : (
+                  <span className="avatar small" aria-hidden="true">
+                    <span>
+                      <Face origin={origin} imageId={author.avatarId} label={author.label} />
+                    </span>
+                  </span>
+                )}
+                <div className="message-main">
+                  {grouped ? null : (
+                    <p className="message-meta">
+                      <strong>{author.label}</strong>
+                      <time dateTime={message.createdAt}>{stamp(message.createdAt)}</time>
+                      {message.pinned ? <span className="message-pinned">fixada</span> : null}
+                    </p>
+                  )}
+                  {message.deleted ? (
+                    <p className="message-body removed">mensagem removida</p>
+                  ) : isEditing ? (
+                    <form
+                      className="message-edit"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void saveEdit();
+                      }}
+                    >
+                      <textarea
+                        value={editing.body}
+                        autoFocus
+                        aria-label="Editar mensagem"
+                        onChange={(event) => setEditing({ id: message.id, body: event.currentTarget.value })}
+                        onKeyDown={(event) => {
+                          if (event.key === "Escape") setEditing(null);
+                          if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                            event.preventDefault();
+                            void saveEdit();
+                          }
+                        }}
+                      />
+                      <p className="hint">Enter salva · Esc cancela</p>
+                    </form>
+                  ) : (
+                    <div className="message-body">
+                      <Markdown source={message.body} onLink={setPendingLink} />
+                      {message.edited ? <span className="message-edited"> (editada)</span> : null}
+                    </div>
+                  )}
+                  {message.reactions.length > 0 ? (
+                    <div className="reactions">
+                      {message.reactions.map((reaction) => {
+                        const mine = userId !== null && reaction.userIds.includes(userId);
+                        const names = reaction.userIds.map((id) => person(id).label).join(", ");
+                        return (
+                          <button
+                            key={reaction.emoji}
+                            type="button"
+                            className={`reaction${mine ? " mine" : ""}`}
+                            aria-pressed={mine}
+                            disabled={readOnly}
+                            title={names}
+                            aria-label={`${reaction.emoji} ${reaction.userIds.length}: ${names}`}
+                            onClick={() => void react(message, reaction.emoji)}
+                          >
+                            <span aria-hidden="true">{reaction.emoji}</span>
+                            <span>{reaction.userIds.length}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                  {picker === message.id ? (
+                    <div className="emoji-picker" role="group" aria-label="Escolher reação">
+                      {QUICK_EMOJIS.map((emoji) => (
+                        <button key={emoji} type="button" aria-label={`Reagir com ${emoji}`} onClick={() => void react(message, emoji)}>
+                          {emoji}
+                        </button>
+                      ))}
+                      <button type="button" className="ghost" onClick={() => setPicker(null)}>
+                        Fechar
+                      </button>
+                    </div>
+                  ) : null}
+                  {removing === message.id ? (
+                    <div className="message-confirm" role="alertdialog" aria-label="Remover mensagem">
+                      <span>Remover esta mensagem? Não dá para desfazer.</span>
+                      <button type="button" className="danger-text" onClick={() => void remove(message.id)}>
+                        Remover
+                      </button>
+                      <button type="button" className="ghost" onClick={() => setRemoving(null)}>
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+                {!message.deleted && !isEditing && !readOnly ? (
+                  <div className="message-actions">
                     <button
                       type="button"
                       className="icon-btn"
-                      aria-label="Editar"
-                      title="Editar"
-                      onClick={() => setEditing({ id: message.id, body: message.body })}
+                      aria-label="Responder"
+                      title="Responder"
+                      onClick={() => {
+                        setReplyTo(message);
+                        composerRef.current?.focus();
+                      }}
                     >
-                      <IconPencil size={16} />
+                      <IconReply size={16} />
                     </button>
-                  ) : null}
-                  {canDeleteMessage(message, userId, manager) ? (
-                    <button type="button" className="icon-btn danger-text" aria-label="Remover" title="Remover" onClick={() => setRemoving(message.id)}>
-                      <IconTrash size={16} />
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      aria-label="Reagir"
+                      title="Reagir"
+                      aria-expanded={picker === message.id}
+                      onClick={() => setPicker(picker === message.id ? null : message.id)}
+                    >
+                      <IconSmile size={16} />
                     </button>
-                  ) : null}
-                </div>
-              ) : null}
-            </li>
-          );
-        })}
-      </ol>
+                    {manager ? (
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        aria-label={message.pinned ? "Desafixar" : "Fixar"}
+                        title={message.pinned ? "Desafixar" : "Fixar"}
+                        aria-pressed={message.pinned}
+                        onClick={() => void togglePin(message)}
+                      >
+                        <IconPin size={16} />
+                      </button>
+                    ) : null}
+                    {canEditMessage(message, userId) ? (
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        aria-label="Editar"
+                        title="Editar"
+                        onClick={() => setEditing({ id: message.id, body: message.body })}
+                      >
+                        <IconPencil size={16} />
+                      </button>
+                    ) : null}
+                    {canDeleteMessage(message, userId, manager) ? (
+                      <button type="button" className="icon-btn danger-text" aria-label="Remover" title="Remover" onClick={() => setRemoving(message.id)}>
+                        <IconTrash size={16} />
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
+        </ol>
+        {panel === "pins" ? (
+          <aside className="chat-panel" aria-label="Mensagens fixadas">
+            <h2>Fixadas</h2>
+            {pins === null ? (
+              <p className="hint">Carregando…</p>
+            ) : pins.length === 0 ? (
+              <p className="hint">Nenhuma mensagem fixada nesta sala.</p>
+            ) : (
+              <ul>
+                {pins.map((message) => (
+                  <li key={message.id}>
+                    <button type="button" className="chat-hit" onClick={() => void jumpTo(message.id)}>
+                      <strong>{person(message.authorId).label}</strong>
+                      <span>{message.body}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </aside>
+        ) : panel === "search" ? (
+          <aside className="chat-panel" aria-label="Buscar mensagens">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void search(false);
+              }}
+            >
+              <input
+                type="search"
+                value={query}
+                maxLength={100}
+                autoFocus
+                placeholder="Palavras da mensagem"
+                aria-label="Buscar nesta sala"
+                onChange={(event) => setQuery(event.currentTarget.value)}
+              />
+            </form>
+            {results === null ? null : results.messages.length === 0 ? (
+              <p className="hint">Nada encontrado.</p>
+            ) : (
+              <ul>
+                {results.messages.map((message) => (
+                  <li key={message.id}>
+                    <button type="button" className="chat-hit" onClick={() => void jumpTo(message.id)}>
+                      <strong>{person(message.authorId).label}</strong>
+                      <time dateTime={message.createdAt}>{stamp(message.createdAt)}</time>
+                      <span>{message.body}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {results?.hasMore ? (
+              <button type="button" className="ghost" onClick={() => void search(true)}>
+                Mais resultados
+              </button>
+            ) : null}
+          </aside>
+        ) : null}
+      </div>
+      {detached ? (
+        <button type="button" className="back-to-latest" onClick={() => void backToLatest()}>
+          Ver mensagens mais recentes
+        </button>
+      ) : null}
       <p className="typing" aria-live="polite">
         {typingNames.length > 0 ? typingLine(typingNames) : ""}
       </p>

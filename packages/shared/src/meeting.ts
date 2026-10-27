@@ -686,8 +686,15 @@ export class MeetingModel {
   }
 
   // ADR 0024: text room messages. Each call answers the message (or page) or null after showing the error.
-  async listMessages(roomId: string, cursor: { before?: string; after?: string } = {}): Promise<ChatPage | null> {
-    const query = cursor.before !== undefined ? `?before=${cursor.before}` : cursor.after !== undefined ? `?after=${cursor.after}` : "";
+  async listMessages(roomId: string, cursor: { before?: string; after?: string; around?: string } = {}): Promise<ChatPage | null> {
+    const query =
+      cursor.before !== undefined
+        ? `?before=${cursor.before}`
+        : cursor.after !== undefined
+          ? `?after=${cursor.after}`
+          : cursor.around !== undefined
+            ? `?around=${cursor.around}`
+            : "";
     const body = await this.memberCall("GET", `/api/v1/rooms/${roomId}/messages${query}`, null);
     return body === null ? null : (parseChatPage(body) ?? null);
   }
@@ -705,6 +712,28 @@ export class MeetingModel {
   async deleteMessage(messageId: string): Promise<ChatMessage | null> {
     const removed = await this.memberCall("POST", `/api/v1/messages/${messageId}/delete`, {});
     return removed === null ? null : (parseChatMessage(removed) ?? null);
+  }
+
+  async reactMessage(messageId: string, emoji: string, on: boolean): Promise<ChatMessage | null> {
+    const reacted = await this.memberCall("POST", `/api/v1/messages/${messageId}/reactions`, { emoji, on });
+    return reacted === null ? null : (parseChatMessage(reacted) ?? null);
+  }
+
+  async pinMessage(messageId: string, pinned: boolean): Promise<ChatMessage | null> {
+    const changed = await this.memberCall("POST", `/api/v1/messages/${messageId}/pin`, { pinned });
+    return changed === null ? null : (parseChatMessage(changed) ?? null);
+  }
+
+  async listPins(roomId: string): Promise<ChatMessage[] | null> {
+    const body = await this.memberCall("GET", `/api/v1/rooms/${roomId}/pins`, null);
+    if (body === null) return null;
+    return parseChatPage({ ...(body as object), hasMore: false })?.messages ?? null;
+  }
+
+  /** The words travel in the body, never in the URL. */
+  async searchMessages(roomId: string, query: string, before?: string): Promise<ChatPage | null> {
+    const body = await this.memberCall("POST", `/api/v1/rooms/${roomId}/messages/search`, { query, before });
+    return body === null ? null : (parseChatPage(body) ?? null);
   }
 
   /** Best effort: a lost typing signal is not worth an error on screen. */
