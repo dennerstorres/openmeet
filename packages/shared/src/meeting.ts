@@ -8,11 +8,14 @@ import {
   parseChatPage,
   parseDm,
   parseDmList,
+  parseServerEmoji,
+  parseServerEmojis,
   type ChatAttachment,
   type ChatMessage,
   type ChatPage,
   type ChatRef,
   type DmSummary,
+  type ServerEmoji,
 } from "./chat.js";
 import {
   canonicalInstanceUrl,
@@ -695,6 +698,26 @@ export class MeetingModel {
 
   async deleteSound(soundId: string): Promise<boolean> {
     return (await this.memberCall("POST", `/api/v1/sounds/${soundId}/delete`, {})) !== null;
+  }
+
+  /** ADR 0024: the emojis of every server the caller belongs to, or null when they could not be read. */
+  async listEmojis(): Promise<ServerEmoji[] | null> {
+    const body = await this.memberCall("GET", "/api/v1/emojis", null);
+    return body === null ? null : (parseServerEmojis(body) ?? null);
+  }
+
+  /** `image` is base64 of a PNG, GIF or WebP; the API judges it again. Owner and moderators only. */
+  async uploadEmoji(serverId: string, name: string, image: string): Promise<ServerEmoji | null> {
+    const body = await this.memberCall("POST", `/api/v1/servers/${serverId}/emojis`, { name, image }, 201);
+    return body === null ? null : (parseServerEmoji(body) ?? null);
+  }
+
+  async renameEmoji(emojiId: string, name: string): Promise<boolean> {
+    return (await this.memberCall("POST", `/api/v1/emojis/${emojiId}/rename`, { name })) !== null;
+  }
+
+  async deleteEmoji(emojiId: string): Promise<boolean> {
+    return (await this.memberCall("POST", `/api/v1/emojis/${emojiId}/delete`, {})) !== null;
   }
 
   // ADR 0024: text room messages. Each call answers the message (or page) or null after showing the error.

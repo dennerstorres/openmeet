@@ -3004,3 +3004,119 @@ button.message-reply:hover span {
   gap: 8px;
   max-width: 100%;
 }
+
+/* F13-10: server emojis. */
+.chat-emoji {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  vertical-align: -5px;
+}
+
+.reaction .chat-emoji {
+  width: 18px;
+  height: 18px;
+  vertical-align: -4px;
+}
+
+.emoji-picker button .chat-emoji {
+  width: 26px;
+  height: 26px;
+  vertical-align: middle;
+}
+
+.emoji-tabs {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 6px;
+  max-width: min(360px, 100%);
+}
+
+.emoji-tab-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.emoji-picker .emoji-tab-row button.emoji-tab {
+  width: auto;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.emoji-picker .emoji-tab-row button.emoji-tab[aria-selected="true"] {
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg-panel));
+  color: var(--text-body);
+}
+
+.emoji-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.emoji-picker .emoji-grid button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.emoji-manage {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.emoji-manage-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.emoji-manage-add input:not([type="file"]) {
+  flex: 1 1 100px;
+  min-width: 0;
+}
+
+.emoji-manage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.emoji-manage-list li {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.emoji-manage-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.composer .emoji-picker {
+  margin: 0 0 6px;
+}
+
+.composer-emoji {
+  position: absolute;
+  right: 22px;
+  bottom: 22px;
+}
+
+.composer-count {
+  right: 64px;
+}

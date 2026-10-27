@@ -162,6 +162,12 @@ const ERROR_TEXT: Record<string, string> = {
   dm_full: "O grupo chegou ao limite de 10 pessoas.",
   blocked: "Não é possível conversar com esta pessoa.",
   user_not_found: "A pessoa não está disponível.",
+  invalid_emoji: "Use um emoji PNG, GIF ou WebP de até 256 KB.",
+  invalid_emoji_name: "O nome do emoji vai de 2 a 32 letras, números ou _.",
+  emoji_too_large: "O emoji passa de 256 KB.",
+  emoji_limit: "O servidor já tem 50 emojis deste tipo.",
+  emoji_name_taken: "Já existe um emoji com este nome no servidor.",
+  emoji_not_found: "O emoji não está disponível.",
 };
 
 const PRESENCE_MS = 5000;

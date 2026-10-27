@@ -42,6 +42,24 @@ export interface ChatMessage {
   /** `@everyone`/`@here` from an owner or moderator. */
   mentionsEveryone: boolean;
   attachments: ChatAttachment[];
+  /** Server emojis the body or the reactions name, as the API resolved them for this chat. */
+  emojis: ChatEmojiRef[];
+}
+
+/** `removed` once the emoji is gone: the body already reads `:name:`, a reaction shows the name. */
+export interface ChatEmojiRef {
+  id: string;
+  name: string;
+  animated: boolean;
+  removed: boolean;
+}
+
+/** One emoji of a server's set, as the picker lists it. */
+export interface ServerEmoji {
+  id: string;
+  serverId: string;
+  name: string;
+  animated: boolean;
 }
 
 /** Width and height only for a picture the API recognised by its bytes; anything else is a download. */
@@ -104,6 +122,18 @@ function parseMentions(value: unknown): string[] | undefined {
   return ids.length === value.length ? ids : undefined;
 }
 
+function parseEmojiRefs(value: unknown): ChatEmojiRef[] | undefined {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 200) return undefined;
+  const refs: ChatEmojiRef[] = [];
+  for (const item of value) {
+    const ref = record(item);
+    if (!ref || typeof ref.id !== "string" || !UUID.test(ref.id) || typeof ref.name !== "string" || !EMOJI_NAME.test(ref.name)) return undefined;
+    refs.push({ id: ref.id.toLowerCase(), name: ref.name, animated: ref.animated === true, removed: ref.removed === true });
+  }
+  return refs;
+}
+
 const PREVIEW_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
 export function attachmentIsImage(attachment: ChatAttachment): boolean {
@@ -161,6 +191,7 @@ export function parseChatMessage(value: unknown): ChatMessage | undefined {
   const reactions = parseReactions(item.reactions);
   const mentions = parseMentions(item.mentions);
   const attachments = parseAttachments(item.attachments);
+  const emojis = parseEmojiRefs(item.emojis);
   if (
     typeof id !== "string" ||
     !MESSAGE_ID.test(id) ||
@@ -177,7 +208,8 @@ export function parseChatMessage(value: unknown): ChatMessage | undefined {
     replyTo === undefined ||
     reactions === undefined ||
     mentions === undefined ||
-    attachments === undefined
+    attachments === undefined ||
+    emojis === undefined
   ) {
     return undefined;
   }
@@ -196,6 +228,7 @@ export function parseChatMessage(value: unknown): ChatMessage | undefined {
     mentions: deleted ? [] : mentions,
     mentionsEveryone: !deleted && item.mentionsEveryone === true,
     attachments: deleted ? [] : attachments,
+    emojis: deleted ? [] : emojis,
   };
 }
 
@@ -249,9 +282,74 @@ export function mentionsUser(message: ChatMessage, userId: string | null): boole
   return message.mentionsEveryone || message.mentions.includes(userId);
 }
 
-/** One line of text for previews: every `<@id>` as `@name`. */
+/** One line of text for previews: every `<@id>` as `@name`, every `<:name:id>` as `:name:`. */
 export function plainBody(body: string, label: (userId: string) => string): string {
-  return body.replace(MENTION_TOKEN, (_, id: string) => `@${label(id.toLowerCase())}`);
+  return body.replace(MENTION_TOKEN, (_, id: string) => `@${label(id.toLowerCase())}`).replace(EMOJI_TOKEN, (_, name: string) => `:${name}:`);
+}
+
+// ADR 0024: a server emoji is `<:name:id>` in the text and `custom:<id>` in a reaction.
+export const EMOJI_NAME = /^[A-Za-z0-9_]{2,32}$/;
+export const EMOJI_TOKEN = /<:([A-Za-z0-9_]{2,32}):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})>/gi;
+const CUSTOM_REACTION = /^custom:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+export const EMOJIS_PER_KIND = 50;
+
+export function emojiToken(emoji: { id: string; name: string }): string {
+  return `<:${emoji.name}:${emoji.id}>`;
+}
+
+export function customReaction(id: string): string {
+  return `custom:${id}`;
+}
+
+/** The emoji id behind a `custom:<id>` reaction, or undefined for a Unicode one. */
+export function customReactionId(emoji: string): string | undefined {
+  return CUSTOM_REACTION.exec(emoji)?.[1]?.toLowerCase();
+}
+
+/** What the person edits: `:name:` in place of each `<:name:id>`. */
+export function emojiDisplay(body: string): string {
+  return body.replace(EMOJI_TOKEN, (_, name: string) => `:${name}:`);
+}
+
+const CODE_SPAN = /```[\s\S]*?```|`[^`\n]*`/g;
+const EMOJI_SHORTCODE = /:([A-Za-z0-9_]{2,32}):/g;
+
+/** Back to the wire: each `:name:` that names a usable emoji becomes its token. Code stays as typed. */
+export function emojiWire(text: string, find: (name: string) => ServerEmoji | undefined): string {
+  let out = "";
+  let index = 0;
+  for (const code of text.matchAll(CODE_SPAN)) {
+    out += text.slice(index, code.index).replace(EMOJI_SHORTCODE, (whole, name: string) => {
+      const emoji = find(name);
+      return emoji ? emojiToken(emoji) : whole;
+    });
+    out += code[0];
+    index = code.index + code[0].length;
+  }
+  return (
+    out +
+    text.slice(index).replace(EMOJI_SHORTCODE, (whole, name: string) => {
+      const emoji = find(name);
+      return emoji ? emojiToken(emoji) : whole;
+    })
+  );
+}
+
+export function parseServerEmoji(value: unknown): ServerEmoji | undefined {
+  const item = record(value);
+  if (!item) return undefined;
+  const { id, serverId, name, animated } = item;
+  if (typeof id !== "string" || !UUID.test(id) || typeof serverId !== "string" || !UUID.test(serverId) || typeof name !== "string" || !EMOJI_NAME.test(name)) {
+    return undefined;
+  }
+  return { id: id.toLowerCase(), serverId: serverId.toLowerCase(), name, animated: animated === true };
+}
+
+export function parseServerEmojis(value: unknown): ServerEmoji[] | undefined {
+  const list = record(value)?.emojis;
+  if (!Array.isArray(list)) return undefined;
+  const emojis = list.map(parseServerEmoji);
+  return emojis.every((emoji): emoji is ServerEmoji => emoji !== undefined) ? emojis : undefined;
 }
 
 /** What the person edits: `@name` in place of each token, and which name stands for which id. */

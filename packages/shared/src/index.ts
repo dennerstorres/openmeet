@@ -14,8 +14,19 @@ export {
   prepareInstanceRequest,
   readErrorCode,
 } from "./instance.js";
-export { ATTACHMENT_IMAGE_TYPES, IMAGE_MAX_BYTES, IMAGE_MAX_SIDE, IMAGE_TYPES, sniffAttachmentImage, sniffImage } from "./image.js";
-export type { AttachmentImageInfo, ImageInfo, ImageType } from "./image.js";
+export {
+  ATTACHMENT_IMAGE_TYPES,
+  EMOJI_MAX_BYTES,
+  EMOJI_MAX_SIDE,
+  EMOJI_TYPES,
+  IMAGE_MAX_BYTES,
+  IMAGE_MAX_SIDE,
+  IMAGE_TYPES,
+  sniffAttachmentImage,
+  sniffEmoji,
+  sniffImage,
+} from "./image.js";
+export type { AttachmentImageInfo, EmojiImageInfo, ImageInfo, ImageType } from "./image.js";
 export {
   ATTACHMENTS_PER_MESSAGE,
   ATTACHMENT_DEFAULT_MAX_BYTES,
@@ -30,8 +41,18 @@ export {
   parseDmList,
   upsertDm,
   parseChatAttachment,
+  EMOJIS_PER_KIND,
+  EMOJI_NAME,
+  EMOJI_TOKEN,
   canDeleteMessage,
   canEditMessage,
+  customReaction,
+  customReactionId,
+  emojiDisplay,
+  emojiToken,
+  emojiWire,
+  parseServerEmoji,
+  parseServerEmojis,
   compareMessageIds,
   mentionCandidates,
   mentionDisplay,
@@ -45,7 +66,19 @@ export {
   plainBody,
   sendableBody,
 } from "./chat.js";
-export type { ChatAttachment, ChatKind, ChatMessage, ChatPage, ChatReaction, ChatRef, DmMember, DmSummary, MentionCandidate } from "./chat.js";
+export type {
+  ChatAttachment,
+  ChatEmojiRef,
+  ChatKind,
+  ChatMessage,
+  ChatPage,
+  ChatReaction,
+  ChatRef,
+  DmMember,
+  DmSummary,
+  MentionCandidate,
+  ServerEmoji,
+} from "./chat.js";
 export { SOUND_MAX_BYTES, SOUND_MAX_MS, SOUND_NAME_MAX, SOUND_SAMPLE_RATE, encodeSound, parseOwnSounds, parseSoundLibrary, sniffSound } from "./sound.js";
 export type { OwnSound, SoundInfo, SoundSummary } from "./sound.js";
 export { inviteFromFragment, inviteLink, invitePageLink, isInviteCode, parseInvite } from "./invite.js";

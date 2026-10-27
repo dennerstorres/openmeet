@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { IMAGE_MAX_BYTES, SOUND_MAX_BYTES } from "@openmeet/shared";
+import { EMOJI_MAX_BYTES, IMAGE_MAX_BYTES, SOUND_MAX_BYTES } from "@openmeet/shared";
 import { createAttemptGate } from "../auth/limit.js";
 import { AuthError, type AuthErrorCode, currentUser, type PublicUser } from "../auth/service.js";
 import { readAccessToken } from "../auth/tokens.js";
@@ -71,6 +71,7 @@ import {
   type MessageView,
 } from "./messages.js";
 import { addDmMember, getDm, leaveDm, listBlocks, listDms, openDm, renameDm, setBlock, type DmView } from "./dms.js";
+import { deleteEmoji, listMyEmojis, listServerEmojis, readEmoji, renameEmoji, uploadEmoji } from "./emojis.js";
 import { deleteSound, importSound, listLibrary, listOwnSounds, readSound, removeFromLibrary, renameSound, uploadSound } from "./sounds.js";
 
 const AUTH_STATUS: Record<AuthErrorCode, number> = {
@@ -119,6 +120,12 @@ const ROOM_STATUS: Record<RoomErrorCode, number> = {
   invalid_attachment: 400,
   attachment_too_large: 413,
   attachment_not_found: 404,
+  invalid_emoji: 400,
+  invalid_emoji_name: 400,
+  emoji_too_large: 413,
+  emoji_limit: 409,
+  emoji_name_taken: 409,
+  emoji_not_found: 404,
 };
 
 function configuredSecret(env: AppEnv): string | undefined {
@@ -794,6 +801,112 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
       request.log.error({ code }, "chat event failed");
     }
   }
+
+  // ADR 0024: server emojis. Base64 in JSON like images and sounds; the picker reloads on emoji.updated.
+  const emojiUploads = createAttemptGate(30, 10 * 60_000);
+  const EMOJI_BASE64_MAX = Math.ceil(EMOJI_MAX_BYTES / 3) * 4;
+  // Room for a file a bit over the limit, so it is refused as too large and not as a broken body.
+  const emojiBody = { bodyLimit: EMOJI_BASE64_MAX * 2 + 4096 };
+
+  function emojiField(body: unknown): Uint8Array {
+    const value = typeof body === "object" && body !== null && !Array.isArray(body) ? (body as Record<string, unknown>).image : undefined;
+    if (typeof value !== "string" || value.length === 0 || value.length > EMOJI_BASE64_MAX * 2 || value.length % 4 !== 0 || !BASE64.test(value)) {
+      throw new RoomError("invalid_emoji");
+    }
+    return new Uint8Array(Buffer.from(value, "base64"));
+  }
+
+  async function publishEmojis(request: FastifyRequest, server: string): Promise<void> {
+    if (!events) return;
+    try {
+      events.publish(await events.serverAudience(server), "emoji.updated", { serverId: server });
+    } catch (error) {
+      const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "error";
+      request.log.error({ code }, "emoji event failed");
+    }
+  }
+
+  app.get("/api/v1/emojis", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await listMyEmojis(db, actor));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.get("/api/v1/servers/:id/emojis", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(await listServerEmojis(db, actor, param(request, "id")));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/servers/:id/emojis", emojiBody, async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const bytes = emojiField(request.body);
+      if (!emojiUploads.allow(actor.id, Date.now())) throw new AuthError("rate_limited");
+      const emoji = await uploadEmoji(db, actor, param(request, "id"), { name: bodyField(request.body, "name"), bytes });
+      await publishEmojis(request, emoji.serverId);
+      return reply.code(201).header("cache-control", "no-store").send(emoji);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  // An emoji id never changes its bytes: renaming keeps them, a new upload gets a new id.
+  app.get("/api/v1/emojis/:id", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const emoji = await readEmoji(db, actor, param(request, "id"));
+      return reply
+        .code(200)
+        .header("content-type", emoji.contentType)
+        .header("x-content-type-options", "nosniff")
+        .header("content-security-policy", "default-src 'none'; sandbox")
+        .header("cache-control", "private, max-age=31536000, immutable")
+        .send(Buffer.from(emoji.bytes));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/emojis/:id/rename", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const emoji = await renameEmoji(db, actor, param(request, "id"), bodyField(request.body, "name"));
+      await publishEmojis(request, emoji.serverId);
+      return reply.code(200).header("cache-control", "no-store").send(emoji);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/emojis/:id/delete", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const emoji = await deleteEmoji(db, actor, param(request, "id"));
+      await publishEmojis(request, emoji.serverId);
+      return reply.code(200).header("cache-control", "no-store").send({ deleted: true });
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
 
   app.get("/api/v1/events", async (request, reply) => {
     try {

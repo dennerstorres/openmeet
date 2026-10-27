@@ -10,6 +10,9 @@ import {
   upsertDm,
   canDeleteMessage,
   canEditMessage,
+  customReactionId,
+  emojiDisplay,
+  emojiWire,
   mentionCandidates,
   mentionDisplay,
   mentionQuery,
@@ -18,6 +21,7 @@ import {
   mergeMessages,
   parseChatMessage,
   parseChatPage,
+  parseServerEmojis,
   plainBody,
   sendableBody,
   type ChatMessage,
@@ -44,6 +48,7 @@ function message(id: string, body = `m${id}`, extra: Partial<ChatMessage> = {}):
     mentions: [],
     mentionsEveryone: false,
     attachments: [],
+    emojis: [],
     ...extra,
   };
 }
@@ -272,4 +277,22 @@ test("the DM list keeps the API shape, names the other people and drops a DM the
     upsertDm(list, left, ana).map((dm) => dm.id),
     [first],
   );
+});
+
+test("server emojis: `:name:` goes to the wire outside code and back for editing", () => {
+  const festa = { id: "44444444-4444-4444-8444-444444444444", serverId: roomId, name: "festa", animated: false };
+  const find = (name: string) => (name.toLowerCase() === "festa" ? festa : undefined);
+  const wire = emojiWire("oi :festa: e :outro: `:festa:` :FESTA:", find);
+  assert.equal(wire, `oi <:festa:${festa.id}> e :outro: \`:festa:\` <:festa:${festa.id}>`);
+  assert.equal(emojiDisplay(wire), "oi :festa: e :outro: `:festa:` :festa:");
+  assert.equal(
+    plainBody(`<:festa:${festa.id}> <@${bia}>`, () => "Bia"),
+    ":festa: @Bia",
+  );
+  assert.equal(customReactionId(`custom:${festa.id.toUpperCase()}`), festa.id);
+  assert.equal(customReactionId("👍"), undefined);
+  const parsed = parseChatMessage({ ...message("1"), emojis: [{ id: festa.id, name: "festa", animated: false, removed: true }] });
+  assert.deepEqual(parsed?.emojis, [{ id: festa.id, name: "festa", animated: false, removed: true }]);
+  assert.equal(parseChatMessage({ ...message("1"), emojis: [{ id: festa.id, name: "x" }] }), undefined);
+  assert.deepEqual(parseServerEmojis({ emojis: [festa] }), [festa]);
 });

@@ -39,7 +39,13 @@ export type RoomErrorCode =
   | "blocked"
   | "invalid_attachment"
   | "attachment_too_large"
-  | "attachment_not_found";
+  | "attachment_not_found"
+  | "invalid_emoji"
+  | "invalid_emoji_name"
+  | "emoji_too_large"
+  | "emoji_limit"
+  | "emoji_name_taken"
+  | "emoji_not_found";
 
 export class RoomError extends Error {
   readonly code: RoomErrorCode;

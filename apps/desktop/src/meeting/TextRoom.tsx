@@ -5,6 +5,8 @@ import {
   attachmentIsImage,
   canDeleteMessage,
   canEditMessage,
+  emojiDisplay,
+  emojiWire,
   inChat,
   mentionCandidates,
   mentionDisplay,
@@ -28,6 +30,7 @@ import { MessageFiles, PictureViewer, fileSize } from "./ChatFiles";
 import { IconHash, IconPaperclip, IconPencil, IconPin, IconReply, IconSearch, IconSmile, IconTrash, IconUsers } from "./Icons";
 import { Face, base64 } from "./images";
 import { Markdown } from "./Markdown";
+import { EmojiPicker, ReactionLabel, reactionText, useEmojiSet } from "./emojis";
 
 // ADR 0024: one text room or DM on screen. History comes in pages, live changes through the session feed; the
 // body is rendered by the safe markdown of F13-07. Rooms and DMs share every message route but the base path.
@@ -121,6 +124,8 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
   const [sending, setSending] = useState(false);
   const [typing, setTyping] = useState<Record<string, number>>({});
   const [picker, setPicker] = useState<string | null>(null);
+  const emojiSet = useEmojiSet(model, subscribe, chat.kind === "dm");
+  const [composerEmoji, setComposerEmoji] = useState(false);
   const [pendingLink, setPendingLink] = useState<string | null>(null);
   const [panel, setPanel] = useState<"pins" | "search" | null>(null);
   const [pins, setPins] = useState<ChatMessage[] | null>(null);
@@ -388,7 +393,7 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
 
   async function send(): Promise<void> {
     const ready = files.filter((file) => file.state === "ready" && file.attachment !== null);
-    const body = sendableBody(mentionWire(draft, picks), ready.length > 0);
+    const body = sendableBody(mentionWire(emojiWire(draft, emojiSet.find), picks), ready.length > 0);
     if (body === undefined || sending || files.some((file) => file.state === "uploading")) return;
     setSending(true);
     const sent = await model.sendMessage(
@@ -413,7 +418,7 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
 
   async function saveEdit(): Promise<void> {
     if (!editing) return;
-    const body = sendableBody(mentionWire(editing.body, editing.picks));
+    const body = sendableBody(mentionWire(emojiWire(editing.body, emojiSet.find), editing.picks));
     if (body === undefined) return;
     const edited = await model.editMessage(editing.id, body);
     if (edited === null) return;
@@ -430,7 +435,7 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
   const label = (id: string) => person(id).label;
 
   function startEdit(message: ChatMessage): void {
-    const shown = mentionDisplay(message.body, label);
+    const shown = mentionDisplay(emojiDisplay(message.body), label);
     setEditing({ id: message.id, body: shown.text, picks: shown.picks });
   }
 
@@ -658,6 +663,7 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
                         source={message.body}
                         onLink={setPendingLink}
                         mentions={{ users: message.mentions, everyone: message.mentionsEveryone, self: userId, label }}
+                        emojis={{ origin, has: (id) => message.emojis.some((emoji) => emoji.id === id && !emoji.removed) && !emojiSet.gone.has(id) }}
                       />
                       {message.edited ? <span className="message-edited"> (editada)</span> : null}
                     </div>
@@ -683,10 +689,12 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
                             aria-pressed={mine}
                             disabled={readOnly}
                             title={names}
-                            aria-label={`${reaction.emoji} ${reaction.userIds.length}: ${names}`}
+                            aria-label={`${reactionText(reaction.emoji, message.emojis)} ${reaction.userIds.length}: ${names}`}
                             onClick={() => void react(message, reaction.emoji)}
                           >
-                            <span aria-hidden="true">{reaction.emoji}</span>
+                            <span aria-hidden="true">
+                              <ReactionLabel origin={origin} emoji={reaction.emoji} refs={message.emojis} gone={emojiSet.gone} />
+                            </span>
                             <span>{reaction.userIds.length}</span>
                           </button>
                         );
@@ -694,16 +702,19 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
                     </div>
                   ) : null}
                   {picker === message.id ? (
-                    <div className="emoji-picker" role="group" aria-label="Escolher reação">
-                      {QUICK_EMOJIS.map((emoji) => (
-                        <button key={emoji} type="button" aria-label={`Reagir com ${emoji}`} onClick={() => void react(message, emoji)}>
-                          {emoji}
-                        </button>
-                      ))}
-                      <button type="button" className="ghost" onClick={() => setPicker(null)}>
-                        Fechar
-                      </button>
-                    </div>
+                    <EmojiPicker
+                      origin={origin}
+                      model={model}
+                      servers={emojiSet.servers}
+                      emojis={emojiSet.emojis}
+                      currentServerId={emojiSet.serverId}
+                      manager={emojiSet.manager}
+                      usable={emojiSet.usable}
+                      quick={QUICK_EMOJIS}
+                      label="Escolher reação"
+                      onPick={(value) => void react(message, value)}
+                      onClose={() => setPicker(null)}
+                    />
                   ) : null}
                   {removing === message.id ? (
                     <div className="message-confirm" role="alertdialog" aria-label="Remover mensagem">
@@ -904,6 +915,37 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
               </button>
             </p>
           ) : null}
+          {composerEmoji ? (
+            <EmojiPicker
+              origin={origin}
+              model={model}
+              servers={emojiSet.servers}
+              emojis={emojiSet.emojis}
+              currentServerId={emojiSet.serverId}
+              manager={emojiSet.manager}
+              usable={emojiSet.usable}
+              quick={QUICK_EMOJIS}
+              label="Inserir emoji"
+              onPick={(value, emoji) => {
+                const at = composerRef.current?.selectionStart ?? draft.length;
+                const piece = emoji ? `:${emoji.name}:` : value;
+                setDraft(draft.slice(0, at) + piece + draft.slice(at));
+                setComposerEmoji(false);
+                composerRef.current?.focus();
+              }}
+              onClose={() => setComposerEmoji(false)}
+            />
+          ) : null}
+          <button
+            type="button"
+            className="icon-btn composer-emoji"
+            aria-label="Inserir emoji"
+            title="Inserir emoji"
+            aria-expanded={composerEmoji}
+            onClick={() => setComposerEmoji(!composerEmoji)}
+          >
+            <IconSmile size={18} />
+          </button>
           <button
             type="button"
             className="icon-btn composer-attach"
