@@ -27,6 +27,27 @@ export function inviteLink(origin: string, code: string): string {
   return `openmeet://convite?host=${encodeURIComponent(inviteHost(origin))}&code=${code}`;
 }
 
+/** RF-27: opens the desktop app on this instance. It carries no code, session or account. */
+export function instanceLink(origin: string): string {
+  return `openmeet://instancia?host=${encodeURIComponent(inviteHost(origin))}`;
+}
+
+/** The origin named by `openmeet://instancia?host=...`, or null for anything else. Never throws. */
+export function parseInstanceLink(raw: string): string | null {
+  const text = raw.trim();
+  if (text.length === 0 || text.length > 512) return null;
+  try {
+    const url = new URL(text);
+    if (url.protocol !== "openmeet:" || url.hostname !== "instancia") return null;
+    if (url.username !== "" || url.password !== "" || url.hash !== "" || (url.pathname !== "" && url.pathname !== "/")) return null;
+    const keys = [...url.searchParams.keys()];
+    if (keys.length !== 1 || keys[0] !== "host") return null;
+    return hostOrigin(url.searchParams.get("host") ?? "");
+  } catch {
+    return null;
+  }
+}
+
 /** ADR 0014: the browser page of the invite. It opens the app or, where the instance serves it, the web client. */
 export function invitePageLink(origin: string, code: string): string {
   if (!isInviteCode(code)) throw new Error("invalid invite code");

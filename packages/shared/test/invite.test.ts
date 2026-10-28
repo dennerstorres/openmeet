@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { inviteFromFragment, inviteLink, invitePageLink, parseInvite } from "../src/invite.js";
+import { instanceLink, parseInstanceLink, inviteFromFragment, inviteLink, invitePageLink, parseInvite } from "../src/invite.js";
 
 const code = "A".repeat(20) + "b_-" + "9".repeat(20);
 
@@ -53,4 +53,24 @@ test("the web client takes the code only from an exact #convite fragment", () =>
   assert.equal(inviteFromFragment("#convite=short"), null);
   assert.equal(inviteFromFragment(`?convite=${code}`), null);
   assert.equal(inviteFromFragment(""), null);
+});
+
+test("instance link (RF-27) round-trips the instance origin", () => {
+  assert.equal(instanceLink("https://meet.example"), "openmeet://instancia?host=meet.example");
+  assert.equal(parseInstanceLink("openmeet://instancia?host=meet.example"), "https://meet.example");
+  assert.equal(parseInstanceLink("openmeet://instancia?host=localhost%3A3000"), "http://localhost:3000");
+});
+
+test("instance link (RF-27) refuses anything but a bare host", () => {
+  for (const raw of [
+    "openmeet://convite?host=meet.example&code=x",
+    "openmeet://instancia?host=meet.example&code=x",
+    "openmeet://instancia?host=user%40evil.example",
+    "openmeet://instancia/x?host=meet.example",
+    "openmeet://instancia?host=meet.example#x",
+    "https://meet.example",
+    "",
+  ]) {
+    assert.equal(parseInstanceLink(raw), null, raw);
+  }
 });

@@ -1,5 +1,6 @@
 //! ADR 0012: `openmeet://convite` links. The native side keeps only that shape and hands
 //! the link to the webview, which parses it again and asks the person before anything is sent.
+//! RF-27 adds `openmeet://instancia`, which only names an instance for an app that has none yet.
 
 use std::sync::Mutex;
 
@@ -15,7 +16,7 @@ pub fn accept_link(raw: &str) -> Option<String> {
         return None;
     }
     let url = tauri::Url::parse(raw).ok()?;
-    if url.scheme() != "openmeet" || url.host_str() != Some("convite") {
+    if url.scheme() != "openmeet" || !matches!(url.host_str(), Some("convite" | "instancia")) {
         return None;
     }
     if !url.username().is_empty() || url.password().is_some() || url.fragment().is_some() {
@@ -59,6 +60,8 @@ mod tests {
     fn keeps_only_invite_links() {
         let link = format!("openmeet://convite?host=meet.example&code={CODE}");
         assert_eq!(accept_link(&link).as_deref(), Some(link.as_str()));
+        let instance = "openmeet://instancia?host=meet.example".to_string();
+        assert_eq!(accept_link(&instance).as_deref(), Some(instance.as_str()));
         for raw in [
             format!("openmeet://sala?host=meet.example&code={CODE}"),
             format!("https://meet.example/convite/{CODE}"),

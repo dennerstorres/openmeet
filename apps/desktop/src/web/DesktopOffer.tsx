@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Body1, Button, Caption1, Card, CardHeader, makeStyles, tokens } from "@fluentui/react-components";
 import { ArrowDownloadRegular } from "@fluentui/react-icons";
+import { instanceLink } from "@openmeet/shared";
 import { DESKTOP_DOWNLOAD_URL, dismissOffer, isWindowsDesktop, offerDismissed } from "./desktopApp";
 
 const useStyles = makeStyles({
@@ -20,6 +21,7 @@ const useStyles = makeStyles({
 export function DesktopOffer() {
   const styles = useStyles();
   const [open, setOpen] = useState(() => isWindowsDesktop() && !offerDismissed());
+  const [downloaded, setDownloaded] = useState(false);
   if (!open) return null;
   const close = () => {
     dismissOffer();
@@ -35,13 +37,25 @@ export function DesktopOffer() {
               <strong>OpenMeet para Windows</strong>
             </Body1>
           }
-          description={<Caption1>O app tem melhor desempenho, áudio do PC, bandeja e atalhos globais.</Caption1>}
+          description={
+            <Caption1>
+              {downloaded
+                ? "Depois de instalar, abra o app por aqui para ele já entrar nesta instância."
+                : "O app tem melhor desempenho, áudio do PC, bandeja e atalhos globais."}
+            </Caption1>
+          }
         />
         <div className={styles.actions}>
           <Button onClick={close}>Agora não</Button>
-          <Button as="a" appearance="primary" href={DESKTOP_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" onClick={close}>
-            Baixar app
-          </Button>
+          {downloaded ? (
+            <Button as="a" appearance="primary" href={instanceLink(window.location.origin)} onClick={close}>
+              Abrir no app
+            </Button>
+          ) : (
+            <Button as="a" appearance="primary" href={DESKTOP_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" onClick={() => setDownloaded(true)}>
+              Baixar app
+            </Button>
+          )}
         </div>
       </Card>
     </div>

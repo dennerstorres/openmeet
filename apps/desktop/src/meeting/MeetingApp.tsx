@@ -31,6 +31,7 @@ import {
 } from "@openmeet/media";
 import {
   inviteFromFragment,
+  parseInstanceLink,
   invitePageLink,
   MeetingModel,
   type InstanceApi,
@@ -537,6 +538,13 @@ export function MeetingApp() {
     let stop: (() => void) | undefined;
     let closed = false;
     const offer = (link: string) => {
+      const instance = parseInstanceLink(link);
+      // RF-27: the web page only names an instance for an app that has none. It never moves a signed-in app.
+      if (instance !== null) {
+        if (rememberedInstance() === null) void model.confirmInstance(instance);
+        void showWindow().catch(() => undefined);
+        return;
+      }
       model.offerInvite(link);
       void showWindow().catch(() => undefined);
     };
