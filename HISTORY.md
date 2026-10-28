@@ -713,3 +713,7 @@ Próxima tarefa:
 ## ADR 0026 — diálogos no Fluent (2026-10-28, branch `poc/fluent-ui`)
 - Novo `ConfirmDialog` (`fluent.tsx`, `modalType="alert"`, confirmar em vermelho, Esc/fundo cancelam salvo com pedido em andamento) para desconectar participante e remover sala/servidor (antes `inline-form`). Perfil virou `Dialog` com `DialogTitle` + fechar; conteúdo interno igual. Configurações do servidor e adicionar servidor seguem no modal antigo.
 - Validação (Windows 11): typecheck, eslint 0 achados, desktop `pnpm test` 36 pass, `pnpm build` ok. Sem teste visual (precisa API + conta). Estado: WAITING_VALIDATION.
+
+## ADR 0026 — modais restantes no Fluent (2026-10-28, branch `poc/fluent-ui`)
+- Adicionar servidor e configurações do servidor viraram `Dialog` (título + fechar, conteúdo igual). CSS `.modal-backdrop`/`.app-modal` removido; a regra móvel `.call-area:has(.modal-backdrop)` saiu porque o `Dialog` usa portal no `body`.
+- Validação (Windows 11): typecheck, eslint, desktop `pnpm test` 36 pass, `pnpm build` ok. Sem teste visual (precisa API + conta), incluindo 375 px. Estado: WAITING_VALIDATION.

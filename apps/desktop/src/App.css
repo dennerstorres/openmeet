@@ -1027,55 +1027,14 @@ a {
   background: var(--bg-main);
 }
 
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  box-sizing: border-box;
-  background: var(--overlay);
-}
-
-.app-modal {
-  width: min(100%, 520px);
-  max-height: min(720px, calc(100vh - 40px));
-  overflow-y: auto;
-  border-radius: 10px;
-  background: var(--bg-main);
-  box-shadow: 0 8px 8px rgb(0 0 0 / 0.35);
-}
-
-.app-modal > header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 20px 20px 16px;
-  border-bottom: 1px solid var(--line);
-}
-
-.app-modal h1,
-.app-modal h2,
-.app-modal p {
+.modal-section h2,
+.modal-section p {
   margin: 0;
 }
 
-.app-modal h1 {
-  color: var(--text);
-  font-size: 19px;
-}
-
-.app-modal h2 {
+.modal-section h2 {
   color: var(--text);
   font-size: 15px;
-}
-
-.app-modal > header p {
-  margin-top: 5px;
-  color: var(--text-muted);
-  font-size: 13px;
 }
 
 .modal-section {
@@ -1770,15 +1729,6 @@ textarea {
 
 /* F12-08: web navigation changes panels; media stays mounted while browsing rooms. */
 @media (max-width: 900px) {
-  .modal-backdrop {
-    padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom))
-      max(12px, env(safe-area-inset-left));
-  }
-
-  .app-modal {
-    max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-  }
-
   .settings-page {
     inset: 0 8px 8px;
     padding: 20px 16px;
@@ -1804,13 +1754,6 @@ textarea {
     height: 100dvh;
     box-sizing: border-box;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-  }
-
-  .web-shell.mobile-rooms .call-area:has(.modal-backdrop) {
-    display: flex;
-    position: fixed;
-    inset: 0;
-    z-index: 9;
   }
 
   .web-shell .room-head-actions .mobile-members-button {

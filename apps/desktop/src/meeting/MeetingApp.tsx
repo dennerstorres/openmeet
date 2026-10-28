@@ -1588,70 +1588,67 @@ export function MeetingApp() {
           </section>
         ) : null}
         {creating === "server" ? (
-          <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.target === event.currentTarget && setCreating(null)}>
-            <section className="app-modal" role="dialog" aria-modal="true" aria-labelledby="add-server-title">
-              <header>
-                <div>
-                  <h1 id="add-server-title">Adicionar servidor</h1>
-                  <p>Crie um espaço novo ou entre usando um convite.</p>
-                </div>
-                <button type="button" className="icon-btn" aria-label="Fechar" onClick={() => setCreating(null)}>
-                  ×
-                </button>
-              </header>
-              {state.canCreateServer ? (
-                <form
-                  className="modal-section"
-                  onSubmit={(event: FormEvent) => {
-                    event.preventDefault();
-                    void model.createServer(serverName).then(() => {
-                      setServerName("");
+          <Dialog open onOpenChange={(_, data) => !data.open && setCreating(null)}>
+            <DialogSurface className="" aria-describedby={undefined}>
+              <DialogBody>
+                <DialogTitle action={<IconAction label="Fechar" icon={<DismissRegular />} onClick={() => setCreating(null)} />}>Adicionar servidor</DialogTitle>
+                <DialogContent>
+                  <p className="hint">Crie um espaço novo ou entre usando um convite.</p>
+                  {state.canCreateServer ? (
+                    <form
+                      className="modal-section"
+                      onSubmit={(event: FormEvent) => {
+                        event.preventDefault();
+                        void model.createServer(serverName).then(() => {
+                          setServerName("");
+                          setCreating(null);
+                        });
+                      }}
+                    >
+                      <div>
+                        <h2>Criar servidor</h2>
+                        <p className="hint">Você será o dono e poderá criar salas e convites.</p>
+                      </div>
+                      <label>
+                        Nome do servidor
+                        <input value={serverName} onChange={(event) => setServerName(event.currentTarget.value)} maxLength={80} autoFocus />
+                      </label>
+                      <button type="submit" className="primary" disabled={state.pending || serverName.trim().length === 0}>
+                        Criar servidor
+                      </button>
+                    </form>
+                  ) : null}
+                  <form
+                    className="modal-section"
+                    onSubmit={(event: FormEvent) => {
+                      event.preventDefault();
+                      model.offerInvite(pastedInvite);
+                      setPastedInvite("");
                       setCreating(null);
-                    });
-                  }}
-                >
-                  <div>
-                    <h2>Criar servidor</h2>
-                    <p className="hint">Você será o dono e poderá criar salas e convites.</p>
-                  </div>
-                  <label>
-                    Nome do servidor
-                    <input value={serverName} onChange={(event) => setServerName(event.currentTarget.value)} maxLength={80} autoFocus />
-                  </label>
-                  <button type="submit" className="primary" disabled={state.pending || serverName.trim().length === 0}>
-                    Criar servidor
-                  </button>
-                </form>
-              ) : null}
-              <form
-                className="modal-section"
-                onSubmit={(event: FormEvent) => {
-                  event.preventDefault();
-                  model.offerInvite(pastedInvite);
-                  setPastedInvite("");
-                  setCreating(null);
-                }}
-              >
-                <div>
-                  <h2>Entrar com convite</h2>
-                  <p className="hint">Cole o link ou o código recebido.</p>
-                </div>
-                <label>
-                  Convite
-                  <input
-                    value={pastedInvite}
-                    onChange={(event) => setPastedInvite(event.currentTarget.value)}
-                    placeholder="Link ou código do convite"
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                </label>
-                <button type="submit" disabled={state.pending || pastedInvite.trim().length === 0}>
-                  Entrar no servidor
-                </button>
-              </form>
-            </section>
-          </div>
+                    }}
+                  >
+                    <div>
+                      <h2>Entrar com convite</h2>
+                      <p className="hint">Cole o link ou o código recebido.</p>
+                    </div>
+                    <label>
+                      Convite
+                      <input
+                        value={pastedInvite}
+                        onChange={(event) => setPastedInvite(event.currentTarget.value)}
+                        placeholder="Link ou código do convite"
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                    </label>
+                    <button type="submit" disabled={state.pending || pastedInvite.trim().length === 0}>
+                      Entrar no servidor
+                    </button>
+                  </form>
+                </DialogContent>
+              </DialogBody>
+            </DialogSurface>
+          </Dialog>
         ) : null}
         {profileOpen && selectedServer && state.serverPresence ? (
           <Dialog open onOpenChange={(_, data) => setProfileOpen(data.open)}>
@@ -1758,131 +1755,135 @@ export function MeetingApp() {
           </Dialog>
         ) : null}
         {serverSettingsOpen && selectedServer && state.serverPresence ? (
-          <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.target === event.currentTarget && setServerSettingsOpen(false)}>
-            <section className="app-modal server-settings-modal" role="dialog" aria-modal="true" aria-labelledby="server-settings-title">
-              <header>
-                <div>
-                  <h1 id="server-settings-title">Configurações de {selectedServer.name}</h1>
-                  <p>Gerencie convites e a privacidade de presença deste servidor.</p>
-                </div>
-                <button type="button" className="icon-btn" aria-label="Fechar" onClick={() => setServerSettingsOpen(false)}>
-                  ×
-                </button>
-              </header>
-              <section className="modal-section">
-                <div>
-                  <h2>Convite</h2>
-                  <p className="hint">O link vale por 24 horas e pode ser usado até 10 vezes.</p>
-                </div>
-                {state.createdInvite ? (
-                  <div className="invite-out">
-                    <input readOnly value={state.createdInvite} aria-label="Link de convite" onFocus={(event) => event.currentTarget.select()} />
-                    <div className="row">
+          <Dialog open onOpenChange={(_, data) => !data.open && setServerSettingsOpen(false)}>
+            <DialogSurface className="server-settings-modal" aria-describedby={undefined}>
+              <DialogBody>
+                <DialogTitle action={<IconAction label="Fechar" icon={<DismissRegular />} onClick={() => setServerSettingsOpen(false)} />}>
+                  Configurações de {selectedServer.name}
+                </DialogTitle>
+                <DialogContent>
+                  <p className="hint">Gerencie convites e a privacidade de presença deste servidor.</p>
+                  <section className="modal-section">
+                    <div>
+                      <h2>Convite</h2>
+                      <p className="hint">O link vale por 24 horas e pode ser usado até 10 vezes.</p>
+                    </div>
+                    {state.createdInvite ? (
+                      <div className="invite-out">
+                        <input readOnly value={state.createdInvite} aria-label="Link de convite" onFocus={(event) => event.currentTarget.select()} />
+                        <div className="row">
+                          <button
+                            type="button"
+                            className="primary"
+                            onClick={() =>
+                              void navigator.clipboard
+                                .writeText(state.createdInvite ?? "")
+                                .then(() => setCopied(true))
+                                .catch(() => setMediaError("Não foi possível copiar. Selecione o link e copie."))
+                            }
+                          >
+                            {copied ? "Copiado" : "Copiar link"}
+                          </button>
+                          <button
+                            type="button"
+                            className="ghost"
+                            onClick={() => {
+                              setCopied(false);
+                              model.clearCreatedInvite();
+                            }}
+                          >
+                            Gerar outro
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
                       <button
                         type="button"
-                        className="primary"
-                        onClick={() =>
-                          void navigator.clipboard
-                            .writeText(state.createdInvite ?? "")
-                            .then(() => setCopied(true))
-                            .catch(() => setMediaError("Não foi possível copiar. Selecione o link e copie."))
-                        }
-                      >
-                        {copied ? "Copiado" : "Copiar link"}
-                      </button>
-                      <button
-                        type="button"
-                        className="ghost"
+                        className="primary modal-action"
+                        disabled={state.pending}
                         onClick={() => {
                           setCopied(false);
-                          model.clearCreatedInvite();
+                          void model.createInvite();
                         }}
                       >
-                        Gerar outro
+                        Criar link de convite
                       </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    className="primary modal-action"
-                    disabled={state.pending}
-                    onClick={() => {
-                      setCopied(false);
-                      void model.createInvite();
-                    }}
-                  >
-                    Criar link de convite
-                  </button>
-                )}
-              </section>
-              {selectedServer.role === "owner" ? (
-                <section className="modal-section">
-                  <div>
-                    <h2>Ícone</h2>
-                    <p className="hint">Aparece na barra de servidores para todos os membros. PNG, JPEG ou WebP.</p>
-                  </div>
-                  <div className="image-row">
-                    <span className="profile-face server-face" aria-hidden="true">
-                      <Face origin={state.origin} imageId={selectedServer.iconId} label={selectedServer.name} />
-                    </span>
-                    <ImagePicker label="Escolher imagem" disabled={state.pending} onPick={(image) => void model.setServerIcon(image)} onError={setMediaError} />
-                    {selectedServer.iconId ? (
-                      <button type="button" className="ghost danger-text" disabled={state.pending} onClick={() => void model.setServerIcon(null)}>
-                        Remover
-                      </button>
-                    ) : null}
-                  </div>
-                </section>
-              ) : null}
-              {selectedServer.role === "owner" ? (
-                <section className="modal-section">
-                  <div>
-                    <h2>Privacidade de presença</h2>
-                    <p className="hint">Defina se membros podem ficar invisíveis e quem pode identificá-los.</p>
-                  </div>
-                  <label className="presence-option">
-                    <input
-                      type="checkbox"
-                      checked={state.serverPresence.allowInvisible}
-                      onChange={(event) => void model.setPresencePolicy(event.currentTarget.checked, state.serverPresence?.managersSeeInvisible ?? false)}
-                    />
-                    Permitir modo invisível
-                  </label>
-                  <label className="presence-option">
-                    <input
-                      type="checkbox"
-                      checked={state.serverPresence.managersSeeInvisible}
-                      disabled={!state.serverPresence.allowInvisible}
-                      onChange={(event) => void model.setPresencePolicy(true, event.currentTarget.checked)}
-                    />
-                    Dono e moderadores podem identificar membros invisíveis
-                  </label>
-                </section>
-              ) : null}
-              {selectedServer.role === "owner" ? (
-                <section className="modal-section">
-                  <div>
-                    <h2>Remover servidor</h2>
-                    <p className="hint">Encerra todas as salas e tira o acesso de todos os membros.</p>
-                  </div>
-                  <div className="row">
-                    <button
-                      type="button"
-                      className="danger-text"
-                      disabled={state.pending}
-                      onClick={() => {
-                        setRemoveTarget({ kind: "server", id: selectedServer.id, label: selectedServer.name });
-                        setServerSettingsOpen(false);
-                      }}
-                    >
-                      Remover servidor
-                    </button>
-                  </div>
-                </section>
-              ) : null}
-            </section>
-          </div>
+                    )}
+                  </section>
+                  {selectedServer.role === "owner" ? (
+                    <section className="modal-section">
+                      <div>
+                        <h2>Ícone</h2>
+                        <p className="hint">Aparece na barra de servidores para todos os membros. PNG, JPEG ou WebP.</p>
+                      </div>
+                      <div className="image-row">
+                        <span className="profile-face server-face" aria-hidden="true">
+                          <Face origin={state.origin} imageId={selectedServer.iconId} label={selectedServer.name} />
+                        </span>
+                        <ImagePicker
+                          label="Escolher imagem"
+                          disabled={state.pending}
+                          onPick={(image) => void model.setServerIcon(image)}
+                          onError={setMediaError}
+                        />
+                        {selectedServer.iconId ? (
+                          <button type="button" className="ghost danger-text" disabled={state.pending} onClick={() => void model.setServerIcon(null)}>
+                            Remover
+                          </button>
+                        ) : null}
+                      </div>
+                    </section>
+                  ) : null}
+                  {selectedServer.role === "owner" ? (
+                    <section className="modal-section">
+                      <div>
+                        <h2>Privacidade de presença</h2>
+                        <p className="hint">Defina se membros podem ficar invisíveis e quem pode identificá-los.</p>
+                      </div>
+                      <label className="presence-option">
+                        <input
+                          type="checkbox"
+                          checked={state.serverPresence.allowInvisible}
+                          onChange={(event) => void model.setPresencePolicy(event.currentTarget.checked, state.serverPresence?.managersSeeInvisible ?? false)}
+                        />
+                        Permitir modo invisível
+                      </label>
+                      <label className="presence-option">
+                        <input
+                          type="checkbox"
+                          checked={state.serverPresence.managersSeeInvisible}
+                          disabled={!state.serverPresence.allowInvisible}
+                          onChange={(event) => void model.setPresencePolicy(true, event.currentTarget.checked)}
+                        />
+                        Dono e moderadores podem identificar membros invisíveis
+                      </label>
+                    </section>
+                  ) : null}
+                  {selectedServer.role === "owner" ? (
+                    <section className="modal-section">
+                      <div>
+                        <h2>Remover servidor</h2>
+                        <p className="hint">Encerra todas as salas e tira o acesso de todos os membros.</p>
+                      </div>
+                      <div className="row">
+                        <button
+                          type="button"
+                          className="danger-text"
+                          disabled={state.pending}
+                          onClick={() => {
+                            setRemoveTarget({ kind: "server", id: selectedServer.id, label: selectedServer.name });
+                            setServerSettingsOpen(false);
+                          }}
+                        >
+                          Remover servidor
+                        </button>
+                      </div>
+                    </section>
+                  ) : null}
+                </DialogContent>
+              </DialogBody>
+            </DialogSurface>
+          </Dialog>
         ) : null}
         {inCall ? (
           <>
