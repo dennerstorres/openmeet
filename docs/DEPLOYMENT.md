@@ -113,3 +113,31 @@ Anexo e emoji ficam dentro do Postgres: entram no backup cifrado e fazem o banco
 ### Retenção
 
 Mensagens, anexos e reações ficam para sempre; não há expurgo automático. Remover uma mensagem apaga de verdade o texto, os anexos, as reações e as menções e deixa só "mensagem removida". Remover sala ou servidor (ADR 0023) só esconde: o conteúdo continua no banco e no backup. Apagar de vez exige SQL do operador, fora da aplicação.
+
+## Coolify
+
+O Coolify já tem o Traefik nas portas 80/443, então o Caddy desta stack sai. O resto do `infra/compose/docker-compose.yml` vale como está. Isso ainda não foi validado numa VPS com Coolify.
+
+1. Na máquina local, gere segredos e o YAML do LiveKit: `node infra/compose/host.mjs --api-domain api.exemplo.com --livekit-domain livekit.exemplo.com` (sem `--up`). Copie `infra/compose/generated/livekit.yaml` para o servidor, por exemplo `/data/openmeet/livekit.yaml`.
+2. No Coolify, crie um recurso **Docker Compose** apontando para este repositório, com o arquivo `infra/compose/docker-compose.yml`. Apague o serviço `caddy` e os volumes `caddy-*` da cópia do Coolify.
+3. Em **Environment Variables**, cole os valores do `.env` gerado: `POSTGRES_PASSWORD`, `AUTH_SECRET`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_URL` (`wss://livekit.exemplo.com`), `BOOTSTRAP_TOKEN`, `PROXY_AUTH`, `API_DOMAIN` e, se quiser, `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`.
+4. No serviço `livekit`, troque o volume `./generated/livekit.yaml` pelo caminho absoluto do passo 1. Mantenha `7881:7881` e `7882:7882/udp` publicados: a mídia não passa pelo Traefik.
+5. Domínios: `api` → `https://api.exemplo.com:3000`; `livekit` → `https://livekit.exemplo.com:7880`. O Traefik emite o certificado.
+6. O serviço `api` precisa receber `X-OpenMeet-Proxy: <PROXY_AUTH>` em toda requisição, como o Caddy fazia (S-11). Sem ele a API não confia no IP do cliente e o rate limit fica por proxy. Adicione nas labels do `api`:
+
+```
+traefik.http.middlewares.openmeet-proxy.headers.customrequestheaders.X-OpenMeet-Proxy=${PROXY_AUTH}
+traefik.http.routers.<router-da-api>.middlewares=openmeet-proxy
+```
+
+O Traefik já substitui `X-Forwarded-For` de cliente não confiável pelo IP real. Não marque o Traefik com `forwardedHeaders.insecure`.
+
+7. Regras do SSE da seção de chat abaixo: sem middleware `buffering` na rota da API, `idleTimeout` acima de 30 s e corpo de até ~14 MB.
+8. Firewall: `80`, `443/tcp+udp`, `7881/tcp`, `7882/udp`. Nunca `3000` nem `5432`.
+
+Depois do primeiro deploy, crie o administrador com o `BOOTSTRAP_TOKEN` e apague essa variável no Coolify.
+
+### Atualizar
+
+- **API**: redeploy no Coolify. As migrations rodam ao subir. Faça `pg-copy.mjs backup` antes; voltar de versão após migration exige restaurar o backup.
+- **LiveKit**: fixado em `v1.13.10`. Para trocar, mude a tag no compose, redeploy e teste uma chamada com áudio, vídeo e tela. A API só usa a chave e o URL, então a troca independe dela.
