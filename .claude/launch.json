@@ -4,7 +4,11 @@
     {
       "name": "desktop-web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@openmeet/desktop", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@openmeet/desktop",
+        "dev"
+      ],
       "port": 1420
     },
     {
@@ -13,14 +17,21 @@
       "runtimeArgs": [
         "--import",
         "file:///C:/www/tauri/openmeet/apps/server/node_modules/tsx/dist/loader.mjs",
-        "C:/Users/ADMINI~1/AppData/Local/Temp/claude/C--www-tauri-openmeet/f9174bb8-cc92-484f-a030-d5847fe4e97d/scratchpad/dev-api.mts"
+        "C:/Users/ADMINI~1/AppData/Local/Temp/claude/C--www-tauri-openmeet/df7c5e4d-8014-42c8-97ad-4bb2f24aada9/scratchpad/dev-api.mts"
       ],
       "port": 3000
     },
     {
       "name": "web-client",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@openmeet/desktop", "exec", "vite", "--mode", "web"],
+      "runtimeArgs": [
+        "--filter",
+        "@openmeet/desktop",
+        "exec",
+        "vite",
+        "--mode",
+        "web"
+      ],
       "port": 1420,
       "env": {
         "OPENMEET_API": "http://127.0.0.1:3002"
@@ -32,7 +43,7 @@
       "runtimeArgs": [
         "--import",
         "file:///C:/www/tauri/openmeet/apps/server/node_modules/tsx/dist/loader.mjs",
-        "C:/Users/ADMINI~1/AppData/Local/Temp/claude/C--www-tauri-openmeet/f9174bb8-cc92-484f-a030-d5847fe4e97d/scratchpad/dev-api.mts"
+        "C:/Users/ADMINI~1/AppData/Local/Temp/claude/C--www-tauri-openmeet/df7c5e4d-8014-42c8-97ad-4bb2f24aada9/scratchpad/dev-api.mts"
       ],
       "port": 3010,
       "env": {
@@ -41,6 +52,126 @@
         "WEB_ROOT": "C:/www/tauri/openmeet/apps/desktop/dist-web",
         "DEV_BOOTSTRAP": "dev-only-bootstrap-token-xyz"
       }
+    },
+    {
+      "name": "delete-api",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--import",
+        "file:///C:/www/tauri/openmeet/apps/server/node_modules/tsx/dist/loader.mjs",
+        "C:/Users/ADMINI~1/AppData/Local/Temp/claude/C--www-tauri-openmeet/1a9d9f9e-9fad-48d2-8ab0-cb1c5c0880f0/scratchpad/dev-api.mts"
+      ],
+      "port": 3012,
+      "env": {
+        "PORT": "3012",
+        "WEB_ORIGIN": "http://localhost:1430"
+      }
+    },
+    {
+      "name": "delete-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@openmeet/desktop",
+        "exec",
+        "vite",
+        "--mode",
+        "web",
+        "--port",
+        "1430",
+        "--strictPort"
+      ],
+      "port": 1430,
+      "env": {
+        "OPENMEET_API": "http://127.0.0.1:3012"
+      }
+    },
+    {
+      "name": "fluent-poc",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@openmeet/desktop",
+        "exec",
+        "vite",
+        "preview",
+        "--port",
+        "4173",
+        "--strictPort",
+        "--outDir",
+        "dist-poc"
+      ],
+      "port": 4173,
+      "env": {
+        "FLUENT_POC": "1"
+      }
+    },
+    {
+      "name": "fluent-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@openmeet/desktop",
+        "exec",
+        "vite",
+        "--mode",
+        "web",
+        "--port",
+        "1440",
+        "--strictPort"
+      ],
+      "port": 1440,
+      "env": {
+        "OPENMEET_API": "http://127.0.0.1:3000"
+      }
+    },
+    {
+      "name": "fluent-api",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--import",
+        "file:///C:/www/tauri/openmeet/apps/server/node_modules/tsx/dist/loader.mjs",
+        "C:/Users/ADMINI~1/AppData/Local/Temp/claude/C--www-tauri-openmeet/1a9d9f9e-9fad-48d2-8ab0-cb1c5c0880f0/scratchpad/dev-api.mts"
+      ],
+      "port": 3000,
+      "env": {
+        "WEB_ORIGIN": "http://localhost:1440"
+      }
+    },
+    {
+      "name": "fluent-api-2",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--import",
+        "file:///C:/www/tauri/openmeet/apps/server/node_modules/tsx/dist/loader.mjs",
+        "C:/Users/ADMINI~1/AppData/Local/Temp/claude/C--www-tauri-openmeet/1a9d9f9e-9fad-48d2-8ab0-cb1c5c0880f0/scratchpad/dev-api.mts"
+      ],
+      "port": 3020,
+      "env": {
+        "PORT": "3020",
+        "WEB_ORIGIN": "http://localhost:1460"
+      },
+      "autoPort": false
+    },
+    {
+      "name": "fluent-web-2",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@openmeet/desktop",
+        "exec",
+        "vite",
+        "--mode",
+        "web",
+        "--port",
+        "1460",
+        "--strictPort"
+      ],
+      "port": 1460,
+      "env": {
+        "OPENMEET_API": "http://127.0.0.1:3020"
+      },
+      "autoPort": false
     }
   ]
 }
