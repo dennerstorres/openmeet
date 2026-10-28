@@ -700,6 +700,9 @@ export function MeetingApp() {
     devicesApplied.current = true;
     for (const kind of DEVICE_KINDS) {
       const saved = storedDevice(kind);
+      // Nothing saved means the system default. Before permission the browser lists devices with an empty
+      // id, and an empty pick would become `{ exact: "" }`, an OverconstrainedError on the next capture.
+      if (saved.length === 0) continue;
       if (kind === "audiooutput" && !session().browser.outputSelection) continue;
       if (media.devices.some((device) => device.kind === kind && device.deviceId === saved && !device.active)) {
         void session()

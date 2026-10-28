@@ -1,4 +1,5 @@
 import {
+  ConnectionState,
   DisconnectReason,
   LocalAudioTrack,
   LocalVideoTrack,
@@ -416,6 +417,7 @@ export class LiveKitPocSession {
         await local.setMicrophoneEnabled(enabled);
       }
     }, "microphone");
+    if (await this.dropIfLeft(Track.Source.Microphone)) return;
     await this.refreshDevices();
     await this.alignOutput();
   }
@@ -528,11 +530,24 @@ export class LiveKitPocSession {
 
   async setCamera(enabled: boolean): Promise<void> {
     await this.toggle(() => this.room.localParticipant.setCameraEnabled(enabled), "camera");
+    if (await this.dropIfLeft(Track.Source.Camera)) return;
     if (enabled) {
       const track = this.room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
       if (track instanceof LocalVideoTrack) await this.videoBackground.apply(track);
     }
     await this.refreshDevices();
+  }
+
+  /** A capture that finishes after leaving the room is never stopped by the disconnect. Stop it here. */
+  private async dropIfLeft(source: Track.Source): Promise<boolean> {
+    if (this.room.state === ConnectionState.Connected || this.room.state === ConnectionState.Reconnecting) return false;
+    const local = this.room.localParticipant;
+    const track = local.getTrackPublication(source)?.track;
+    if (track) {
+      track.stop();
+      await local.unpublishTrack(track, true).catch(() => undefined);
+    }
+    return true;
   }
 
   async setBackgroundBlur(enabled: boolean): Promise<void> {
