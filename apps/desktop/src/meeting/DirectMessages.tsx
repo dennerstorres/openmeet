@@ -2,7 +2,10 @@ import { DM_GROUP_MAX, bumpDm, dmTitle, parseChatMessage, parseDm, upsertDm, typ
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type { ChatListener } from "./chat-events";
 import { dmClosed, dmPeer } from "./dm-state";
-import { IconPlus, IconUserPlus, IconUsers } from "./Icons";
+import { IconUsers } from "./Icons";
+import { IconAction } from "./fluent";
+import { Button, Input } from "@fluentui/react-components";
+import { AddRegular, PeopleAddRegular } from "@fluentui/react-icons";
 import { Face } from "./images";
 import { TextRoom, type ChatPerson } from "./TextRoom";
 
@@ -127,12 +130,12 @@ export function PeoplePicker(props: {
         {picked.length} de até {props.room} {props.room === 1 ? "pessoa" : "pessoas"}
       </p>
       <div className="row">
-        <button type="submit" disabled={picked.length === 0 || props.busy === true}>
+        <Button type="submit" appearance="primary" disabled={picked.length === 0 || props.busy === true}>
           {props.submit}
-        </button>
-        <button type="button" className="ghost" onClick={props.onCancel}>
+        </Button>
+        <Button appearance="subtle" onClick={props.onCancel}>
           Cancelar
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -159,16 +162,7 @@ export function DmList(props: {
           <strong>Mensagens diretas</strong>
         </div>
         <div className="room-head-actions">
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label="Novo grupo"
-            title="Novo grupo"
-            aria-expanded={creating}
-            onClick={() => setCreating((held) => !held)}
-          >
-            <IconPlus size={18} />
-          </button>
+          <IconAction label="Novo grupo" expanded={creating} icon={<AddRegular />} onClick={() => setCreating((held) => !held)} />
         </div>
       </header>
       {creating ? (
@@ -226,12 +220,12 @@ export function DmList(props: {
 export function MemberCard(props: { label: string; blocked: boolean; onMessage: () => void; onBlock: (on: boolean) => void }) {
   return (
     <div className="member-card" role="group" aria-label={`Ações para ${props.label}`}>
-      <button type="button" onClick={props.onMessage}>
+      <Button appearance="primary" onClick={props.onMessage}>
         Mensagem direta
-      </button>
-      <button type="button" className={props.blocked ? "ghost" : "ghost danger-text"} onClick={() => props.onBlock(!props.blocked)}>
+      </Button>
+      <Button appearance="subtle" className={props.blocked ? undefined : "danger-text"} onClick={() => props.onBlock(!props.blocked)}>
         {props.blocked ? "Desbloquear" : "Bloquear"}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -279,20 +273,11 @@ export function DmChat(props: {
   }, [dm.id]);
 
   const actions = peer ? (
-    <button type="button" className={iBlocked ? "ghost" : "ghost danger-text"} onClick={() => props.onBlock(peer.id, !iBlocked)}>
+    <Button appearance="subtle" className={iBlocked ? undefined : "danger-text"} onClick={() => props.onBlock(peer.id, !iBlocked)}>
       {iBlocked ? "Desbloquear" : "Bloquear"}
-    </button>
+    </Button>
   ) : (
-    <button
-      type="button"
-      className="icon-btn"
-      aria-label="Pessoas do grupo"
-      title="Pessoas do grupo"
-      aria-expanded={people}
-      onClick={() => setPeople((held) => !held)}
-    >
-      <IconUserPlus size={18} />
-    </button>
+    <IconAction label="Pessoas do grupo" expanded={people} icon={<PeopleAddRegular />} onClick={() => setPeople((held) => !held)} />
   );
 
   const banner = (
@@ -325,11 +310,13 @@ export function DmChat(props: {
                 });
               }}
             >
-              <input aria-label="Nome do grupo" value={naming} maxLength={80} onChange={(event) => setNaming(event.currentTarget.value)} autoFocus />
-              <button type="submit">Salvar</button>
-              <button type="button" className="ghost" onClick={() => setNaming(null)}>
+              <Input aria-label="Nome do grupo" value={naming} maxLength={80} onChange={(_, data) => setNaming(data.value)} autoFocus />
+              <Button type="submit" appearance="primary">
+                Salvar
+              </Button>
+              <Button appearance="subtle" onClick={() => setNaming(null)}>
                 Cancelar
-              </button>
+              </Button>
             </form>
           ) : null}
           {adding ? (
@@ -354,8 +341,8 @@ export function DmChat(props: {
             <div className="inline-form" role="alertdialog" aria-label="Sair do grupo">
               <p>Sair de {title}? Você deixa de ver as mensagens; quem criou o grupo pode chamar você de volta.</p>
               <div className="row">
-                <button
-                  type="button"
+                <Button
+                  appearance="primary"
                   className="danger"
                   onClick={() =>
                     void model.leaveDm(dm.id).then((left) => {
@@ -364,27 +351,27 @@ export function DmChat(props: {
                   }
                 >
                   Sair do grupo
-                </button>
-                <button type="button" className="ghost" onClick={() => setLeaving(false)}>
+                </Button>
+                <Button appearance="subtle" onClick={() => setLeaving(false)}>
                   Cancelar
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
             <div className="row">
               {creator && free > 0 ? (
-                <button type="button" className="ghost" onClick={() => setAdding(true)}>
+                <Button appearance="subtle" onClick={() => setAdding(true)}>
                   Adicionar pessoa
-                </button>
+                </Button>
               ) : null}
               {creator ? (
-                <button type="button" className="ghost" onClick={() => setNaming(dm.name ?? "")}>
+                <Button appearance="subtle" onClick={() => setNaming(dm.name ?? "")}>
                   Renomear
-                </button>
+                </Button>
               ) : null}
-              <button type="button" className="ghost danger-text" onClick={() => setLeaving(true)}>
+              <Button appearance="subtle" className="danger-text" onClick={() => setLeaving(true)}>
                 Sair do grupo
-              </button>
+              </Button>
             </div>
           )}
         </section>

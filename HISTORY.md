@@ -701,3 +701,7 @@ Próxima tarefa:
 ## ADR 0026 — chat de texto no Fluent (2026-10-28, branch `poc/fluent-ui`)
 - `TextRoom`: cabeçalho (fixadas/buscar como toggle, Fechar), ações da mensagem, confirmações, composer (emoji/anexo) e botões de texto viraram `IconAction`/`Button`. `IconAction` ganhou `pressed` (vira `ToggleButton`) e `expanded`. Reações, resultados e lista de menções seguem nativos.
 - Validação (Windows 11): typecheck, desktop `pnpm test` 36 pass, `pnpm build` ok. Sem teste visual (precisa API + conta). Estado: WAITING_VALIDATION.
+
+## ADR 0026 — DMs no Fluent (2026-10-28, branch `poc/fluent-ui`)
+- `DirectMessages`: novo grupo e pessoas do grupo como `IconAction` (`AddRegular`, `PeopleAddRegular`); seletor de pessoas, cartão do membro, bloquear, renomear (`Input`), adicionar e sair do grupo como `Button`. Itens da lista de conversas seguem nativos.
+- Validação (Windows 11): typecheck, desktop `pnpm test` 36 pass, `pnpm build` ok. Sem teste visual (precisa API + conta). Estado: WAITING_VALIDATION.
