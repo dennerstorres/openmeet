@@ -742,3 +742,6 @@ Próxima tarefa:
 - Desktop (`.exe` release do código atual, Windows 11, WebView2, 1456 px, só visualização na instância real): barra de salas, chat, membros, menu da conta (com Trocar instância) e configurações do servidor iguais ao web, ícones 20 px, sem quebras. Pendente estético: botões subtle e checkboxes ficam recuados ~8 px do texto da seção (padding interno do Fluent).
 - Alinhamento: checkbox do Fluent com `margin-inline-start: -8px` (caixa alinha ao texto); "Remover servidor" isolado virou `secondary`. Conferido no web; testes 36 pass, build ok.
 - Campos x botões: neutros do tema Fluent agora seguem a paleta do app (superfície #1f2423, borda #3a423f, hover/pressed), e a linha inferior do campo usa a mesma cor da borda. Campos e botões ficam com 32 px (44 px no toque), raio 4 e mesma borda. O contorno de foco global saiu dos campos Fluent, que agora mostram só o sublinhado verde. Conferido no web em 1280 e 375 px; testes 36 pass, build ok.
+
+## ADR 0026 — POC removido (2026-10-28, branch `poc/fluent-ui`)
+- Saíram `apps/desktop/fluent-poc.html`, `src/poc/FluentPoc.tsx`, o bloco `FLUENT_POC` do `vite.config.ts` e `dist-poc/` do `.gitignore`. Validação: typecheck, eslint, `pnpm test` 36 pass, `pnpm build` e `pnpm build:web` ok.
