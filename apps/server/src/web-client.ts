@@ -17,6 +17,9 @@ const TYPES: Record<string, string> = {
   ".json": "application/json; charset=utf-8",
   ".webmanifest": "application/manifest+json",
   ".txt": "text/plain; charset=utf-8",
+  // Background blur (ADR 0016): the MediaPipe runtime and the segmentation model under media/.
+  ".wasm": "application/wasm",
+  ".tflite": "application/octet-stream",
 };
 
 const IMMUTABLE = "public, max-age=31536000, immutable";
