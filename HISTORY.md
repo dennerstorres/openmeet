@@ -697,3 +697,7 @@ Próxima tarefa:
 ## ADR 0026 — controles da sala no Fluent (2026-10-28, branch `poc/fluent-ui`)
 - Painel de voz e rodapé da conta: sair (`IconAction` com `CallEndRegular`), Câmera/Tela como `ToggleButton` (`Video*`, `ShareScreenStartRegular`), microfone `IconAction` (`Mic*`), ensurdecer `ToggleButton` + `Tooltip` de descrição.
 - Validação (Windows 11): typecheck, lint 0 achados, desktop `pnpm test` 36 pass, `pnpm build` (JS 1.425 kB, 391 kB gzip). Sem teste visual em chamada: a API local não tem LiveKit. Estado: WAITING_VALIDATION.
+
+## ADR 0026 — chat de texto no Fluent (2026-10-28, branch `poc/fluent-ui`)
+- `TextRoom`: cabeçalho (fixadas/buscar como toggle, Fechar), ações da mensagem, confirmações, composer (emoji/anexo) e botões de texto viraram `IconAction`/`Button`. `IconAction` ganhou `pressed` (vira `ToggleButton`) e `expanded`. Reações, resultados e lista de menções seguem nativos.
+- Validação (Windows 11): typecheck, desktop `pnpm test` 36 pass, `pnpm build` ok. Sem teste visual (precisa API + conta). Estado: WAITING_VALIDATION.
