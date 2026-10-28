@@ -38,7 +38,7 @@ body {
   background: var(--bg-rail);
 }
 
-button:not(.fui-Button),
+button:where(:not(.fui-Button)),
 input,
 select,
 textarea {
@@ -46,7 +46,7 @@ textarea {
   color: inherit;
 }
 
-button:not(.fui-Button) {
+button:where(:not(.fui-Button)) {
   border: 0;
   border-radius: 4px;
   background: #48524e;
@@ -57,16 +57,16 @@ button:not(.fui-Button) {
   transition: background 0.12s ease;
 }
 
-button:not(.fui-Button):hover:not(:disabled) {
+button:where(:not(.fui-Button)):hover:not(:disabled) {
   background: #67726d;
 }
 
-button:not(.fui-Button):disabled {
+button:where(:not(.fui-Button)):disabled {
   opacity: 0.45;
   cursor: default;
 }
 
-button:not(.fui-Button):focus-visible,
+button:where(:not(.fui-Button)):focus-visible,
 summary:focus-visible,
 input:focus-visible,
 select:focus-visible,
@@ -75,39 +75,39 @@ textarea:focus-visible {
   outline-offset: 1px;
 }
 
-button:not(.fui-Button).primary,
-button:not(.fui-Button)[type="submit"],
-button:not(.fui-Button).on {
+button:where(:not(.fui-Button)).primary,
+button:where(:not(.fui-Button))[type="submit"],
+button:where(:not(.fui-Button)).on {
   background: var(--accent);
   color: #fff;
 }
 
-button:not(.fui-Button).primary:hover:not(:disabled),
-button:not(.fui-Button)[type="submit"]:hover:not(:disabled),
-button:not(.fui-Button).on:hover:not(:disabled) {
+button:where(:not(.fui-Button)).primary:hover:not(:disabled),
+button:where(:not(.fui-Button))[type="submit"]:hover:not(:disabled),
+button:where(:not(.fui-Button)).on:hover:not(:disabled) {
   background: var(--accent-hover);
 }
 
-button:not(.fui-Button).off,
-button:not(.fui-Button).danger,
+button:where(:not(.fui-Button)).off,
+button:where(:not(.fui-Button)).danger,
 .fui-Button.danger {
   background: var(--danger);
   color: #fff;
 }
 
-button:not(.fui-Button).ghost {
+button:where(:not(.fui-Button)).ghost {
   background: transparent;
   color: var(--text-muted);
   font-weight: 500;
 }
 
-button:not(.fui-Button).ghost:hover:not(:disabled) {
+button:where(:not(.fui-Button)).ghost:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text);
 }
 
 .danger-text,
-button:not(.fui-Button).danger-text,
+button:where(:not(.fui-Button)).danger-text,
 .fui-Button.danger-text {
   color: var(--danger-text);
 }
@@ -122,7 +122,7 @@ textarea {
   padding: 10px;
 }
 
-label {
+label:where(:not(.fui-Label)) {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -784,41 +784,8 @@ a {
   background: var(--bg-panel);
 }
 
-.paste-invite input {
-  width: 100%;
-  box-sizing: border-box;
-  font-size: 13px;
-}
-
 .invite-out input {
   font-size: 12px;
-}
-
-.icon-btn {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  list-style: none;
-}
-
-.icon-btn::-webkit-details-marker {
-  display: none;
-}
-
-.icon-btn:hover:not(:disabled) {
-  background: var(--bg-active);
-  color: var(--text);
-}
-
-.icon-btn.danger-text {
-  color: var(--danger-text);
 }
 
 .voice-panel {
@@ -927,7 +894,6 @@ a {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 
 .settings-page {
   position: absolute;
@@ -1762,6 +1728,11 @@ textarea {
     display: grid;
   }
 
+  .web-shell .members-panel header .fui-Button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
   .web-shell .members-panel {
     position: fixed;
     top: max(8px, env(safe-area-inset-top));
@@ -1839,14 +1810,9 @@ textarea {
     min-height: 48px;
   }
   .web-shell .room-item,
-  .web-shell .room-bar button,
-  .web-shell .icon-btn {
+  .web-shell .room-bar button {
     min-height: 44px;
   }
-  .web-shell .icon-btn {
-    width: 44px;
-  }
-
 
   .web-shell .call-area {
     gap: 8px;
@@ -2804,10 +2770,8 @@ button.message-reply:hover span {
   font-size: 12px;
 }
 
-.notify-level select {
+.notify-level {
   max-width: 150px;
-  padding: 2px 4px;
-  font-size: 12px;
 }
 
 /* ADR 0024: files on messages and in the composer. */
@@ -3007,7 +2971,7 @@ button.message-reply:hover span {
   align-items: center;
 }
 
-.emoji-manage-add input:not([type="file"]) {
+.emoji-manage-add .fui-Input {
   flex: 1 1 100px;
   min-width: 0;
 }

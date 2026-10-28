@@ -57,6 +57,7 @@ import { ConfirmDialog, IconAction } from "./fluent";
 import {
   Badge,
   Button,
+  Checkbox,
   Dialog,
   DialogBody,
   DialogContent,
@@ -71,6 +72,7 @@ import {
   MenuPopover,
   MenuTrigger,
   Select,
+  Slider,
   ToggleButton,
   Tooltip,
 } from "@fluentui/react-components";
@@ -98,7 +100,7 @@ import {
   VideoRegular,
 } from "@fluentui/react-icons";
 import { SoundPanel, storedSoundVolume } from "./sounds";
-import { IconCamera, IconGear, IconHangUp, IconHeadphones, IconLogo, IconMic, IconScreen, IconSignal, IconUsers } from "./Icons";
+import { IconLogo, IconSignal } from "./Icons";
 import { ShellConsent } from "../shell/ShellConsent";
 import {
   createDesktopApi,
@@ -1293,9 +1295,7 @@ export function MeetingApp() {
               <strong>Membros</strong>
               <span>{state.serverPresence.members.length}</span>
             </div>
-            <button type="button" className="icon-btn" aria-label="Recolher membros" title="Recolher membros" onClick={() => setMembersOpen(false)}>
-              ×
-            </button>
+            <IconAction label="Recolher membros" icon={<DismissRegular />} onClick={() => setMembersOpen(false)} />
           </header>
           <ul>
             {state.serverPresence.members.map((member) => (
@@ -1328,14 +1328,12 @@ export function MeetingApp() {
             ))}
           </ul>
           {state.serverPresence.allowInvisible ? (
-            <label className="presence-option member-self-mode">
-              <input
-                type="checkbox"
-                checked={state.serverPresence.selfMode === "invisible"}
-                onChange={(event) => void model.setPresenceMode(event.currentTarget.checked ? "invisible" : "visible")}
-              />
-              Aparecer como invisível
-            </label>
+            <Checkbox
+              className="presence-option member-self-mode"
+              label="Aparecer como invisível"
+              checked={state.serverPresence.selfMode === "invisible"}
+              onChange={(_, data) => void model.setPresenceMode(data.checked === true ? "invisible" : "visible")}
+            />
           ) : null}
         </aside>
       ) : null}
@@ -1343,7 +1341,7 @@ export function MeetingApp() {
       <section className="call-area">
         {!membersOpen && selectedServer ? (
           <button type="button" className="members-toggle" aria-label="Mostrar membros" title="Mostrar membros" onClick={() => setMembersOpen(true)}>
-            <IconUsers size={19} />
+            <PeopleRegular fontSize={19} />
             <span>{state.serverPresence?.members.length ?? 0}</span>
           </button>
         ) : null}
@@ -1444,9 +1442,9 @@ export function MeetingApp() {
                 <p className="eyebrow">Aplicativo</p>
                 <h1 id="settings-title">Configurações</h1>
               </div>
-              <button type="button" className="ghost" onClick={() => setSettingsOpen(false)}>
+              <Button appearance="subtle" onClick={() => setSettingsOpen(false)}>
                 Fechar
-              </button>
+              </Button>
             </header>
             <div className="settings-content">
               <div>
@@ -1470,30 +1468,26 @@ export function MeetingApp() {
                   disabled={inCall && (!controlsEnabled || controlPending)}
                   onChange={onDevice}
                 />
-                <label className="effect-toggle">
-                  <input
-                    type="checkbox"
-                    checked={media.backgroundBlur}
-                    disabled={!media.backgroundBlurSupported || controlPending}
-                    onChange={(event) => {
-                      const enabled = event.currentTarget.checked;
-                      void runControl("blur de fundo", () => session().setBackgroundBlur(enabled));
-                    }}
-                  />
-                  Desfocar fundo da câmera
-                </label>
+                <Checkbox
+                  className="effect-toggle"
+                  label="Desfocar fundo da câmera"
+                  checked={media.backgroundBlur}
+                  disabled={!media.backgroundBlurSupported || controlPending}
+                  onChange={(_, data) => {
+                    const enabled = data.checked === true;
+                    void runControl("blur de fundo", () => session().setBackgroundBlur(enabled));
+                  }}
+                />
                 {media.backgroundBlurSupported ? (
-                  <label>
-                    Intensidade do desfoque: {blurRadius}
-                    <input
-                      type="range"
+                  <Field label={`Intensidade do desfoque: ${blurRadius}`}>
+                    <Slider
                       min={BLUR_RADIUS_MIN}
                       max={BLUR_RADIUS_MAX}
                       step={1}
                       value={blurRadius}
                       aria-valuetext={`raio ${blurRadius} px`}
-                      onChange={(event) => {
-                        const value = clampBlurRadius(Number(event.currentTarget.value));
+                      onChange={(_, data) => {
+                        const value = clampBlurRadius(data.value);
                         setBlurRadius(value);
                         try {
                           localStorage.setItem(BLUR_RADIUS_KEY, String(value));
@@ -1505,16 +1499,16 @@ export function MeetingApp() {
                           .catch(() => setMediaError("Não foi possível ajustar o desfoque."));
                       }}
                     />
-                  </label>
+                  </Field>
                 ) : null}
                 {media.backgroundBlurSupported ? (
                   <p className="hint">O efeito é processado neste aparelho e pode aumentar o uso de bateria.</p>
                 ) : (
                   <p className="hint">Este navegador não oferece o processamento necessário para o blur.</p>
                 )}
-                <button type="button" disabled={inCall && !controlsEnabled} onClick={() => void refreshDevices()}>
+                <Button disabled={inCall && !controlsEnabled} onClick={() => void refreshDevices()}>
                   Atualizar dispositivos
-                </button>
+                </Button>
               </div>
               {consent ? (
                 <>
@@ -1532,22 +1526,20 @@ export function MeetingApp() {
                     <p className="hint">Avisos do navegador para menções e mensagens diretas quando esta aba não está na frente.</p>
                   </div>
                   <div className="settings-group">
-                    <label className="effect-toggle">
-                      <input
-                        type="checkbox"
-                        checked={webNotify}
-                        onChange={(event) => {
-                          if (!event.target.checked) {
-                            browserNotifications.disable();
-                            setWebNotify(false);
-                            return;
-                          }
-                          // The permission prompt only ever follows this click.
-                          void browserNotifications.enable().then(setWebNotify);
-                        }}
-                      />
-                      Mostrar notificações do navegador
-                    </label>
+                    <Checkbox
+                      className="effect-toggle"
+                      label="Mostrar notificações do navegador"
+                      checked={webNotify}
+                      onChange={(_, data) => {
+                        if (data.checked !== true) {
+                          browserNotifications.disable();
+                          setWebNotify(false);
+                          return;
+                        }
+                        // The permission prompt only ever follows this click.
+                        void browserNotifications.enable().then(setWebNotify);
+                      }}
+                    />
                   </div>
                 </>
               ) : null}
@@ -1568,19 +1560,17 @@ export function MeetingApp() {
                 ) : (
                   <p className="metrics">{inCall ? "Métricas ainda não disponíveis." : "As métricas aparecem durante uma chamada."}</p>
                 )}
-                <label className="export">
-                  <input
-                    type="checkbox"
-                    checked={exportConsent}
-                    onChange={(event) => {
-                      setExportConsent(event.currentTarget.checked);
-                    }}
-                  />
-                  Autorizar exportação do diagnóstico
-                </label>
-                <button type="button" disabled={!exportConsent} onClick={() => exportDiagnostic()}>
+                <Checkbox
+                  className="export"
+                  label="Autorizar exportação do diagnóstico"
+                  checked={exportConsent}
+                  onChange={(_, data) => {
+                    setExportConsent(data.checked === true);
+                  }}
+                />
+                <Button disabled={!exportConsent} onClick={() => exportDiagnostic()}>
                   Exportar diagnóstico
-                </button>
+                </Button>
               </div>
             </div>
           </section>
@@ -1607,13 +1597,12 @@ export function MeetingApp() {
                         <h2>Criar servidor</h2>
                         <p className="hint">Você será o dono e poderá criar salas e convites.</p>
                       </div>
-                      <label>
-                        Nome do servidor
-                        <input value={serverName} onChange={(event) => setServerName(event.currentTarget.value)} maxLength={80} autoFocus />
-                      </label>
-                      <button type="submit" className="primary" disabled={state.pending || serverName.trim().length === 0}>
+                      <Field label="Nome do servidor">
+                        <Input value={serverName} onChange={(_, data) => setServerName(data.value)} maxLength={80} autoFocus />
+                      </Field>
+                      <Button type="submit" appearance="primary" disabled={state.pending || serverName.trim().length === 0}>
                         Criar servidor
-                      </button>
+                      </Button>
                     </form>
                   ) : null}
                   <form
@@ -1629,19 +1618,18 @@ export function MeetingApp() {
                       <h2>Entrar com convite</h2>
                       <p className="hint">Cole o link ou o código recebido.</p>
                     </div>
-                    <label>
-                      Convite
-                      <input
+                    <Field label="Convite">
+                      <Input
                         value={pastedInvite}
-                        onChange={(event) => setPastedInvite(event.currentTarget.value)}
+                        onChange={(_, data) => setPastedInvite(data.value)}
                         placeholder="Link ou código do convite"
                         autoComplete="off"
                         spellCheck={false}
                       />
-                    </label>
-                    <button type="submit" disabled={state.pending || pastedInvite.trim().length === 0}>
+                    </Field>
+                    <Button type="submit" appearance="primary" disabled={state.pending || pastedInvite.trim().length === 0}>
                       Entrar no servidor
-                    </button>
+                    </Button>
                   </form>
                 </DialogContent>
               </DialogBody>
@@ -1671,9 +1659,9 @@ export function MeetingApp() {
                             onError={setMediaError}
                           />
                           {state.serverPresence.selfProfile.globalAvatarId ? (
-                            <button type="button" className="ghost danger-text" disabled={state.pending} onClick={() => void model.setAccountAvatar(null)}>
+                            <Button appearance="subtle" className="danger-text" disabled={state.pending} onClick={() => void model.setAccountAvatar(null)}>
                               Remover
-                            </button>
+                            </Button>
                           ) : null}
                         </div>
                       </div>
@@ -1700,14 +1688,14 @@ export function MeetingApp() {
                           onError={setMediaError}
                         />
                         {state.serverPresence.selfProfile.avatarId ? (
-                          <button
-                            type="button"
-                            className="ghost danger-text"
+                          <Button
+                            appearance="subtle"
+                            className="danger-text"
                             disabled={state.pending}
                             onClick={() => void model.setServerProfile({ avatar: null })}
                           >
                             Remover
-                          </button>
+                          </Button>
                         ) : null}
                       </div>
                     </div>
@@ -1718,23 +1706,20 @@ export function MeetingApp() {
                         void model.setServerProfile({ nickname: nickname.trim() === "" ? null : nickname });
                       }}
                     >
-                      <label>
-                        Apelido
-                        <input
-                          value={nickname}
-                          onChange={(event) => setNickname(event.currentTarget.value)}
-                          maxLength={80}
-                          placeholder={state.userLabel ?? ""}
-                        />
-                      </label>
+                      <Field label="Apelido">
+                        <Input value={nickname} onChange={(_, data) => setNickname(data.value)} maxLength={80} placeholder={state.userLabel ?? ""} />
+                      </Field>
                       <div className="row">
-                        <button type="submit" disabled={state.pending || nickname.trim() === (state.serverPresence.selfProfile.nickname ?? "")}>
+                        <Button
+                          type="submit"
+                          appearance="primary"
+                          disabled={state.pending || nickname.trim() === (state.serverPresence.selfProfile.nickname ?? "")}
+                        >
                           Salvar apelido
-                        </button>
+                        </Button>
                         {state.serverPresence.selfProfile.nickname !== null || state.serverPresence.selfProfile.avatarId !== null ? (
-                          <button
-                            type="button"
-                            className="ghost"
+                          <Button
+                            appearance="subtle"
                             disabled={state.pending}
                             onClick={() => {
                               setNickname("");
@@ -1742,7 +1727,7 @@ export function MeetingApp() {
                             }}
                           >
                             Usar perfil da conta
-                          </button>
+                          </Button>
                         ) : null}
                       </div>
                     </form>
@@ -1768,11 +1753,10 @@ export function MeetingApp() {
                     </div>
                     {state.createdInvite ? (
                       <div className="invite-out">
-                        <input readOnly value={state.createdInvite} aria-label="Link de convite" onFocus={(event) => event.currentTarget.select()} />
+                        <Input readOnly value={state.createdInvite} aria-label="Link de convite" onFocus={(event) => event.currentTarget.select()} />
                         <div className="row">
-                          <button
-                            type="button"
-                            className="primary"
+                          <Button
+                            appearance="primary"
                             onClick={() =>
                               void navigator.clipboard
                                 .writeText(state.createdInvite ?? "")
@@ -1781,23 +1765,22 @@ export function MeetingApp() {
                             }
                           >
                             {copied ? "Copiado" : "Copiar link"}
-                          </button>
-                          <button
-                            type="button"
-                            className="ghost"
+                          </Button>
+                          <Button
+                            appearance="subtle"
                             onClick={() => {
                               setCopied(false);
                               model.clearCreatedInvite();
                             }}
                           >
                             Gerar outro
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     ) : (
-                      <button
-                        type="button"
-                        className="primary modal-action"
+                      <Button
+                        appearance="primary"
+                        className="modal-action"
                         disabled={state.pending}
                         onClick={() => {
                           setCopied(false);
@@ -1805,7 +1788,7 @@ export function MeetingApp() {
                         }}
                       >
                         Criar link de convite
-                      </button>
+                      </Button>
                     )}
                   </section>
                   {selectedServer.role === "owner" ? (
@@ -1825,9 +1808,9 @@ export function MeetingApp() {
                           onError={setMediaError}
                         />
                         {selectedServer.iconId ? (
-                          <button type="button" className="ghost danger-text" disabled={state.pending} onClick={() => void model.setServerIcon(null)}>
+                          <Button appearance="subtle" className="danger-text" disabled={state.pending} onClick={() => void model.setServerIcon(null)}>
                             Remover
-                          </button>
+                          </Button>
                         ) : null}
                       </div>
                     </section>
@@ -1838,23 +1821,19 @@ export function MeetingApp() {
                         <h2>Privacidade de presença</h2>
                         <p className="hint">Defina se membros podem ficar invisíveis e quem pode identificá-los.</p>
                       </div>
-                      <label className="presence-option">
-                        <input
-                          type="checkbox"
-                          checked={state.serverPresence.allowInvisible}
-                          onChange={(event) => void model.setPresencePolicy(event.currentTarget.checked, state.serverPresence?.managersSeeInvisible ?? false)}
-                        />
-                        Permitir modo invisível
-                      </label>
-                      <label className="presence-option">
-                        <input
-                          type="checkbox"
-                          checked={state.serverPresence.managersSeeInvisible}
-                          disabled={!state.serverPresence.allowInvisible}
-                          onChange={(event) => void model.setPresencePolicy(true, event.currentTarget.checked)}
-                        />
-                        Dono e moderadores podem identificar membros invisíveis
-                      </label>
+                      <Checkbox
+                        className="presence-option"
+                        label="Permitir modo invisível"
+                        checked={state.serverPresence.allowInvisible}
+                        onChange={(_, data) => void model.setPresencePolicy(data.checked === true, state.serverPresence?.managersSeeInvisible ?? false)}
+                      />
+                      <Checkbox
+                        className="presence-option"
+                        label="Dono e moderadores podem identificar membros invisíveis"
+                        checked={state.serverPresence.managersSeeInvisible}
+                        disabled={!state.serverPresence.allowInvisible}
+                        onChange={(_, data) => void model.setPresencePolicy(true, data.checked === true)}
+                      />
                     </section>
                   ) : null}
                   {selectedServer.role === "owner" ? (
@@ -1864,8 +1843,8 @@ export function MeetingApp() {
                         <p className="hint">Encerra todas as salas e tira o acesso de todos os membros.</p>
                       </div>
                       <div className="row">
-                        <button
-                          type="button"
+                        <Button
+                          appearance="subtle"
                           className="danger-text"
                           disabled={state.pending}
                           onClick={() => {
@@ -1874,7 +1853,7 @@ export function MeetingApp() {
                           }}
                         >
                           Remover servidor
-                        </button>
+                        </Button>
                       </div>
                     </section>
                   ) : null}
@@ -1919,9 +1898,9 @@ export function MeetingApp() {
                 </button>
               </div>
               {layout === "spotlight" ? (
-                <button type="button" className="ghost" onClick={() => setFullscreen(true)} disabled={placement.featuredId === null}>
+                <Button appearance="subtle" size="small" onClick={() => setFullscreen(true)} disabled={placement.featuredId === null}>
                   Tela cheia
-                </button>
+                </Button>
               ) : null}
             </header>
             {caption ? (
@@ -1958,9 +1937,8 @@ export function MeetingApp() {
             />
             <div className={`dock${isFullscreen ? " thin" : ""}`}>
               {media.audioPlayback ? null : (
-                <button
-                  type="button"
-                  className="primary"
+                <Button
+                  appearance="primary"
                   onClick={() =>
                     void session()
                       .startRemoteAudio()
@@ -1968,7 +1946,7 @@ export function MeetingApp() {
                   }
                 >
                   Ativar som
-                </button>
+                </Button>
               )}
               <button
                 type="button"
@@ -1978,7 +1956,7 @@ export function MeetingApp() {
                 disabled={!controlsEnabled || controlPending}
                 onClick={toggleMicrophone}
               >
-                <IconMic size={22} off={!media.microphone} />
+                {media.microphone ? <MicRegular fontSize={22} /> : <MicOffRegular fontSize={22} />}
               </button>
               <button
                 type="button"
@@ -1988,7 +1966,7 @@ export function MeetingApp() {
                 disabled={!controlsEnabled || controlPending}
                 onClick={toggleCamera}
               >
-                <IconCamera size={22} off={!media.camera} />
+                {media.camera ? <VideoRegular fontSize={22} /> : <VideoOffRegular fontSize={22} />}
               </button>
               <button
                 type="button"
@@ -1999,7 +1977,7 @@ export function MeetingApp() {
                 disabled={!controlsEnabled || controlPending}
                 onClick={toggleScreen}
               >
-                <IconScreen size={22} />
+                <ShareScreenStartRegular fontSize={22} />
               </button>
               <button
                 type="button"
@@ -2009,7 +1987,7 @@ export function MeetingApp() {
                 title={deafened ? "Voltar a ouvir as pessoas neste PC" : "Cortar o som de todos neste PC. O microfone não muda."}
                 onClick={toggleDeafen}
               >
-                <IconHeadphones size={22} off={deafened} />
+                {deafened ? <SpeakerMuteRegular fontSize={22} /> : <HeadphonesRegular fontSize={22} />}
               </button>
               {session().browser.screenAudio ? (
                 <label className="share-audio" title="Pede o som do PC junto com a imagem. Muda na próxima vez que compartilhar.">
@@ -2043,9 +2021,9 @@ export function MeetingApp() {
                 />
               ) : null}
               {isFullscreen ? (
-                <button type="button" className="ghost" onClick={() => setFullscreen(false)}>
+                <Button appearance="subtle" onClick={() => setFullscreen(false)}>
                   Sair da tela cheia
-                </button>
+                </Button>
               ) : (
                 <details
                   className="more"
@@ -2055,7 +2033,7 @@ export function MeetingApp() {
                   }}
                 >
                   <summary className="ctl" aria-label="Dispositivos e diagnóstico" title="Dispositivos e diagnóstico">
-                    <IconGear size={22} />
+                    <SettingsRegular fontSize={22} />
                   </summary>
                   <div className="more-body">
                     <button
@@ -2072,31 +2050,28 @@ export function MeetingApp() {
                       Fechar ajustes
                     </button>
                     <DeviceSelect label="Entrada" kind="audioinput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
-                    <label>
-                      Volume de entrada do microfone: {microphoneVolume}%
-                      <input
-                        type="range"
+                    <Field label={`Volume de entrada do microfone: ${microphoneVolume}%`}>
+                      <Slider
                         min={0}
                         max={200}
                         step={1}
                         value={microphoneVolume}
                         disabled={!controlsEnabled || controlPending}
                         aria-valuetext={`${microphoneVolume}%`}
-                        onChange={(event) => {
-                          const value = Number(event.currentTarget.value);
+                        onChange={(_, data) => {
+                          const value = data.value;
                           session().setMicrophoneVolume(value / 100);
                           setMicrophoneVolume(value);
                         }}
                       />
-                    </label>
+                    </Field>
                     <p className="hint">100% mantém o nível original. Acima disso, o som pode distorcer. 0% corta sua voz.</p>
-                    <label>
-                      Efeito de voz
-                      <select
+                    <Field label="Efeito de voz">
+                      <Select
                         value={media.voiceEffect}
                         disabled={controlPending}
-                        onChange={(event) => {
-                          const value = event.currentTarget.value;
+                        onChange={(_, data) => {
+                          const value = data.value;
                           if (!isVoiceEffect(value)) return;
                           session()
                             .setVoiceEffect(value)
@@ -2108,12 +2083,14 @@ export function MeetingApp() {
                             {VOICE_EFFECT_LABEL[effect]}
                           </option>
                         ))}
-                      </select>
-                    </label>
-                    <label className="effect-toggle">
-                      <input type="checkbox" checked={media.voiceMonitor} onChange={(event) => session().setVoiceMonitor(event.currentTarget.checked)} />
-                      Ouvir minha voz
-                    </label>
+                      </Select>
+                    </Field>
+                    <Checkbox
+                      className="effect-toggle"
+                      label="Ouvir minha voz"
+                      checked={media.voiceMonitor}
+                      onChange={(_, data) => session().setVoiceMonitor(data.checked === true)}
+                    />
                     <p className="hint">Todos na sala ouvem o efeito. Para se ouvir, use fone: no alto-falante a voz volta para o microfone.</p>
                     {(() => {
                       // ADR 0022: an input of this PC played to the room as its own card.
@@ -2123,13 +2100,12 @@ export function MeetingApp() {
                       return (
                         <fieldset className="radio-controls">
                           <legend>Rádio</legend>
-                          <label>
-                            Entrada do rádio
-                            <select
+                          <Field label="Entrada do rádio">
+                            <Select
                               value={chosen}
                               disabled={!controlsEnabled || controlPending || inputs.length === 0}
-                              onChange={(event) => {
-                                const value = event.currentTarget.value;
+                              onChange={(_, data) => {
+                                const value = data.value;
                                 setRadioInput(value);
                                 if (media.radio) void runControl("rádio", () => session().setRadio(value));
                               }}
@@ -2139,16 +2115,15 @@ export function MeetingApp() {
                                   {device.label}
                                 </option>
                               ))}
-                            </select>
-                          </label>
-                          <button
-                            type="button"
-                            className={media.radio ? "on" : ""}
+                            </Select>
+                          </Field>
+                          <Button
+                            appearance={media.radio ? "primary" : "secondary"}
                             disabled={!controlsEnabled || controlPending || chosen === ""}
                             onClick={() => void runControl("rádio", () => session().setRadio(media.radio ? null : chosen))}
                           >
                             {media.radio ? "Desligar rádio" : "Ligar rádio"}
-                          </button>
+                          </Button>
                           {chosen !== "" && chosen === micId ? (
                             <p className="hint">Essa é a mesma entrada do microfone: sua voz iria junto com a música.</p>
                           ) : null}
@@ -2159,21 +2134,20 @@ export function MeetingApp() {
                         </fieldset>
                       );
                     })()}
-                    <button
-                      type="button"
+                    <Button
                       onClick={(event) => {
                         event.currentTarget.closest("details")?.removeAttribute("open");
                         setSettingsOpen(true);
                       }}
                     >
                       Saída, câmera e diagnóstico
-                    </button>
+                    </Button>
                   </div>
                 </details>
               )}
               <span className="dock-sep" aria-hidden="true" />
               <button type="button" className="ctl leave" aria-label="Sair da sala" title="Sair da sala" onClick={leaveCall}>
-                <IconHangUp size={24} />
+                <CallEndRegular fontSize={24} />
               </button>
             </div>
           </>
@@ -2216,13 +2190,12 @@ function DeviceSelect({
   const options = devices.filter((device) => device.kind === kind);
   const active = options.find((device) => device.active);
   return (
-    <label>
-      {label}
-      <select
+    <Field label={label}>
+      <Select
         value={active?.deviceId ?? ""}
         disabled={disabled}
-        onChange={(event) => {
-          onChange(kind, event.currentTarget.value);
+        onChange={(_, data) => {
+          onChange(kind, data.value);
         }}
       >
         <option value="">padrão</option>
@@ -2231,17 +2204,17 @@ function DeviceSelect({
             {device.active ? `${device.label} (ativo)` : device.label}
           </option>
         ))}
-      </select>
-    </label>
+      </Select>
+    </Field>
   );
 }
 
 function WebInstanceStep({ pending, onRetry }: { pending: boolean; onRetry: () => void }) {
   return (
     <div className="stack">
-      <button type="button" disabled={pending} onClick={onRetry}>
+      <Button appearance="primary" disabled={pending} onClick={onRetry}>
         Tentar de novo
-      </button>
+      </Button>
     </div>
   );
 }
@@ -2266,13 +2239,12 @@ function InstanceStep({
       }}
     >
       <p>A senha só é enviada depois que este endereço confirmar a instância.</p>
-      <label>
-        Endereço
-        <input value={address} onChange={(event) => onAddress(event.currentTarget.value)} autoComplete="url" spellCheck={false} />
-      </label>
-      <button type="submit" disabled={pending}>
+      <Field label="Endereço">
+        <Input value={address} onChange={(_, data) => onAddress(data.value)} autoComplete="url" spellCheck={false} />
+      </Field>
+      <Button type="submit" appearance="primary" disabled={pending}>
         Confirmar instância
-      </button>
+      </Button>
       {import.meta.env.DEV ? <a href="?poc=1">Prova de mídia</a> : null}
     </form>
   );
@@ -2305,40 +2277,36 @@ function AccountStep(props: {
       }}
     >
       {props.bootstrapOpen ? (
-        <label>
-          Token de instalação
-          <input value={props.setupToken} onChange={(event) => props.onSetupToken(event.currentTarget.value)} autoComplete="off" spellCheck={false} />
-        </label>
+        <Field label="Token de instalação">
+          <Input value={props.setupToken} onChange={(_, data) => props.onSetupToken(data.value)} autoComplete="off" spellCheck={false} />
+        </Field>
       ) : null}
-      <label>
-        Usuário
-        <input value={props.username} onChange={(event) => props.onUsername(event.currentTarget.value)} autoComplete="username" />
-      </label>
+      <Field label="Usuário">
+        <Input value={props.username} onChange={(_, data) => props.onUsername(data.value)} autoComplete="username" />
+      </Field>
       {props.bootstrapOpen ? (
-        <label>
-          Nome
-          <input value={props.displayName} onChange={(event) => props.onDisplayName(event.currentTarget.value)} autoComplete="name" />
-        </label>
+        <Field label="Nome">
+          <Input value={props.displayName} onChange={(_, data) => props.onDisplayName(data.value)} autoComplete="name" />
+        </Field>
       ) : null}
-      <label>
-        Senha
-        <input
+      <Field label="Senha">
+        <Input
           type="password"
           value={props.password}
-          onChange={(event) => props.onPassword(event.currentTarget.value)}
+          onChange={(_, data) => props.onPassword(data.value)}
           autoComplete={props.bootstrapOpen ? "new-password" : "current-password"}
         />
-      </label>
-      <button type="submit" disabled={props.pending}>
+      </Field>
+      <Button type="submit" appearance="primary" disabled={props.pending}>
         {props.bootstrapOpen ? "Criar administrador" : "Entrar"}
-      </button>
+      </Button>
       {props.googleLogin && !props.bootstrapOpen ? (
         props.googleWaiting ? (
           <div className="google-wait" role="status">
             <p>Conclua a entrada no navegador que abriu. Esta tela continua sozinha.</p>
-            <button type="button" className="ghost" onClick={props.onCancelGoogle}>
+            <Button appearance="subtle" onClick={props.onCancelGoogle}>
               Cancelar
-            </button>
+            </Button>
           </div>
         ) : (
           <button type="button" className="google" disabled={props.pending} onClick={props.onGoogle}>
@@ -2346,11 +2314,7 @@ function AccountStep(props: {
           </button>
         )
       ) : null}
-      {props.onChange ? (
-        <button type="button" onClick={props.onChange}>
-          Trocar instância
-        </button>
-      ) : null}
+      {props.onChange ? <Button onClick={props.onChange}>Trocar instância</Button> : null}
     </form>
   );
 }
@@ -2372,9 +2336,9 @@ function InvitePanel(props: {
           O convite é de <strong>{props.offer.host}</strong>. Abra o link do convite no navegador para entrar por esse endereço.
         </p>
         <div className="row">
-          <button type="button" className="ghost" onClick={props.onDecline}>
+          <Button appearance="subtle" onClick={props.onDecline}>
             Fechar
-          </button>
+          </Button>
         </div>
       </section>
     );
@@ -2394,12 +2358,12 @@ function InvitePanel(props: {
           </p>
         )}
         <div className="row">
-          <button type="button" className="primary" disabled={props.pending} onClick={props.onAccept}>
+          <Button appearance="primary" disabled={props.pending} onClick={props.onAccept}>
             {props.offer.sameInstance ? "Aceitar convite" : `Abrir ${props.offer.host}`}
-          </button>
-          <button type="button" className="ghost" onClick={props.onDecline}>
+          </Button>
+          <Button appearance="subtle" onClick={props.onDecline}>
             Recusar
-          </button>
+          </Button>
         </div>
       </section>
     );

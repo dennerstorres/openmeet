@@ -11,6 +11,7 @@ import {
   type ServerSummary,
   type SoundSummary,
 } from "@openmeet/shared";
+import { Button, Field, Input, Select, Slider } from "@fluentui/react-components";
 import { fetchSound } from "../shell/native";
 import { base64 } from "./images";
 
@@ -160,17 +161,15 @@ export function SoundPanel(props: {
         </svg>
       </summary>
       <div className="more-body sound-panel">
-        <label>
-          Volume dos sons: {Math.round(volume * 100)}%
-          <input
-            type="range"
+        <Field label={`Volume dos sons: ${Math.round(volume * 100)}%`}>
+          <Slider
             min={0}
             max={100}
             step={1}
             value={Math.round(volume * 100)}
             aria-valuetext={`${Math.round(volume * 100)}%`}
-            onChange={(event) => {
-              const value = Number(event.currentTarget.value) / 100;
+            onChange={(_, data) => {
+              const value = data.value / 100;
               session().setSoundVolume(value);
               try {
                 localStorage.setItem(SOUND_VOLUME_KEY, String(value));
@@ -179,11 +178,11 @@ export function SoundPanel(props: {
               }
             }}
           />
-        </label>
+        </Field>
         {playing !== null ? (
-          <button type="button" className="on" onClick={() => session().stopSound()}>
+          <Button appearance="primary" onClick={() => session().stopSound()}>
             Parar som
-          </button>
+          </Button>
         ) : null}
 
         <h3>Biblioteca deste servidor</h3>
@@ -199,9 +198,9 @@ export function SoundPanel(props: {
                   ▶ {sound.name} <span className="hint">{seconds(sound.durationMs)}</span>
                 </button>
                 {sound.canRemove ? (
-                  <button
-                    type="button"
-                    className="ghost"
+                  <Button
+                    appearance="subtle"
+                    size="small"
                     disabled={busy}
                     aria-label={`Tirar ${sound.name} deste servidor`}
                     onClick={() =>
@@ -209,7 +208,7 @@ export function SoundPanel(props: {
                     }
                   >
                     Tirar
-                  </button>
+                  </Button>
                 ) : null}
               </li>
             ))}
@@ -228,13 +227,12 @@ export function SoundPanel(props: {
               if (picked && name.trim() === "") setName(defaultName(picked));
             }}
           />
-          <label>
-            Nome
-            <input value={name} maxLength={SOUND_NAME_MAX} disabled={busy} onChange={(event) => setName(event.currentTarget.value)} />
-          </label>
-          <button type="submit" disabled={busy || file === null || name.trim() === ""}>
+          <Field label="Nome">
+            <Input value={name} maxLength={SOUND_NAME_MAX} disabled={busy} onChange={(_, data) => setName(data.value)} />
+          </Field>
+          <Button type="submit" appearance="primary" disabled={busy || file === null || name.trim() === ""}>
             {busy ? "Enviando…" : "Enviar para este servidor"}
-          </button>
+          </Button>
           <p className="hint">Até 20 s. Todos os membros do servidor podem tocar o som.</p>
         </form>
 
@@ -252,30 +250,32 @@ export function SoundPanel(props: {
                     </span>
                     {elsewhere.length > 0 ? (
                       <>
-                        <select
+                        <Select
+                          size="small"
                           aria-label={`Servidor para importar ${sound.name}`}
                           value={chosen}
                           disabled={busy}
-                          onChange={(event) => setTarget({ ...target, [sound.id]: event.currentTarget.value })}
+                          onChange={(_, data) => setTarget({ ...target, [sound.id]: data.value })}
                         >
                           {elsewhere.map((server) => (
                             <option key={server.id} value={server.id}>
                               {server.name}
                             </option>
                           ))}
-                        </select>
-                        <button
-                          type="button"
+                        </Select>
+                        <Button
+                          size="small"
                           disabled={busy || !memberOf.has(chosen)}
                           onClick={() => void act(() => model.importSound(chosen, sound.id), "Não foi possível importar o som.")}
                         >
                           Importar
-                        </button>
+                        </Button>
                       </>
                     ) : null}
-                    <button
-                      type="button"
-                      className="ghost danger-text"
+                    <Button
+                      appearance="subtle"
+                      size="small"
+                      className="danger-text"
                       disabled={busy}
                       aria-label={
                         confirming === sound.id ? `Confirmar: apagar ${sound.name} de todos os servidores` : `Apagar ${sound.name} de todos os servidores`
@@ -291,7 +291,7 @@ export function SoundPanel(props: {
                       onBlur={() => setConfirming((current) => (current === sound.id ? null : current))}
                     >
                       {confirming === sound.id ? "Apagar de todos?" : "Apagar"}
-                    </button>
+                    </Button>
                   </li>
                 );
               })}

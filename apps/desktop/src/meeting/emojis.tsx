@@ -10,6 +10,7 @@ import {
   type ServerEmoji,
   type ServerSummary,
 } from "@openmeet/shared";
+import { Button, Input } from "@fluentui/react-components";
 import { fetchEmoji, isTauri } from "../shell/native";
 import type { ChatListener } from "./chat-events";
 import { base64 } from "./images";
@@ -211,10 +212,10 @@ function EmojiManager(props: { model: MeetingModel; origin: string | null; serve
             }}
           />
         </label>
-        <input aria-label="Nome do emoji" placeholder="nome" value={name} maxLength={32} onChange={(event) => setName(event.currentTarget.value)} />
-        <button type="button" disabled={!file || busy} onClick={() => void upload()}>
+        <Input size="small" aria-label="Nome do emoji" placeholder="nome" value={name} maxLength={32} onChange={(_, data) => setName(data.value)} />
+        <Button appearance="primary" size="small" disabled={!file || busy} onClick={() => void upload()}>
           Enviar
-        </button>
+        </Button>
       </div>
       {problem ? <p className="error">{problem}</p> : null}
       <ul className="emoji-manage-list">
@@ -223,29 +224,30 @@ function EmojiManager(props: { model: MeetingModel; origin: string | null; serve
             <EmojiImage origin={props.origin} id={emoji.id} name={emoji.name} />
             {renaming?.id === emoji.id ? (
               <>
-                <input
+                <Input
+                  size="small"
                   aria-label={`Novo nome de ${emoji.name}`}
                   value={renaming.name}
                   maxLength={32}
-                  onChange={(event) => setRenaming({ id: emoji.id, name: event.currentTarget.value })}
+                  onChange={(_, data) => setRenaming({ id: emoji.id, name: data.value })}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") void rename();
                     if (event.key === "Escape") setRenaming(null);
                   }}
                 />
-                <button type="button" className="ghost" onClick={() => void rename()}>
+                <Button appearance="subtle" size="small" onClick={() => void rename()}>
                   Salvar
-                </button>
+                </Button>
               </>
             ) : (
               <>
                 <span className="emoji-manage-name">:{emoji.name}:</span>
-                <button type="button" className="ghost" onClick={() => setRenaming({ id: emoji.id, name: emoji.name })}>
+                <Button appearance="subtle" size="small" onClick={() => setRenaming({ id: emoji.id, name: emoji.name })}>
                   Renomear
-                </button>
-                <button type="button" className="ghost" onClick={() => void props.model.deleteEmoji(emoji.id)}>
+                </Button>
+                <Button appearance="subtle" size="small" onClick={() => void props.model.deleteEmoji(emoji.id)}>
                   Remover
-                </button>
+                </Button>
               </>
             )}
           </li>
@@ -292,9 +294,9 @@ export function EmojiPicker(props: {
             {server.name}
           </button>
         ))}
-        <button type="button" className="ghost" onClick={props.onClose}>
+        <Button appearance="subtle" size="small" onClick={props.onClose}>
           Fechar
-        </button>
+        </Button>
       </div>
       {tab === "unicode" ? (
         <div className="emoji-grid">
@@ -324,9 +326,9 @@ export function EmojiPicker(props: {
           </div>
           {props.manager && tab === props.currentServerId ? (
             <>
-              <button type="button" className="ghost" aria-expanded={managing} onClick={() => setManaging(!managing)}>
+              <Button appearance="subtle" size="small" aria-expanded={managing} onClick={() => setManaging(!managing)}>
                 {managing ? "Fechar gerenciamento" : "Gerenciar emojis"}
-              </button>
+              </Button>
               {managing ? <EmojiManager model={props.model} origin={props.origin} serverId={tab} emojis={shown} /> : null}
             </>
           ) : null}

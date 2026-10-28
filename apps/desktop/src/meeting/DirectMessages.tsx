@@ -2,10 +2,9 @@ import { DM_GROUP_MAX, bumpDm, dmTitle, parseChatMessage, parseDm, upsertDm, typ
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type { ChatListener } from "./chat-events";
 import { dmClosed, dmPeer } from "./dm-state";
-import { IconUsers } from "./Icons";
 import { IconAction } from "./fluent";
-import { Button, Input } from "@fluentui/react-components";
-import { AddRegular, PeopleAddRegular } from "@fluentui/react-icons";
+import { Button, Checkbox, Field, Input } from "@fluentui/react-components";
+import { AddRegular, PeopleAddRegular, PeopleRegular } from "@fluentui/react-icons";
 import { Face } from "./images";
 import { TextRoom, type ChatPerson } from "./TextRoom";
 
@@ -95,15 +94,13 @@ export function PeoplePicker(props: {
     >
       <strong>{props.title}</strong>
       {props.withName ? (
-        <label>
-          Nome do grupo (opcional)
-          <input value={name} maxLength={80} onChange={(event) => setName(event.currentTarget.value)} />
-        </label>
+        <Field label="Nome do grupo (opcional)">
+          <Input value={name} maxLength={80} onChange={(_, data) => setName(data.value)} />
+        </Field>
       ) : null}
-      <label>
-        Buscar pessoa
-        <input value={filter} onChange={(event) => setFilter(event.currentTarget.value)} autoFocus />
-      </label>
+      <Field label="Buscar pessoa">
+        <Input value={filter} onChange={(_, data) => setFilter(data.value)} autoFocus />
+      </Field>
       {props.candidates.length === 0 ? (
         <p className="hint">Ninguém para chamar. Só entra quem divide um servidor com você.</p>
       ) : (
@@ -112,15 +109,12 @@ export function PeoplePicker(props: {
             const checked = picked.includes(person.id);
             return (
               <li key={person.id}>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={!checked && full}
-                    onChange={() => setPicked((held) => (checked ? held.filter((id) => id !== person.id) : [...held, person.id]))}
-                  />
-                  {person.label}
-                </label>
+                <Checkbox
+                  label={person.label}
+                  checked={checked}
+                  disabled={!checked && full}
+                  onChange={() => setPicked((held) => (checked ? held.filter((id) => id !== person.id) : [...held, person.id]))}
+                />
               </li>
             );
           })}
@@ -201,7 +195,7 @@ export function DmList(props: {
                 onClick={() => props.onOpen(dm)}
               >
                 <span className="dm-face" aria-hidden="true">
-                  {peer ? <Face origin={props.origin} imageId={peer.avatarId} label={peer.label} /> : <IconUsers size={16} />}
+                  {peer ? <Face origin={props.origin} imageId={peer.avatarId} label={peer.label} /> : <PeopleRegular fontSize={16} />}
                 </span>
                 <span className="room-name">{title}</span>
                 {dm.kind === "group" ? <span className="dm-size">{dm.members.length}</span> : null}

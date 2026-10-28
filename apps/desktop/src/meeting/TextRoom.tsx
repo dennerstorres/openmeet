@@ -27,9 +27,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEv
 import { isTauri, openChatLink } from "../shell/native";
 import type { ChatListener } from "./chat-events";
 import { MessageFiles, PictureViewer, fileSize } from "./ChatFiles";
-import { IconHash, IconReply, IconUsers } from "./Icons";
+import { IconHash, IconUsers } from "./Icons";
 import { IconAction } from "./fluent";
-import { Button } from "@fluentui/react-components";
+import { Button, Input } from "@fluentui/react-components";
 import { ArrowReplyRegular, AttachRegular, DeleteRegular, EditRegular, EmojiRegular, PinRegular, SearchRegular } from "@fluentui/react-icons";
 import { Face, base64 } from "./images";
 import { Markdown } from "./Markdown";
@@ -602,7 +602,7 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
               >
                 {message.replyTo ? (
                   <button type="button" className="message-reply" onClick={() => void jumpTo(message.replyTo?.id ?? message.id)}>
-                    <IconReply size={14} />
+                    <ArrowReplyRegular fontSize={14} />
                     <strong>{person(message.replyTo.authorId).label}</strong>
                     <span>{message.replyTo.deleted ? "mensagem removida" : plainBody(message.replyTo.body, label)}</span>
                   </button>
@@ -780,14 +780,14 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
                 void search(false);
               }}
             >
-              <input
+              <Input
                 type="search"
                 value={query}
                 maxLength={100}
                 autoFocus
                 placeholder="Palavras da mensagem"
                 aria-label="Buscar nesta sala"
-                onChange={(event) => setQuery(event.currentTarget.value)}
+                onChange={(_, data) => setQuery(data.value)}
               />
             </form>
             {results === null ? null : results.messages.length === 0 ? (
@@ -814,9 +814,9 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
         ) : null}
       </div>
       {detached ? (
-        <button type="button" className="back-to-latest" onClick={() => void backToLatest()}>
+        <Button size="small" className="back-to-latest" onClick={() => void backToLatest()}>
           Ver mensagens mais recentes
-        </button>
+        </Button>
       ) : null}
       <p className="typing" aria-live="polite">
         {typingNames.length > 0 ? typingLine(typingNames) : ""}
