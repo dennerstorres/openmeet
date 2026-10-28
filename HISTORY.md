@@ -705,3 +705,7 @@ Próxima tarefa:
 ## ADR 0026 — DMs no Fluent (2026-10-28, branch `poc/fluent-ui`)
 - `DirectMessages`: novo grupo e pessoas do grupo como `IconAction` (`AddRegular`, `PeopleAddRegular`); seletor de pessoas, cartão do membro, bloquear, renomear (`Input`), adicionar e sair do grupo como `Button`. Itens da lista de conversas seguem nativos.
 - Validação (Windows 11): typecheck, desktop `pnpm test` 36 pass, `pnpm build` ok. Sem teste visual (precisa API + conta). Estado: WAITING_VALIDATION.
+
+## ADR 0026 — menu da conta no Fluent (2026-10-28, branch `poc/fluent-ui`)
+- `details.account-menu` virou `Menu` (gatilho `SettingsRegular` com `Tooltip`; Perfil, Atualizar, Configurações, Trocar instância, Sair da conta com ícones). Fechamento por clique fora e Esc agora é do Fluent; CSS `.account-menu` removido do `App.css`.
+- Validação (Windows 11): typecheck, desktop `pnpm test` 36 pass, `pnpm build` ok. Sem teste visual (precisa API + conta), incluindo 375 px. Estado: WAITING_VALIDATION.

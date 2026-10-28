@@ -54,9 +54,10 @@ import { holdMeetingLock } from "../shell/background";
 import { CardStage } from "./Cards";
 import { Face, ImagePicker } from "./images";
 import { IconAction } from "./fluent";
-import { Badge, Button, Field, Input, Select, ToggleButton, Tooltip } from "@fluentui/react-components";
+import { Badge, Button, Field, Input, Menu, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger, Select, ToggleButton, Tooltip } from "@fluentui/react-components";
 import {
   AddRegular,
+  ArrowSyncRegular,
   CallEndRegular,
   ChatRegular,
   ClockRegular,
@@ -66,8 +67,11 @@ import {
   MicRegular,
   NumberSymbolRegular,
   PeopleRegular,
+  PersonRegular,
+  ServerRegular,
   SettingsRegular,
   ShareScreenStartRegular,
+  SignOutRegular,
   Speaker2Regular,
   SpeakerMuteRegular,
   VideoOffRegular,
@@ -515,7 +519,7 @@ export function MeetingApp() {
     function closeMenus(event: PointerEvent): void {
       const target = event.target;
       if (!(target instanceof Node)) return;
-      document.querySelectorAll<HTMLDetailsElement>("details.account-menu[open], details.more[open]").forEach((menu) => {
+      document.querySelectorAll<HTMLDetailsElement>("details.more[open]").forEach((menu) => {
         if (!menu.contains(target)) menu.open = false;
       });
     }
@@ -1224,47 +1228,43 @@ export function MeetingApp() {
               </Tooltip>
             </>
           ) : null}
-          <details className="account-menu">
-            <summary className="icon-btn" aria-label="Conta" title="Conta">
-              <IconGear />
-            </summary>
-            <div className="menu">
-              {state.serverPresence ? (
-                <button
-                  type="button"
-                  className="ghost"
-                  onClick={(event) => {
-                    event.currentTarget.closest("details")?.removeAttribute("open");
-                    setNickname(state.serverPresence?.selfProfile.nickname ?? "");
-                    setProfileOpen(true);
-                  }}
-                >
-                  Perfil
-                </button>
-              ) : null}
-              <button type="button" className="ghost" onClick={() => void model.reloadRooms()} disabled={state.pending}>
-                Atualizar
-              </button>
-              <button
-                type="button"
-                className="ghost"
-                onClick={(event) => {
-                  event.currentTarget.closest("details")?.removeAttribute("open");
-                  setSettingsOpen(true);
-                }}
-              >
-                Configurações
-              </button>
-              {__WEB__ ? null : (
-                <button type="button" className="ghost" onClick={() => void model.changeInstance()}>
-                  Trocar instância
-                </button>
-              )}
-              <button type="button" className="ghost danger-text" onClick={() => void model.signOut()} disabled={state.pending}>
-                Sair da conta
-              </button>
-            </div>
-          </details>
+          <Menu positioning="above-end">
+            <MenuTrigger disableButtonEnhancement>
+              <Tooltip content="Conta" relationship="label" withArrow>
+                <Button appearance="subtle" size="small" icon={<SettingsRegular />} />
+              </Tooltip>
+            </MenuTrigger>
+            <MenuPopover>
+              <MenuList>
+                {state.serverPresence ? (
+                  <MenuItem
+                    icon={<PersonRegular />}
+                    onClick={() => {
+                      setNickname(state.serverPresence?.selfProfile.nickname ?? "");
+                      setProfileOpen(true);
+                    }}
+                  >
+                    Perfil
+                  </MenuItem>
+                ) : null}
+                <MenuItem icon={<ArrowSyncRegular />} disabled={state.pending} onClick={() => void model.reloadRooms()}>
+                  Atualizar
+                </MenuItem>
+                <MenuItem icon={<SettingsRegular />} onClick={() => setSettingsOpen(true)}>
+                  Configurações
+                </MenuItem>
+                {__WEB__ ? null : (
+                  <MenuItem icon={<ServerRegular />} onClick={() => void model.changeInstance()}>
+                    Trocar instância
+                  </MenuItem>
+                )}
+                <MenuDivider />
+                <MenuItem icon={<SignOutRegular />} disabled={state.pending} onClick={() => void model.signOut()}>
+                  Sair da conta
+                </MenuItem>
+              </MenuList>
+            </MenuPopover>
+          </Menu>
         </footer>
       </aside>
 

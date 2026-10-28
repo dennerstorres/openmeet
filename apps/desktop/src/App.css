@@ -926,23 +926,6 @@ a {
   white-space: nowrap;
 }
 
-.account-menu .menu {
-  position: absolute;
-  right: 8px;
-  bottom: calc(100% + 8px);
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  min-width: 188px;
-  padding: 6px;
-  border-radius: 8px;
-  background: #0c0f0e;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
-}
-
-.account-menu .menu button {
-  text-align: left;
-}
 
 .settings-page {
   position: absolute;
@@ -1919,15 +1902,6 @@ textarea {
     width: 44px;
   }
 
-  .web-shell .account-menu .menu {
-    position: fixed;
-    left: max(8px, env(safe-area-inset-left));
-    right: max(8px, env(safe-area-inset-right));
-    bottom: calc(72px + env(safe-area-inset-bottom));
-    min-width: 0;
-    max-height: 60dvh;
-    overflow-y: auto;
-  }
 
   .web-shell .call-area {
     gap: 8px;
