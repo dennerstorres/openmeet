@@ -14,6 +14,8 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@fluentui/react-components": "9.75.0",
+    "@fluentui/react-icons": "2.0.344",
     "@openmeet/media": "workspace:*",
     "@openmeet/shared": "workspace:*",
     "@tauri-apps/api": "^2",
@@ -21,6 +23,7 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@griffel/vite-plugin": "1.0.1",
     "@tauri-apps/cli": "^2",
     "@types/node": "^24.19.2",
     "@types/react": "^19.1.8",

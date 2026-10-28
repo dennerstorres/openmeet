@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import { griffel } from "@griffel/vite-plugin";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 const host = process.env.TAURI_DEV_HOST;
@@ -19,9 +20,12 @@ function webShell(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
-  plugins: mode === "web" ? [webShell(), react()] : [react()],
+  // ADR 0026: Griffel extracts our own makeStyles at build time; Fluent's precompiled styles still load at runtime.
+  plugins: mode === "web" ? [webShell(), react(), griffel()] : [react(), griffel()],
   define: { __WEB__: JSON.stringify(mode === "web") },
-  build: mode === "web" ? { outDir: "dist-web" } : {},
+  build: mode === "web" ? { outDir: "dist-web" } : process.env.FLUENT_POC ? { rollupOptions: { input: { poc: "fluent-poc.html" } }, outDir: "dist-poc" } : {},
+  // POC only: serve the build with the production CSP from tauri.conf.json.
+  preview: process.env.FLUENT_POC ? { headers: { "Content-Security-Policy": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; img-src 'self' blob: data:; base-uri 'none'" } } : undefined,
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
