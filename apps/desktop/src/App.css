@@ -2282,6 +2282,8 @@ textarea {
 }
 
 .composer textarea:where(:not([class*="fui-"])) {
+  /* Block, so no baseline gap pushes it above the absolutely placed icons. */
+  display: block;
   min-height: 44px;
   padding: 12px 48px 12px 16px;
   border-radius: 8px;
@@ -2546,8 +2548,12 @@ button.message-reply:hover span:where(:not([class*="fui-"])) {
 }
 
 .emoji-picker button:where(:not([class*="fui-"])):not(.ghost) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 34px;
   height: 34px;
+  padding: 0;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -2797,8 +2803,8 @@ button.message-reply:hover span:where(:not([class*="fui-"])) {
 
 .composer-attach {
   position: absolute;
-  left: 22px;
-  bottom: 22px;
+  left: 26px;
+  bottom: 26px;
 }
 
 .chat-files {
@@ -3015,10 +3021,11 @@ button.message-reply:hover span:where(:not([class*="fui-"])) {
   margin: 0 0 6px;
 }
 
+/* Small Fluent buttons are 24px: (44px textarea - 24px) / 2 + 16px composer padding. */
 .composer-emoji {
   position: absolute;
-  right: 22px;
-  bottom: 22px;
+  right: 26px;
+  bottom: 26px;
 }
 
 .composer-count {
