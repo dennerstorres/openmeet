@@ -531,7 +531,7 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
           icon={<SearchRegular />}
           onClick={() => void openPanel("search")}
         />
-        <Button appearance="subtle" onClick={onClose}>
+        <Button appearance="subtle" size="small" onClick={onClose}>
           Fechar
         </Button>
       </header>

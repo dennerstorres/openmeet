@@ -946,7 +946,7 @@ export function MeetingApp() {
             >
               Salas
             </button>
-            <button type="button" aria-pressed={!mobileRooms} disabled={!inCall && !kickTarget && !textRoom && !openDm} onClick={() => setMobileRooms(false)}>
+            <button type="button" aria-pressed={!mobileRooms} disabled={!inCall && !textRoom && !openDm} onClick={() => setMobileRooms(false)}>
               {textRoom ? `#${textRoom.name}` : openDm ? "Conversa" : inCall ? "Voltar à chamada" : "Chamada"}
             </button>
           </nav>
@@ -1098,7 +1098,6 @@ export function MeetingApp() {
                       icon={<DeleteRegular />}
                       onClick={() => {
                         setRemoveTarget({ kind: "room", id: room.id, label: room.name });
-                        setMobileRooms(false);
                       }}
                     />
                   ) : null}
@@ -1122,7 +1121,6 @@ export function MeetingApp() {
                                 icon={<CallEndRegular />}
                                 onClick={() => {
                                   setKickTarget({ roomId: room.id, userId: person.id, label: person.label });
-                                  setMobileRooms(false);
                                 }}
                               />
                             ) : null}

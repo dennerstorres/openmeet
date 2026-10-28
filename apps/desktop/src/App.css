@@ -106,7 +106,8 @@ button.ghost:hover:not(:disabled) {
 }
 
 .danger-text,
-button.ghost.danger-text {
+button.ghost.danger-text,
+.fui-Button.danger-text {
   color: var(--danger-text);
 }
 
