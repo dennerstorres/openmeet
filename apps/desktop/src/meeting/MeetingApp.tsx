@@ -300,6 +300,23 @@ function chatTransport(origin: string, broker: SessionBroker | undefined): { tra
   return { transport: createDesktopChatTransport(origin), renew: () => renewDesktopSession(origin) };
 }
 
+function rememberedInstance(): string | null {
+  try {
+    return localStorage.getItem("openmeet.instance");
+  } catch {
+    return null;
+  }
+}
+
+// Leaving the instance is the only thing that makes the desktop app ask for an address again.
+function forgetInstance(): void {
+  try {
+    localStorage.removeItem("openmeet.instance");
+  } catch {
+    // Nothing remembered without storage.
+  }
+}
+
 function storedAddress(): string {
   try {
     return localStorage.getItem("openmeet.instance") ?? "http://127.0.0.1:3000";
@@ -445,6 +462,11 @@ export function MeetingApp() {
   };
 
   useEffect(() => model.subscribe(setState), [model]);
+  useEffect(() => {
+    if (__WEB__) return;
+    const remembered = rememberedInstance();
+    if (remembered !== null) void model.confirmInstance(remembered);
+  }, [model]);
   useEffect(() => {
     if (!__WEB__) return;
     // ADR 0014: the invite page hands the code over in the fragment. It leaves the address bar at once.
@@ -903,7 +925,14 @@ export function MeetingApp() {
                     setSetupToken("");
                   });
                 }}
-                onChange={__WEB__ ? null : () => void model.changeInstance()}
+                onChange={
+                  __WEB__
+                    ? null
+                    : () => {
+                        forgetInstance();
+                        void model.changeInstance();
+                      }
+                }
                 googleLogin={state.googleLogin}
                 googleWaiting={state.googleWaiting}
                 onGoogle={() => {
@@ -1280,7 +1309,13 @@ export function MeetingApp() {
                   Configurações
                 </MenuItem>
                 {__WEB__ ? null : (
-                  <MenuItem icon={<ServerRegular />} onClick={() => void model.changeInstance()}>
+                  <MenuItem
+                    icon={<ServerRegular />}
+                    onClick={() => {
+                      forgetInstance();
+                      void model.changeInstance();
+                    }}
+                  >
                     Trocar instância
                   </MenuItem>
                 )}
