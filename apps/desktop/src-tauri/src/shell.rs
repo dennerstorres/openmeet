@@ -211,7 +211,7 @@ fn apply_shortcuts(app: &AppHandle, consent: bool, announce: bool) -> Result<(),
         }
     }
     if announce && !blocked.is_empty() {
-        notify(app, &format!("Atalho em uso, nÃ£o registrado: {}", blocked.join(", ")));
+        notify(app, &format!("Atalho em uso, não registrado: {}", blocked.join(", ")));
     }
     Ok(())
 }
@@ -403,9 +403,9 @@ fn track_label(kind: &str, live: bool, on: bool) -> &'static str {
         ("microphone", true, true) => "Desligar microfone",
         ("microphone", true, false) => "Ligar microfone",
         ("microphone", false, _) => "Alternar microfone",
-        ("camera", true, true) => "Desligar cÃ¢mera",
-        ("camera", true, false) => "Ligar cÃ¢mera",
-        _ => "Alternar cÃ¢mera",
+        ("camera", true, true) => "Desligar câmera",
+        ("camera", true, false) => "Ligar câmera",
+        _ => "Alternar câmera",
     }
 }
 
@@ -413,8 +413,8 @@ fn track_notice(kind: &str, on: bool) -> Option<&'static str> {
     match (kind, on) {
         ("microphone", true) => Some("Microfone ligado"),
         ("microphone", false) => Some("Microfone desligado"),
-        ("camera", true) => Some("CÃ¢mera ligada"),
-        ("camera", false) => Some("CÃ¢mera desligada"),
+        ("camera", true) => Some("Câmera ligada"),
+        ("camera", false) => Some("Câmera desligada"),
         _ => None,
     }
 }
@@ -574,7 +574,7 @@ mod tests {
     fn tray_label_says_toggle_until_the_meeting_is_live() {
         assert_eq!(track_label("microphone", false, true), "Alternar microfone");
         assert_eq!(track_label("microphone", true, true), "Desligar microfone");
-        assert_eq!(track_label("camera", true, false), "Ligar cÃ¢mera");
+        assert_eq!(track_label("camera", true, false), "Ligar câmera");
         assert_eq!(track_notice("microphone", false), Some("Microfone desligado"));
         assert_eq!(track_notice("screen", true), None);
     }
