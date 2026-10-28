@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Body1, Button, Caption1, Card, CardHeader, makeStyles, tokens } from "@fluentui/react-components";
 import { ArrowSyncRegular } from "@fluentui/react-icons";
 import { checkUpdate, installUpdate, isTauri } from "./native";
-import { updateFailure, watchUpdates, type UpdateView } from "./update";
+import { updateFailure, watchUpdates, windowWake, type UpdateView } from "./update";
 
 const useStyles = makeStyles({
   root: {
@@ -27,7 +27,7 @@ export function UpdateNotice() {
 
   useEffect(() => {
     if (!isTauri()) return;
-    return watchUpdates(checkUpdate, setUpdate);
+    return watchUpdates(checkUpdate, setUpdate, undefined, undefined, windowWake);
   }, []);
 
   if (!update || dismissed === update.version) return null;

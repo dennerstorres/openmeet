@@ -57,6 +57,34 @@ test("a failed check tries again after the retry delay, not the interval", async
   assert.deepEqual(seen, ["0.3.0"]);
 });
 
+test("a wake checks again only past the gap", async () => {
+  let checks = 0;
+  let signal = () => {};
+  const stop = watchUpdates(
+    async () => {
+      checks += 1;
+      return null;
+    },
+    () => {},
+    1000,
+    1000,
+    (fire) => {
+      signal = fire;
+      return () => {};
+    },
+    10,
+  );
+  await tick();
+  signal();
+  assert.equal(checks, 1);
+  await new Promise((resolve) => setTimeout(resolve, 15));
+  signal();
+  assert.equal(checks, 2);
+  stop();
+  signal();
+  assert.equal(checks, 2);
+});
+
 test("install failures read as short messages, in a call first", () => {
   assert.match(updateFailure("update_in_call"), /Saia da chamada para reiniciar/);
   assert.match(updateFailure("update_missing"), /não está mais disponível/);
