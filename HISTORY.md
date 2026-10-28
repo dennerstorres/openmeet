@@ -722,3 +722,7 @@ Próxima tarefa:
 - Web local (Chrome do app, API PGlite 3020 + vite 1460, conta de teste): adicionar servidor, criar sala, chat (enviar, ações por hover, fixar como toggle, painel de fixadas, remover inline), menu da conta, Perfil, configurações do servidor, `ConfirmDialog` de remover servidor/sala; 375 px: remover sala, menu, chat, novo grupo de DM. Funciona.
 - Corrigido no teste: `.danger-text` não pintava `Button` do Fluent (agora `.fui-Button.danger-text`); kick/remover sala trocavam o celular para a aba de chamada (sobra do `inline-form`); "Fechar" do chat em `size="small"`.
 - Não testado: conversa de DM (precisa 2ª conta), chamada (sem LiveKit), `.exe`. Notado, pré-existente: sala sem identificador dá "Os dados não foram aceitos"; cabeçalho do chat quebra linha a 800 px com membros aberto.
+
+## ADR 0026 — limpeza de CSS e ícones (2026-10-28, branch `poc/fluent-ui`)
+- Premissa do handoff corrigida: `Icons.tsx` ainda é usado e restam ~140 controles nativos (emojis, sons, cards, formulários), então apagar o CSS global quebraria a UI. Feito: regras globais de `button` passam a valer só para `button:not(.fui-Button)` (o Fluent não é mais pintado por cima); `.fui-Button.danger` para o botão vermelho do grupo de DM; 12 ícones sem uso removidos de `Icons.tsx`.
+- Validação (Windows 11): typecheck, eslint, desktop `pnpm test` 36 pass, `pnpm build` ok; tela conferida no web local (chat, configurações do servidor, vermelho de remover). Estado: WAITING_VALIDATION.

@@ -38,7 +38,7 @@ body {
   background: var(--bg-rail);
 }
 
-button,
+button:not(.fui-Button),
 input,
 select,
 textarea {
@@ -46,7 +46,7 @@ textarea {
   color: inherit;
 }
 
-button {
+button:not(.fui-Button) {
   border: 0;
   border-radius: 4px;
   background: #48524e;
@@ -57,16 +57,16 @@ button {
   transition: background 0.12s ease;
 }
 
-button:hover:not(:disabled) {
+button:not(.fui-Button):hover:not(:disabled) {
   background: #67726d;
 }
 
-button:disabled {
+button:not(.fui-Button):disabled {
   opacity: 0.45;
   cursor: default;
 }
 
-button:focus-visible,
+button:not(.fui-Button):focus-visible,
 summary:focus-visible,
 input:focus-visible,
 select:focus-visible,
@@ -75,38 +75,39 @@ textarea:focus-visible {
   outline-offset: 1px;
 }
 
-button.primary,
-button[type="submit"],
-button.on {
+button:not(.fui-Button).primary,
+button:not(.fui-Button)[type="submit"],
+button:not(.fui-Button).on {
   background: var(--accent);
   color: #fff;
 }
 
-button.primary:hover:not(:disabled),
-button[type="submit"]:hover:not(:disabled),
-button.on:hover:not(:disabled) {
+button:not(.fui-Button).primary:hover:not(:disabled),
+button:not(.fui-Button)[type="submit"]:hover:not(:disabled),
+button:not(.fui-Button).on:hover:not(:disabled) {
   background: var(--accent-hover);
 }
 
-button.off,
-button.danger {
+button:not(.fui-Button).off,
+button:not(.fui-Button).danger,
+.fui-Button.danger {
   background: var(--danger);
   color: #fff;
 }
 
-button.ghost {
+button:not(.fui-Button).ghost {
   background: transparent;
   color: var(--text-muted);
   font-weight: 500;
 }
 
-button.ghost:hover:not(:disabled) {
+button:not(.fui-Button).ghost:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text);
 }
 
 .danger-text,
-button.ghost.danger-text,
+button:not(.fui-Button).danger-text,
 .fui-Button.danger-text {
   color: var(--danger-text);
 }
