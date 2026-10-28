@@ -948,7 +948,7 @@ export function MeetingApp() {
             >
               Salas
             </button>
-            <button type="button" aria-pressed={!mobileRooms} disabled={!inCall && !textRoom && !openDm} onClick={() => setMobileRooms(false)}>
+            <button type="button" aria-pressed={!mobileRooms} disabled={!inCall && !textRoom && !openDm && !settingsOpen} onClick={() => setMobileRooms(false)}>
               {textRoom ? `#${textRoom.name}` : openDm ? "Conversa" : inCall ? "Voltar à chamada" : "Chamada"}
             </button>
           </nav>
@@ -1270,7 +1270,13 @@ export function MeetingApp() {
                 <MenuItem icon={<ArrowSyncRegular />} disabled={state.pending} onClick={() => void model.reloadRooms()}>
                   Atualizar
                 </MenuItem>
-                <MenuItem icon={<SettingsRegular />} onClick={() => setSettingsOpen(true)}>
+                <MenuItem
+                  icon={<SettingsRegular />}
+                  onClick={() => {
+                    setSettingsOpen(true);
+                    setMobileRooms(false);
+                  }}
+                >
                   Configurações
                 </MenuItem>
                 {__WEB__ ? null : (

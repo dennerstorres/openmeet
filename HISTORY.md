@@ -732,3 +732,10 @@ Próxima tarefa:
 - Mantidos nativos de propósito (layout próprio): abas móveis, trilho de servidores, linhas de sala/membro/chat/reação/menção/emoji, botões redondos `.ctl` do dock, Destaque/Grade, textareas do composer e edição, volume por card, seletores de arquivo.
 - Tema: `createDarkTheme` com rampa verde do accent (#15803d), senão o primário ficava azul. CSS global de `button`/`label` agora em `:where(:not(.fui-*))` (especificidade zero, não sobe acima das classes do app). `.icon-btn` removido; × dos membros com 44 px no móvel.
 - Validação (Windows 11): typecheck, eslint src, desktop `pnpm test` 36 pass, `pnpm build` ok; tela conferida no web local (configurações do servidor, página de configurações, painel de membros em 375 px). Sem chamada (LiveKit) nem `.exe`. Estado: WAITING_VALIDATION.
+
+## ADR 0026 — auditoria visual e padronização (web) (2026-10-28, branch `poc/fluent-ui`)
+- Escala única = rampas do Fluent: espaçamento 2/4/6/8/10/12/16/20/24/32, raio 4/6/8 (+círculo), fonte 10/12/14/16/20/24/28. Script encaixou 68 valores fora da régua no `App.css` (ex.: 13→14 px de fonte, 14→16 de padding, raio 10/16→8).
+- 77 seletores legados por descendente (`X span`, `X input`, `X button`…) ganharam `:where(:not([class*="fui-"]))`: não atingem mais o interior do Fluent (ex.: ícones de 12 px no cabeçalho do servidor). Mantidos de propósito: fonte 16 px anti-zoom do iOS e alinhamento de `.modal-section > button`.
+- Toque (≤900 px): todo `Button`, `Input`, `Select` e `MenuItem` do Fluent com 44 px. Desktop: todo botão de ícone 24 px com ícone de 20 px (medido no DOM).
+- Corrigido: seções dos diálogos alinhadas ao título (padding horizontal 0); seletor de notificação do chat em linha própria no celular (cortava texto); "Configurações" no celular agora troca para a aba onde a página aparece.
+- Validação (Windows 11): typecheck, eslint src, desktop `pnpm test` 36 pass, `pnpm build` ok; web local conferido em 1280 px e 375 px (login, salas, chat, menu, configurações, diálogos). Estado: WAITING_VALIDATION.

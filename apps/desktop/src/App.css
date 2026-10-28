@@ -51,7 +51,7 @@ button:where(:not(.fui-Button)) {
   border-radius: 4px;
   background: #48524e;
   color: var(--text);
-  padding: 8px 14px;
+  padding: 8px 16px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.12s ease;
@@ -133,10 +133,10 @@ label:where(:not(.fui-Label)) {
   text-transform: uppercase;
 }
 
-label input,
-label select,
-label textarea {
-  font-size: 15px;
+label input:where(:not([class*="fui-"])),
+label select:where(:not([class*="fui-"])),
+label textarea:where(:not([class*="fui-"])) {
+  font-size: 16px;
   font-weight: 400;
   letter-spacing: normal;
   text-transform: none;
@@ -155,7 +155,7 @@ a {
 .hint {
   margin: 0;
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .badge {
@@ -163,7 +163,7 @@ a {
   border-radius: 999px;
   background: var(--bg-active);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -171,7 +171,7 @@ a {
 .metrics {
   margin: 4px 0 0;
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .error {
@@ -247,13 +247,13 @@ a {
   color: var(--text-muted);
 }
 
-.auth-form button.google {
+.auth-form button:where(:not([class*="fui-"])).google {
   border: 1px solid #48524e;
   background: transparent;
   color: var(--text);
 }
 
-.auth-form button.google:hover:not(:disabled) {
+.auth-form button:where(:not([class*="fui-"])).google:hover:not(:disabled) {
   background: var(--bg-hover);
 }
 
@@ -270,7 +270,7 @@ a {
 .auth-side strong {
   margin-top: 8px;
   color: var(--text);
-  font-size: 22px;
+  font-size: 24px;
 }
 
 .auth-side p {
@@ -342,7 +342,7 @@ a {
   border-radius: 50%;
   background: var(--bg-main);
   color: var(--text-body);
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
   transition:
     border-radius 0.15s ease,
@@ -351,7 +351,7 @@ a {
 
 .server-pill:hover:not(:disabled),
 .server-pill.selected {
-  border-radius: 16px;
+  border-radius: 8px;
   background: var(--accent);
   color: #fff;
 }
@@ -427,7 +427,7 @@ a {
 
 .room-bar-head strong {
   overflow: hidden;
-  font-size: 15px;
+  font-size: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -436,7 +436,7 @@ a {
   min-width: 0;
 }
 
-.room-bar-head > div:first-child span {
+.room-bar-head > div:first-child span:where(:not([class*="fui-"])) {
   display: block;
   margin-top: 1px;
 }
@@ -451,7 +451,7 @@ a {
   display: none;
 }
 
-.room-bar-head span {
+.room-bar-head span:where(:not([class*="fui-"])) {
   color: var(--text-faint);
   font-size: 12px;
 }
@@ -474,7 +474,7 @@ a {
   padding: 6px 8px;
   background: transparent;
   color: var(--text-faint);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 500;
   text-align: left;
 }
@@ -521,7 +521,7 @@ a {
   white-space: nowrap;
 }
 
-.room-bar button.add-room {
+.room-bar button:where(:not([class*="fui-"])).add-room {
   align-self: stretch;
   padding: 6px 8px;
   color: var(--text-faint);
@@ -556,7 +556,7 @@ a {
 .members-panel > header > div {
   display: flex;
   align-items: baseline;
-  gap: 7px;
+  gap: 8px;
 }
 
 .members-panel > header strong {
@@ -564,7 +564,7 @@ a {
   font-size: 14px;
 }
 
-.members-panel > header span {
+.members-panel > header span:where(:not([class*="fui-"])) {
   color: var(--text-faint);
   font-size: 12px;
 }
@@ -617,10 +617,10 @@ a {
   padding: 4px 0 2px 40px;
 }
 
-.member-card button {
+.member-card button:where(:not([class*="fui-"])) {
   min-height: 32px;
   padding: 4px 10px;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .members-panel > ul > li:hover {
@@ -657,14 +657,14 @@ a {
 .member-copy strong {
   overflow: hidden;
   color: var(--text-body);
-  font-size: 13px;
+  font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.member-copy > span {
+.member-copy > span:where(:not([class*="fui-"])) {
   color: var(--text-faint);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .member-self-mode {
@@ -682,12 +682,12 @@ a {
   align-items: center;
   gap: 6px;
   min-height: 32px;
-  padding: 0 9px;
+  padding: 0 8px;
   background: var(--bg-side);
   color: var(--text-muted);
 }
 
-.members-toggle span {
+.members-toggle span:where(:not([class*="fui-"])) {
   font-size: 12px;
 }
 
@@ -703,7 +703,7 @@ a {
 .server-members ul {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   margin: 8px 0;
   padding: 0;
   list-style: none;
@@ -714,7 +714,7 @@ a {
   align-items: center;
   gap: 8px;
   min-height: 28px;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .presence-dot {
@@ -750,22 +750,22 @@ a {
 
 .member-status {
   color: var(--text-faint);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .presence-option {
   flex-direction: row;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   margin-top: 8px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: normal;
   text-transform: none;
 }
 
-.presence-option input {
+.presence-option input:where(:not([class*="fui-"])) {
   accent-color: var(--accent);
 }
 
@@ -784,7 +784,7 @@ a {
   background: var(--bg-panel);
 }
 
-.invite-out input {
+.invite-out input:where(:not([class*="fui-"])) {
   font-size: 12px;
 }
 
@@ -838,7 +838,7 @@ a {
   gap: 8px;
 }
 
-.voice-actions button {
+.voice-actions button:where(:not([class*="fui-"])) {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -846,14 +846,14 @@ a {
   padding: 6px;
   border-radius: 6px;
   background: var(--bg-main);
-  font-size: 13px;
+  font-size: 14px;
 }
 
-.voice-actions button:hover:not(:disabled) {
+.voice-actions button:where(:not([class*="fui-"])):hover:not(:disabled) {
   background: var(--bg-active);
 }
 
-.voice-actions button.on {
+.voice-actions button:where(:not([class*="fui-"])).on {
   background: var(--accent);
 }
 
@@ -900,9 +900,9 @@ a {
   inset: 0 16px 16px;
   z-index: 4;
   overflow: auto;
-  padding: 28px;
+  padding: 24px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 8px;
   box-sizing: border-box;
   background: var(--bg-main);
 }
@@ -924,11 +924,11 @@ a {
 
 .settings-page h1 {
   margin-top: 4px;
-  font-size: 26px;
+  font-size: 28px;
 }
 
 .settings-page h2 {
-  font-size: 18px;
+  font-size: 20px;
 }
 
 .settings-page .eyebrow {
@@ -944,7 +944,7 @@ a {
   grid-template-columns: minmax(160px, 0.4fr) minmax(280px, 1fr);
   gap: 32px;
   max-width: 820px;
-  padding-top: 28px;
+  padding-top: 24px;
 }
 
 /* The page sits beside the room list, so its own width decides the columns, not the window's. */
@@ -1002,15 +1002,15 @@ a {
 
 .modal-section h2 {
   color: var(--text);
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .modal-section {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 14px;
-  padding: 20px;
+  gap: 16px;
+  padding: 20px 0;
 }
 
 .modal-section + .modal-section {
@@ -1035,7 +1035,7 @@ a {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
 }
 
 .image-copy {
@@ -1059,7 +1059,7 @@ a {
 }
 
 .profile-face.server-face {
-  border-radius: 16px;
+  border-radius: 8px;
   background: var(--bg-main);
   color: var(--text-body);
 }
@@ -1070,7 +1070,7 @@ a {
   flex-direction: row;
   align-items: center;
   border-radius: 4px;
-  padding: 8px 14px;
+  padding: 8px 16px;
   color: var(--text-muted);
   font-size: inherit;
   font-weight: 500;
@@ -1095,7 +1095,7 @@ a {
   cursor: default;
 }
 
-.image-pick input {
+.image-pick input:where(:not([class*="fui-"])) {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -1109,12 +1109,12 @@ a {
   gap: 10px;
 }
 
-.nickname-form label {
+.nickname-form label:where(:not([class*="fui-"])) {
   display: flex;
   flex-direction: column;
   gap: 6px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .modal-section .invite-out {
@@ -1123,7 +1123,7 @@ a {
   gap: 10px;
 }
 
-.modal-section .invite-out input {
+.modal-section .invite-out input:where(:not([class*="fui-"])) {
   width: 100%;
   box-sizing: border-box;
 }
@@ -1147,7 +1147,7 @@ a {
   flex: 1;
   margin: 0;
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .call-room {
@@ -1179,23 +1179,23 @@ a {
 .segmented {
   display: flex;
   gap: 2px;
-  padding: 3px;
+  padding: 4px;
   border-radius: 6px;
   background: var(--bg-rail);
 }
 
-.segmented button {
+.segmented button:where(:not([class*="fui-"])) {
   padding: 4px 12px;
   background: transparent;
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: 14px;
 }
 
-.segmented button:hover:not(:disabled) {
+.segmented button:where(:not([class*="fui-"])):hover:not(:disabled) {
   background: var(--bg-hover);
 }
 
-.segmented button[aria-pressed="true"] {
+.segmented button:where(:not([class*="fui-"]))[aria-pressed="true"] {
   background: var(--bg-active);
   color: var(--text);
 }
@@ -1203,7 +1203,7 @@ a {
 .sharing {
   margin: 0;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .idle {
@@ -1256,7 +1256,7 @@ a {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--bg-panel);
   box-shadow: inset 0 0 0 0 transparent;
   transition: box-shadow 0.12s ease;
@@ -1288,7 +1288,7 @@ video {
   width: 100%;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  border-radius: 10px;
+  border-radius: 8px;
   background: #0a0d0c;
 }
 
@@ -1314,7 +1314,7 @@ video {
   min-height: 0;
 }
 
-.avatar span {
+.avatar span:where(:not([class*="fui-"])) {
   display: grid;
   place-items: center;
   width: clamp(40px, 22%, 96px);
@@ -1330,9 +1330,9 @@ video {
   flex: 0 0 auto;
 }
 
-.avatar.small span {
+.avatar.small span:where(:not([class*="fui-"])) {
   width: 32px;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .card footer {
@@ -1347,28 +1347,28 @@ video {
 
 .card .name {
   overflow: hidden;
-  padding: 3px 8px;
+  padding: 4px 8px;
   border-radius: 4px;
   background: var(--overlay);
   color: var(--text);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.card footer button {
+.card footer button:where(:not([class*="fui-"])) {
   margin-left: auto;
-  padding: 3px 8px;
+  padding: 4px 8px;
   background: var(--overlay);
   color: var(--text);
   font-size: 12px;
   opacity: 0;
 }
 
-.card:hover footer button,
-.card footer button:focus-visible,
-.card.pinned footer button {
+.card:hover footer button:where(:not([class*="fui-"])),
+.card footer button:where(:not([class*="fui-"])):focus-visible,
+.card.pinned footer button:where(:not([class*="fui-"])) {
   opacity: 1;
 }
 
@@ -1392,12 +1392,12 @@ video {
   opacity: 1;
 }
 
-.card-audio button {
+.card-audio button:where(:not([class*="fui-"])) {
   padding: 2px 6px;
   font-size: 12px;
 }
 
-.card-audio input[type="range"] {
+.card-audio input:where(:not([class*="fui-"]))[type="range"] {
   accent-color: var(--glow);
   padding: 0;
   background: transparent;
@@ -1413,7 +1413,7 @@ video {
   align-self: center;
   justify-content: center;
   padding: 10px 12px;
-  border-radius: 16px;
+  border-radius: 8px;
   background: var(--bg-rail);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
 }
@@ -1479,7 +1479,7 @@ video {
   text-transform: none;
 }
 
-.share-audio input {
+.share-audio input:where(:not([class*="fui-"])) {
   accent-color: var(--accent);
 }
 
@@ -1496,7 +1496,7 @@ video {
   flex-direction: column;
   gap: 10px;
   width: min(420px, 80vw);
-  padding: 14px;
+  padding: 16px;
   border-radius: 8px;
   background: #0c0f0e;
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
@@ -1507,7 +1507,7 @@ video {
   flex-direction: row;
   align-items: center;
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   letter-spacing: normal;
   text-transform: none;
@@ -1517,13 +1517,13 @@ video {
   flex-direction: row;
   align-items: center;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   letter-spacing: normal;
   text-transform: none;
 }
 
-.effect-toggle input {
+.effect-toggle input:where(:not([class*="fui-"])) {
   accent-color: var(--accent);
 }
 
@@ -1572,7 +1572,7 @@ video {
   flex-direction: column;
   gap: 8px;
   max-width: 560px;
-  padding: 14px 16px;
+  padding: 16px 16px;
   border: 1px solid var(--accent);
   border-radius: 8px;
   background: var(--bg-side);
@@ -1606,7 +1606,7 @@ video {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 3px 0;
+  padding: 4px 0;
   color: var(--text-muted);
   font-size: 14px;
 }
@@ -1615,7 +1615,7 @@ video {
   flex: 0 0 auto;
 }
 
-.avatar.tiny span {
+.avatar.tiny span:where(:not([class*="fui-"])) {
   width: 24px;
   font-size: 10px;
   box-shadow: 0 0 0 2px transparent;
@@ -1626,7 +1626,7 @@ video {
   color: var(--text);
 }
 
-.occupants li.speaking .avatar span {
+.occupants li.speaking .avatar span:where(:not([class*="fui-"])) {
   box-shadow:
     0 0 0 2px var(--bg-side),
     0 0 0 4px var(--glow);
@@ -1681,7 +1681,7 @@ textarea {
 .voice figcaption {
   margin-top: 6px;
   color: var(--text-body);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1690,7 +1690,7 @@ textarea {
   .server-pill::before,
   .card,
   .dock.thin,
-  .avatar.tiny span {
+  .avatar.tiny span:where(:not([class*="fui-"])) {
     transition: none;
   }
 }
@@ -1728,11 +1728,6 @@ textarea {
     display: grid;
   }
 
-  .web-shell .members-panel header .fui-Button {
-    min-width: 44px;
-    min-height: 44px;
-  }
-
   .web-shell .members-panel {
     position: fixed;
     top: max(8px, env(safe-area-inset-top));
@@ -1741,7 +1736,7 @@ textarea {
     z-index: 8;
     width: min(82vw, 300px);
     border: 1px solid var(--line);
-    border-radius: 10px;
+    border-radius: 8px;
     box-shadow: 0 8px 8px rgb(0 0 0 / 0.4);
   }
 
@@ -1757,13 +1752,13 @@ textarea {
     gap: 8px;
   }
 
-  .mobile-navigation nav button {
+  .mobile-navigation nav button:where(:not([class*="fui-"])) {
     flex: 1;
     min-height: 44px;
     background: var(--bg-side);
   }
 
-  .mobile-navigation nav button[aria-pressed="true"] {
+  .mobile-navigation nav button:where(:not([class*="fui-"]))[aria-pressed="true"] {
     background: var(--accent);
   }
 
@@ -1810,7 +1805,7 @@ textarea {
     min-height: 48px;
   }
   .web-shell .room-item,
-  .web-shell .room-bar button {
+  .web-shell .room-bar button:where(:not([class*="fui-"])) {
     min-height: 44px;
   }
 
@@ -1836,7 +1831,7 @@ textarea {
     max-width: 100%;
     overflow-wrap: anywhere;
   }
-  .web-shell .call-strip button {
+  .web-shell .call-strip button:where(:not([class*="fui-"])) {
     min-height: 44px;
   }
   .web-shell .cards {
@@ -1911,8 +1906,8 @@ textarea {
     min-height: 44px;
   }
   .web-shell .more-body > *,
-  .web-shell label,
-  .web-auth label {
+  .web-shell label:where(:not([class*="fui-"])),
+  .web-auth label:where(:not([class*="fui-"])) {
     min-width: 0;
   }
   .web-shell .metrics,
@@ -1928,7 +1923,22 @@ textarea {
     box-sizing: border-box;
     font-size: 16px;
   }
-  .web-shell input[type="range"] {
+  .web-shell input:where(:not([class*="fui-"]))[type="range"] {
+    min-height: 44px;
+  }
+  .web-shell .text-room-head .notify-level {
+    order: 1;
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  /* ADR 0026: every Fluent control gets the same 44px touch target. */
+  .web-shell .fui-Button,
+  .fui-MenuPopover .fui-MenuItem,
+  .web-shell .fui-Input,
+  .web-shell .fui-Select__select,
+  .web-auth .fui-Input {
+    min-width: 44px;
     min-height: 44px;
   }
 
@@ -1951,29 +1961,29 @@ textarea {
   .web-auth .auth-mark {
     display: none;
   }
-  .web-auth button {
+  .web-auth button:where(:not([class*="fui-"])) {
     min-height: 44px;
   }
 }
 
 @media (hover: none), (pointer: coarse) {
-  .web-shell .card footer button,
+  .web-shell .card footer button:where(:not([class*="fui-"])),
   .web-shell .card-audio {
     opacity: 1;
   }
-  .web-shell .card footer button,
-  .web-shell .card-audio button {
+  .web-shell .card footer button:where(:not([class*="fui-"])),
+  .web-shell .card-audio button:where(:not([class*="fui-"])) {
     min-height: 44px;
   }
   .web-shell .card-audio {
     left: 8px;
     flex-wrap: wrap;
   }
-  .web-shell .card-audio label {
+  .web-shell .card-audio label:where(:not([class*="fui-"])) {
     flex: 1;
     min-width: 70px;
   }
-  .web-shell .card-audio input {
+  .web-shell .card-audio input:where(:not([class*="fui-"])) {
     width: 100%;
     box-sizing: border-box;
     min-height: 44px;
@@ -2039,8 +2049,8 @@ textarea {
   gap: 6px;
 }
 
-.sound-list li > button:first-child,
-.sound-list li > span:first-child {
+.sound-list li > button:where(:not([class*="fui-"])):first-child,
+.sound-list li > span:where(:not([class*="fui-"])):first-child {
   flex: 1 1 160px;
   min-width: 0;
   overflow: hidden;
@@ -2049,7 +2059,7 @@ textarea {
   white-space: nowrap;
 }
 
-.sound-list select {
+.sound-list select:where(:not([class*="fui-"])) {
   max-width: 140px;
 }
 
@@ -2088,7 +2098,7 @@ textarea {
   flex-direction: column;
   min-height: 0;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--bg-main);
   overflow: hidden;
 }
@@ -2132,7 +2142,7 @@ textarea {
 
 .message-start p {
   margin: 6px 0 0;
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .message {
@@ -2159,7 +2169,7 @@ textarea {
   align-self: start;
 }
 
-.message .avatar.small span {
+.message .avatar.small span:where(:not([class*="fui-"])) {
   width: 36px;
 }
 
@@ -2176,11 +2186,11 @@ textarea {
   margin: 0 0 2px;
   overflow: hidden;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
   white-space: nowrap;
 }
 
-.message-reply span {
+.message-reply span:where(:not([class*="fui-"])) {
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -2194,7 +2204,7 @@ textarea {
 
 .message-meta strong {
   color: var(--text);
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .message-meta time {
@@ -2205,7 +2215,7 @@ textarea {
 .message-body {
   margin: 0;
   color: var(--text-body);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.45;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -2214,7 +2224,7 @@ textarea {
 .message-body.removed,
 .message-edited {
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: 14px;
   font-style: italic;
 }
 
@@ -2235,8 +2245,8 @@ textarea {
   display: flex;
 }
 
-.message-edit textarea,
-.composer textarea {
+.message-edit textarea:where(:not([class*="fui-"])),
+.composer textarea:where(:not([class*="fui-"])) {
   width: 100%;
   box-sizing: border-box;
   resize: none;
@@ -2255,7 +2265,7 @@ textarea {
   gap: 8px;
   margin-top: 6px;
   color: var(--text-body);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .typing {
@@ -2271,9 +2281,9 @@ textarea {
   padding: 0 16px 16px;
 }
 
-.composer textarea {
+.composer textarea:where(:not([class*="fui-"])) {
   min-height: 44px;
-  padding: 11px 48px 11px 14px;
+  padding: 12px 48px 12px 16px;
   border-radius: 8px;
 }
 
@@ -2284,7 +2294,7 @@ textarea {
   gap: 8px;
   margin: 0 0 6px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .composer-count {
@@ -2321,7 +2331,7 @@ textarea {
   border-radius: 50%;
   background: var(--bg-active);
   color: var(--text);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   overflow: hidden;
 }
@@ -2382,7 +2392,8 @@ textarea {
   flex-wrap: wrap;
 }
 
-.dm-people input {
+.dm-people input:where(:not([class*="fui-"])),
+.dm-people .fui-Input {
   flex: 1;
   min-width: 0;
 }
@@ -2398,7 +2409,7 @@ textarea {
   list-style: none;
 }
 
-.people-list label {
+.people-list label:where(:not([class*="fui-"])) {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -2458,10 +2469,10 @@ textarea {
   background: var(--bg-hover);
 }
 
-.chat-hit span {
+.chat-hit span:where(:not([class*="fui-"])) {
   display: -webkit-box;
   overflow: hidden;
-  font-size: 13px;
+  font-size: 14px;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
   white-space: pre-wrap;
@@ -2486,7 +2497,7 @@ button.message-reply {
   cursor: pointer;
 }
 
-button.message-reply:hover span {
+button.message-reply:hover span:where(:not([class*="fui-"])) {
   color: var(--text-body);
 }
 
@@ -2513,7 +2524,7 @@ button.message-reply:hover span {
   background: var(--bg-panel);
   color: var(--text-body);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
 }
 
@@ -2534,7 +2545,7 @@ button.message-reply:hover span {
   background: var(--bg-panel);
 }
 
-.emoji-picker button:not(.ghost) {
+.emoji-picker button:where(:not([class*="fui-"])):not(.ghost) {
   width: 34px;
   height: 34px;
   border: 0;
@@ -2544,8 +2555,8 @@ button.message-reply:hover span {
   cursor: pointer;
 }
 
-.emoji-picker button:not(.ghost):hover,
-.emoji-picker button:not(.ghost):focus-visible {
+.emoji-picker button:where(:not([class*="fui-"])):not(.ghost):hover,
+.emoji-picker button:where(:not([class*="fui-"])):not(.ghost):focus-visible {
   background: var(--bg-hover);
 }
 
@@ -2582,7 +2593,7 @@ button.message-reply:hover span {
   border-radius: 4px;
   background: var(--bg-input);
   font-family: Consolas, "Cascadia Mono", monospace;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .md-code {
@@ -2684,7 +2695,7 @@ button.message-reply:hover span {
   box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
 }
 
-.mention-list button {
+.mention-list button:where(:not([class*="fui-"])) {
   display: flex;
   gap: 8px;
   align-items: baseline;
@@ -2697,12 +2708,12 @@ button.message-reply:hover span {
   text-align: left;
 }
 
-.mention-list button.active,
-.mention-list button:hover {
+.mention-list button:where(:not([class*="fui-"])).active,
+.mention-list button:where(:not([class*="fui-"])):hover {
   background: var(--bg-active);
 }
 
-.mention-list span {
+.mention-list span:where(:not([class*="fui-"])) {
   color: var(--text-muted);
   font-size: 12px;
 }
@@ -2710,11 +2721,11 @@ button.message-reply:hover span {
 .mention-count {
   min-width: 18px;
   margin-left: auto;
-  padding: 0 5px;
+  padding: 0 4px;
   border-radius: 999px;
   background: var(--danger);
   color: #fff;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 18px;
   text-align: center;
@@ -2740,7 +2751,7 @@ button.message-reply:hover span {
   min-width: 22px;
   padding: 0 4px;
   color: #fff;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 16px;
   text-align: center;
@@ -2780,7 +2791,7 @@ button.message-reply:hover span {
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 
-.composer textarea {
+.composer textarea:where(:not([class*="fui-"])) {
   padding-left: 46px;
 }
 
@@ -2869,7 +2880,7 @@ button.message-reply:hover span {
   gap: 8px;
   margin: 0 0 6px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .picture-viewer {
@@ -2931,16 +2942,16 @@ button.message-reply:hover span {
   gap: 4px;
 }
 
-.emoji-picker .emoji-tab-row button.emoji-tab {
+.emoji-picker .emoji-tab-row button:where(:not([class*="fui-"])).emoji-tab {
   width: auto;
   height: 28px;
   padding: 0 10px;
   border-radius: 999px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
-.emoji-picker .emoji-tab-row button.emoji-tab[aria-selected="true"] {
+.emoji-picker .emoji-tab-row button:where(:not([class*="fui-"])).emoji-tab[aria-selected="true"] {
   background: color-mix(in srgb, var(--accent) 22%, var(--bg-panel));
   color: var(--text-body);
 }
@@ -2953,7 +2964,7 @@ button.message-reply:hover span {
   overflow-y: auto;
 }
 
-.emoji-picker .emoji-grid button:disabled {
+.emoji-picker .emoji-grid button:where(:not([class*="fui-"])):disabled {
   opacity: 0.45;
   cursor: default;
 }
