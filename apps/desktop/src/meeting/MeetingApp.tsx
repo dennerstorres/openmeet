@@ -54,6 +54,7 @@ import { holdMeetingLock } from "../shell/background";
 import { CardStage } from "./Cards";
 import { Face, ImagePicker } from "./images";
 import { ConfirmDialog, IconAction } from "./fluent";
+import { DESKTOP_DOWNLOAD_URL, isWindowsDesktop } from "../web/desktopApp";
 import {
   Badge,
   Button,
@@ -78,6 +79,7 @@ import {
 } from "@fluentui/react-components";
 import {
   AddRegular,
+  ArrowDownloadRegular,
   ArrowSyncRegular,
   CallEndRegular,
   ChatRegular,
@@ -1308,7 +1310,13 @@ export function MeetingApp() {
                 >
                   Configurações
                 </MenuItem>
-                {__WEB__ ? null : (
+                {__WEB__ ? (
+                  isWindowsDesktop() ? (
+                    <MenuItem icon={<ArrowDownloadRegular />} onClick={() => window.open(DESKTOP_DOWNLOAD_URL, "_blank", "noopener,noreferrer")}>
+                      Baixar app para Windows
+                    </MenuItem>
+                  ) : null
+                ) : (
                   <MenuItem
                     icon={<ServerRegular />}
                     onClick={() => {

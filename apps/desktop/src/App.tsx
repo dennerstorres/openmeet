@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { FluentProvider, createDarkTheme, makeStyles, type BrandVariants } from "@fluentui/react-components";
 import { MeetingApp } from "./meeting/MeetingApp";
 import { UpdateNotice } from "./shell/UpdateNotice";
+import { DesktopOffer } from "./web/DesktopOffer";
 import "./App.css";
 
 // S-13: the media proof never ships in the installer. A production build replaces DEV with false,
@@ -68,7 +69,7 @@ export default function App() {
   ) : (
     <FluentProvider theme={theme} className={styles.provider}>
       <MeetingApp />
-      {__WEB__ ? null : <UpdateNotice />}
+      {__WEB__ ? <DesktopOffer /> : <UpdateNotice />}
     </FluentProvider>
   );
 }
