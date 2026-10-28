@@ -166,8 +166,7 @@ a {
 }
 
 .origin,
-.metrics,
-.shortcuts p {
+.metrics {
   margin: 4px 0 0;
   color: var(--text-faint);
   font-size: 13px;
@@ -1725,11 +1724,6 @@ video {
 
 /* Shortcut consent and the media proof page. */
 
-.shortcuts label {
-  flex-direction: row;
-  align-items: center;
-}
-
 .poc {
   max-width: 960px;
   margin: 0 auto;
@@ -2127,46 +2121,6 @@ textarea {
   .web-shell .cards.spotlight .card.strip {
     flex-basis: 110px;
   }
-}
-
-.update-notice {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 20;
-  display: grid;
-  gap: 8px;
-  width: min(calc(100% - 32px), 360px);
-  box-sizing: border-box;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--bg-panel);
-  color: var(--text-body);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
-}
-
-.update-notice strong {
-  color: var(--text);
-}
-
-.update-notes {
-  max-height: 120px;
-  margin: 0;
-  overflow: auto;
-  color: var(--text-muted);
-  white-space: pre-line;
-}
-
-.update-error {
-  margin: 0;
-  color: var(--danger-text);
-}
-
-.update-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
 }
 
 /* ADR 0021: sound library panel, same surface as the settings panel. */

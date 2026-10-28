@@ -683,3 +683,8 @@ Próxima tarefa:
 - Com `style-src 'self'`: página sem estilo, 14 `<style>` vazios bloqueados. Extração do plugin não aceita os `__styles` pré-compilados do Fluent (erro de build).
 - Com `style-src 'self' 'sha256-47DEQ…'` (hash do `<style>` vazio): tokens aplicados (`--colorBrandBackground` #0f6cbd), menu, diálogo e os três temas renderizam, contador de `securitypolicyviolation` em 0. Bundle da POC: 530 kB (151 kB gzip).
 - Validação: Chromium do painel do app, Windows 11. Sem build Tauri/WebView2 real. CSP com o hash aplicada em `tauri.conf.json` e `web-client.ts` com aprovação do usuário (2026-10-28); `web-client.test.ts` 5 pass, desktop `pnpm test` 36 pass, typecheck ok. Falta WebView2 real na primeira tela migrada. Estado: WAITING_VALIDATION.
+
+## ADR 0026 — primeira tela no Fluent (2026-10-28, branch `poc/fluent-ui`)
+- `FluentProvider` (`webDarkTheme`, fundo transparente) na raiz em `App.tsx`; o app segue só escuro até todas as telas migrarem. `ShellConsent` usa `Switch`/`Caption1`; `UpdateNotice` usa `Card`/`Button` com ícone Fluent. CSS morto removido (`.update-*`, `.shortcuts p/label`).
+- Validação (Windows 11): `pnpm typecheck`, `pnpm lint`, desktop `pnpm test` 36 pass, `pnpm build` (JS 1.313 kB, 361 kB gzip). `tauri build --no-bundle` e o `.exe` aberto com depuração remota do WebView2: `FluentProvider` com token `--colorBrandBackground` #115ea3, 9 regras Griffel inseridas, 0 mensagens de CSP no log após reload.
+- Falta: ver `ShellConsent` e `UpdateNotice` na tela (exige instância configurada e uma atualização publicada). Estado: WAITING_VALIDATION.
