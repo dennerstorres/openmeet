@@ -53,23 +53,30 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { holdMeetingLock } from "../shell/background";
 import { CardStage } from "./Cards";
 import { Face, ImagePicker } from "./images";
+import { IconAction } from "./fluent";
+import { Badge, Button, Field, Input, Select } from "@fluentui/react-components";
+import {
+  AddRegular,
+  CallEndRegular,
+  ChatRegular,
+  ClockRegular,
+  DeleteRegular,
+  NumberSymbolRegular,
+  PeopleRegular,
+  SettingsRegular,
+  Speaker2Regular,
+} from "@fluentui/react-icons";
 import { SoundPanel, storedSoundVolume } from "./sounds";
 import {
   IconCamera,
-  IconClock,
   IconGear,
   IconHangUp,
-  IconHash,
   IconHeadphones,
   IconLogo,
   IconMic,
-  IconPlus,
   IconScreen,
   IconSignal,
-  IconSpeaker,
-  IconTrash,
   IconUsers,
-  IconChat,
 } from "./Icons";
 import { ShellConsent } from "../shell/ShellConsent";
 import {
@@ -939,7 +946,7 @@ export function MeetingApp() {
           aria-current={dmView ? "true" : undefined}
           onClick={() => setDmView(true)}
         >
-          <IconChat size={22} />
+          <ChatRegular fontSize={22} />
           <PillBadge mentions={dmBadge} unread={false} />
         </button>
         <span className="server-separator" aria-hidden="true" />
@@ -967,7 +974,7 @@ export function MeetingApp() {
           aria-label="Adicionar servidor"
           onClick={() => setCreating(creating === "server" ? null : "server")}
         >
-          <IconPlus size={22} />
+          <AddRegular fontSize={22} />
         </button>
       </nav>
 
@@ -995,37 +1002,13 @@ export function MeetingApp() {
               </div>
               <div className="room-head-actions">
                 {selectedServer ? (
-                  <button
-                    type="button"
-                    className="icon-btn mobile-members-button"
-                    aria-label="Mostrar membros"
-                    title="Mostrar membros"
-                    onClick={() => setMembersOpen(true)}
-                  >
-                    <IconUsers size={18} />
-                  </button>
+                  <IconAction className="mobile-members-button" label="Mostrar membros" icon={<PeopleRegular />} onClick={() => setMembersOpen(true)} />
                 ) : null}
                 {selectedServer && state.canCreate ? (
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    aria-label="Criar sala"
-                    title="Criar sala"
-                    onClick={() => setCreating(creating === "room" ? null : "room")}
-                  >
-                    <IconPlus size={18} />
-                  </button>
+                  <IconAction label="Criar sala" icon={<AddRegular />} onClick={() => setCreating(creating === "room" ? null : "room")} />
                 ) : null}
                 {selectedServer && (selectedServer.role === "owner" || selectedServer.role === "moderator") ? (
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    aria-label="Configurações do servidor"
-                    title="Configurações do servidor"
-                    onClick={() => setServerSettingsOpen(true)}
-                  >
-                    <IconGear size={18} />
-                  </button>
+                  <IconAction label="Configurações do servidor" icon={<SettingsRegular />} onClick={() => setServerSettingsOpen(true)} />
                 ) : null}
               </div>
             </header>
@@ -1068,25 +1051,35 @@ export function MeetingApp() {
                       });
                     }}
                   >
-                    {room.channel === "text" ? <IconHash /> : room.kind === "temporary" ? <IconClock /> : <IconSpeaker />}
+                    {room.channel === "text" ? (
+                      <NumberSymbolRegular fontSize={18} />
+                    ) : room.kind === "temporary" ? (
+                      <ClockRegular fontSize={18} />
+                    ) : (
+                      <Speaker2Regular fontSize={18} />
+                    )}
                     <span className="room-name">{room.name}</span>
                     <UnreadMark badge={chatBadge(unread.state, { kind: "room", id: room.id })} />
-                    {room.ended ? <span className="badge">encerrada</span> : room.kind === "temporary" ? <span className="sr">temporária</span> : null}
+                    {room.ended ? (
+                      <Badge appearance="tint" color="subtle" size="small">
+                        encerrada
+                      </Badge>
+                    ) : room.kind === "temporary" ? (
+                      <span className="sr">temporária</span>
+                    ) : null}
                   </button>
                   {state.canCreate ? (
-                    <button
-                      type="button"
-                      className="icon-btn danger-text room-remove"
+                    <IconAction
+                      className="room-remove"
+                      danger
                       disabled={state.pending}
-                      aria-label={`Remover a sala ${room.name}`}
-                      title={`Remover a sala ${room.name}`}
+                      label={`Remover a sala ${room.name}`}
+                      icon={<DeleteRegular />}
                       onClick={() => {
                         setRemoveTarget({ kind: "room", id: room.id, label: room.name });
                         setMobileRooms(false);
                       }}
-                    >
-                      <IconTrash size={16} />
-                    </button>
+                    />
                   ) : null}
                   {(state.presence?.[room.id] ?? []).length > 0 ? (
                     <ul className="occupants" aria-label={`Na sala ${room.name}`}>
@@ -1101,19 +1094,16 @@ export function MeetingApp() {
                             </span>
                             <span className="room-name">{person.label}</span>
                             {(state.canCreate || state.role === "admin") && !media.participants.some((p) => p.local && p.identity === person.id) ? (
-                              <button
-                                type="button"
-                                className="icon-btn danger-text"
+                              <IconAction
+                                danger
                                 disabled={state.pending}
-                                aria-label={`Desconectar ${person.label} da sala`}
-                                title={`Desconectar ${person.label} da sala`}
+                                label={`Desconectar ${person.label} da sala`}
+                                icon={<CallEndRegular />}
                                 onClick={() => {
                                   setKickTarget({ roomId: room.id, userId: person.id, label: person.label });
                                   setMobileRooms(false);
                                 }}
-                              >
-                                <IconHangUp size={16} />
-                              </button>
+                              />
                             ) : null}
                             {speaking ? <span className="sr"> falando</span> : null}
                           </li>
@@ -1138,39 +1128,35 @@ export function MeetingApp() {
                     });
                   }}
                 >
-                  <label>
-                    Nome
-                    <input value={roomName} onChange={(event) => setRoomName(event.currentTarget.value)} maxLength={80} autoFocus />
-                  </label>
-                  <label>
-                    Identificador
-                    <input value={roomSlug} onChange={(event) => setRoomSlug(event.currentTarget.value)} spellCheck={false} maxLength={64} />
-                  </label>
-                  <label>
-                    Canal
-                    <select value={roomChannel} onChange={(event) => setRoomChannel(event.currentTarget.value === "text" ? "text" : "voice")}>
+                  <Field label="Nome">
+                    <Input value={roomName} onChange={(_, data) => setRoomName(data.value)} maxLength={80} autoFocus />
+                  </Field>
+                  <Field label="Identificador">
+                    <Input value={roomSlug} onChange={(_, data) => setRoomSlug(data.value)} spellCheck={false} maxLength={64} />
+                  </Field>
+                  <Field label="Canal">
+                    <Select value={roomChannel} onChange={(_, data) => setRoomChannel(data.value === "text" ? "text" : "voice")}>
                       <option value="voice">Voz</option>
                       <option value="text">Texto</option>
-                    </select>
-                  </label>
+                    </Select>
+                  </Field>
                   {roomChannel === "voice" ? (
-                    <label>
-                      Tipo
-                      <select value={roomKind} onChange={(event) => setRoomKind(event.currentTarget.value)}>
+                    <Field label="Tipo">
+                      <Select value={roomKind} onChange={(_, data) => setRoomKind(data.value)}>
                         <option value="persistent">Persistente</option>
                         <option value="temporary">Temporária</option>
-                      </select>
-                    </label>
+                      </Select>
+                    </Field>
                   ) : (
                     <p className="hint">Sala de texto guarda as mensagens e é sempre persistente.</p>
                   )}
                   <div className="row">
-                    <button type="submit" disabled={state.pending}>
+                    <Button type="submit" appearance="primary" disabled={state.pending}>
                       Criar sala
-                    </button>
-                    <button type="button" className="ghost" onClick={() => setCreating(null)}>
+                    </Button>
+                    <Button appearance="subtle" onClick={() => setCreating(null)}>
                       Cancelar
-                    </button>
+                    </Button>
                   </div>
                 </form>
               ) : null

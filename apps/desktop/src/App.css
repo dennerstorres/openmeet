@@ -445,7 +445,7 @@ a {
   gap: 2px;
 }
 
-.mobile-members-button {
+.room-head-actions .mobile-members-button {
   display: none;
 }
 
@@ -1830,7 +1830,7 @@ textarea {
     z-index: 9;
   }
 
-  .web-shell .mobile-members-button {
+  .web-shell .room-head-actions .mobile-members-button {
     display: grid;
   }
 
