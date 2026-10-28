@@ -2,6 +2,7 @@
 
 ### 2026-10-28 — release 0.2.7 — Claude
 Branch `main`, após merge da `fix/camera-mic-desfoque` (OverconstrainedError da câmera/mic, .wasm do desfoque no web, captura que termina depois de sair da sala é parada). Versão 0.2.6 → 0.2.7 nos quatro arquivos, por pedido do usuário. Push da `main` e tag `v0.2.7`. Bug do ícone de câmera na aba ainda não validado no fluxo real.
+Release 0.2.7: run 40691187103 concluída com sucesso; GitHub Release `v0.2.7` com `OpenMeet_0.2.7_x64-setup.exe`, `.sig`, `latest.json` e `SHA256SUMS`.
 
 ### 2026-10-27 — F07-11, release 0.2.6 — Claude
 Branch `main`, após o merge da F07-10. Versão 0.2.5 → 0.2.6 nos quatro arquivos, por pedido do usuário, com as salas de texto (fase 13) e a atualização baixada sem perguntar. Push da `main` e tag `v0.2.6` para o workflow de release. Quem está na 0.2.5 ainda vê o aviso antigo ("Instalar e reiniciar"); o fluxo novo vale a partir da 0.2.6 → 0.2.7.
