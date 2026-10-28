@@ -68,9 +68,9 @@ button:where(:not(.fui-Button)):disabled {
 
 button:where(:not(.fui-Button)):focus-visible,
 summary:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
+input:where(:not([class*="fui-"])):focus-visible,
+select:where(:not([class*="fui-"])):focus-visible,
+textarea:where(:not([class*="fui-"])):focus-visible {
   outline: 2px solid var(--glow);
   outline-offset: 1px;
 }

@@ -28,7 +28,33 @@ const brand: BrandVariants = {
   150: "#a8e0b7",
   160: "#cdeed6",
 };
-const theme = { ...createDarkTheme(brand), colorBrandForeground1: brand[120], colorBrandForeground2: brand[130] };
+// Neutrals follow the app palette in App.css, so fields, buttons, menus and dialogs share one surface and border.
+const stroke = "#3a423f";
+const strokeHover = "#4b5551";
+const theme = {
+  ...createDarkTheme(brand),
+  colorBrandForeground1: brand[120],
+  colorBrandForeground2: brand[130],
+  colorNeutralForeground1: "#eef3f0",
+  colorNeutralForeground2: "#d5ddd8",
+  colorNeutralForeground3: "#aab5af",
+  colorNeutralForeground4: "#8a9690",
+  colorNeutralBackground1: "#1f2423",
+  colorNeutralBackground1Hover: "#2e3532",
+  colorNeutralBackground1Pressed: "#38403d",
+  colorNeutralBackground1Selected: "#38403d",
+  colorNeutralBackground2: "#1a1f1e",
+  colorNeutralBackground3: "#151918",
+  colorSubtleBackgroundHover: "#2e3532",
+  colorSubtleBackgroundPressed: "#38403d",
+  colorSubtleBackgroundSelected: "#38403d",
+  colorNeutralStroke1: stroke,
+  colorNeutralStroke1Hover: strokeHover,
+  colorNeutralStroke1Pressed: strokeHover,
+  colorNeutralStrokeAccessible: stroke,
+  colorNeutralStrokeAccessibleHover: strokeHover,
+  colorNeutralStrokeAccessiblePressed: strokeHover,
+};
 
 const useStyles = makeStyles({ provider: { backgroundColor: "transparent", color: "inherit" } });
 
