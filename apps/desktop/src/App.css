@@ -3024,3 +3024,8 @@ button.message-reply:hover span:where(:not([class*="fui-"])) {
 .composer-count {
   right: 64px;
 }
+
+/* ADR 0026: a checkbox's box lines up with the text above it (Fluent pads the root by 8px). */
+.fui-Checkbox {
+  margin-inline-start: -8px;
+}

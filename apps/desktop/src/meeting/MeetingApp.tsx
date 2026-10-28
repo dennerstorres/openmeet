@@ -1850,7 +1850,7 @@ export function MeetingApp() {
                       </div>
                       <div className="row">
                         <Button
-                          appearance="subtle"
+                          appearance="secondary"
                           className="danger-text"
                           disabled={state.pending}
                           onClick={() => {
