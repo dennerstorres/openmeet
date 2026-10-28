@@ -693,3 +693,7 @@ Próxima tarefa:
 - `MeetingApp.tsx`: botões de ícone da barra de salas (membros, criar sala, configurações, remover sala, desconectar pessoa) viraram `IconAction` (`meeting/fluent.tsx`: `Button` subtle + `Tooltip`); ícones da barra de servidores e das salas trocados por `@fluentui/react-icons`; "encerrada" é `Badge`; formulário de criar sala usa `Field`/`Input`/`Select`/`Button`. `.mobile-members-button` ganhou especificidade para vencer o `display` do Griffel.
 - Validação (Windows 11, 2026-10-28): typecheck, lint, desktop `pnpm test` 36 pass, `pnpm build`. Web local (API PGlite + `vite --mode web`, conta de teste): servidor com 3 salas (voz, temporária, texto), ícones e tooltips certos, lixeira no hover, formulário de criar sala abre. O CSS global antigo de `label`/`input`/`button` ainda pinta por cima de parte dos campos Fluent; some quando os estilos globais forem removidos no fim da migração.
 - Falta: `.exe` real e conferir mobile (375 px). Estado: WAITING_VALIDATION.
+
+## ADR 0026 — controles da sala no Fluent (2026-10-28, branch `poc/fluent-ui`)
+- Painel de voz e rodapé da conta: sair (`IconAction` com `CallEndRegular`), Câmera/Tela como `ToggleButton` (`Video*`, `ShareScreenStartRegular`), microfone `IconAction` (`Mic*`), ensurdecer `ToggleButton` + `Tooltip` de descrição.
+- Validação (Windows 11): typecheck, lint 0 achados, desktop `pnpm test` 36 pass, `pnpm build` (JS 1.425 kB, 391 kB gzip). Sem teste visual em chamada: a API local não tem LiveKit. Estado: WAITING_VALIDATION.

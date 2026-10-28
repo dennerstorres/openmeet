@@ -54,30 +54,27 @@ import { holdMeetingLock } from "../shell/background";
 import { CardStage } from "./Cards";
 import { Face, ImagePicker } from "./images";
 import { IconAction } from "./fluent";
-import { Badge, Button, Field, Input, Select } from "@fluentui/react-components";
+import { Badge, Button, Field, Input, Select, ToggleButton, Tooltip } from "@fluentui/react-components";
 import {
   AddRegular,
   CallEndRegular,
   ChatRegular,
   ClockRegular,
   DeleteRegular,
+  HeadphonesRegular,
+  MicOffRegular,
+  MicRegular,
   NumberSymbolRegular,
   PeopleRegular,
   SettingsRegular,
+  ShareScreenStartRegular,
   Speaker2Regular,
+  SpeakerMuteRegular,
+  VideoOffRegular,
+  VideoRegular,
 } from "@fluentui/react-icons";
 import { SoundPanel, storedSoundVolume } from "./sounds";
-import {
-  IconCamera,
-  IconGear,
-  IconHangUp,
-  IconHeadphones,
-  IconLogo,
-  IconMic,
-  IconScreen,
-  IconSignal,
-  IconUsers,
-} from "./Icons";
+import { IconCamera, IconGear, IconHangUp, IconHeadphones, IconLogo, IconMic, IconScreen, IconSignal, IconUsers } from "./Icons";
 import { ShellConsent } from "../shell/ShellConsent";
 import {
   createDesktopApi,
@@ -1175,25 +1172,20 @@ export function MeetingApp() {
                   {state.activeRoomName ?? "Reunião"} / {activeServer?.name ?? "servidor"}
                 </p>
               </div>
-              <button type="button" className="icon-btn" aria-label="Sair da sala" title="Sair da sala" onClick={leaveCall}>
-                <IconHangUp />
-              </button>
+              <IconAction label="Sair da sala" danger icon={<CallEndRegular />} onClick={leaveCall} />
             </div>
             <div className="voice-actions">
-              <button type="button" className={media.camera ? "on" : ""} disabled={!controlsEnabled || controlPending} onClick={toggleCamera}>
-                <IconCamera size={18} off={!media.camera} />
-                Câmera
-              </button>
-              <button
-                type="button"
-                className={media.screen ? "on" : ""}
-                aria-pressed={media.screen}
+              <ToggleButton
+                checked={media.camera}
+                icon={media.camera ? <VideoRegular /> : <VideoOffRegular />}
                 disabled={!controlsEnabled || controlPending}
-                onClick={toggleScreen}
+                onClick={toggleCamera}
               >
-                <IconScreen size={18} />
+                Câmera
+              </ToggleButton>
+              <ToggleButton checked={media.screen} icon={<ShareScreenStartRegular />} disabled={!controlsEnabled || controlPending} onClick={toggleScreen}>
                 Tela
-              </button>
+              </ToggleButton>
             </div>
           </section>
         ) : null}
@@ -1209,26 +1201,27 @@ export function MeetingApp() {
           </div>
           {inCall ? (
             <>
-              <button
-                type="button"
-                className={`icon-btn${media.microphone ? "" : " danger-text"}`}
-                aria-label={media.microphone ? "Desligar microfone" : "Ligar microfone"}
-                title={media.microphone ? "Desligar microfone" : "Ligar microfone"}
+              <IconAction
+                label={media.microphone ? "Desligar microfone" : "Ligar microfone"}
+                danger={!media.microphone}
                 disabled={!controlsEnabled || controlPending}
+                icon={media.microphone ? <MicRegular /> : <MicOffRegular />}
                 onClick={toggleMicrophone}
+              />
+              <Tooltip
+                content={deafened ? "Voltar a ouvir as pessoas neste PC" : "Cortar o som de todos neste PC. O microfone não muda."}
+                relationship="description"
+                withArrow
               >
-                <IconMic off={!media.microphone} />
-              </button>
-              <button
-                type="button"
-                className={`icon-btn${deafened ? " danger-text" : ""}`}
-                aria-label="Ensurdecer"
-                aria-pressed={deafened}
-                title={deafened ? "Voltar a ouvir as pessoas neste PC" : "Cortar o som de todos neste PC. O microfone não muda."}
-                onClick={toggleDeafen}
-              >
-                <IconHeadphones off={deafened} />
-              </button>
+                <ToggleButton
+                  appearance="subtle"
+                  size="small"
+                  aria-label="Ensurdecer"
+                  checked={deafened}
+                  icon={deafened ? <SpeakerMuteRegular /> : <HeadphonesRegular />}
+                  onClick={toggleDeafen}
+                />
+              </Tooltip>
             </>
           ) : null}
           <details className="account-menu">
