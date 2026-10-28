@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import { griffel } from "@griffel/vite-plugin";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 const host = process.env.TAURI_DEV_HOST;
@@ -19,7 +20,8 @@ function webShell(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
-  plugins: mode === "web" ? [webShell(), react()] : [react()],
+  // ADR 0026: Griffel extracts our own makeStyles at build time; Fluent's precompiled styles still load at runtime.
+  plugins: mode === "web" ? [webShell(), react(), griffel()] : [react(), griffel()],
   define: { __WEB__: JSON.stringify(mode === "web") },
   build: mode === "web" ? { outDir: "dist-web" } : {},
 

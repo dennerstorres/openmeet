@@ -677,3 +677,71 @@ Próxima tarefa:
 - `OverconstrainedError` ao ligar câmera (desktop) e câmera/mic (web) sem permissão prévia: antes da permissão o navegador lista dispositivos com `deviceId` vazio; sem nada salvo, `storedDevice` devolvia `""`, casava com eles e `selectDevice` gravava `{ exact: "" }` nos defaults do LiveKit. Agora sem dispositivo salvo usa o padrão do sistema (`MeetingApp.tsx`).
 - Desfoque na web abortava com "both async and sync fetching of the wasm failed": o servidor web ignorava `.wasm` e `.tflite` em `media/`. Tipos adicionados em `apps/server/src/web-client.ts`, com teste.
 - Validação (Windows 11, 2026-10-28): `tsx --test test/web-client.test.ts` (5 pass), typecheck de desktop e server passam. Sem teste com câmera real nem navegador. Estado: WAITING_VALIDATION.
+
+## ADR 0026 — POC do Fluent UI v9 (2026-10-28, branch `poc/fluent-ui`)
+- Dependências fixas: `@fluentui/react-components` 9.75.0, `@fluentui/react-icons` 2.0.344, `@griffel/vite-plugin` 1.0.1 (dev). Página isolada `apps/desktop/fluent-poc.html` + `src/poc/FluentPoc.tsx` (Button, Dialog, Menu, TabList, temas light/dark/HC), build com `FLUENT_POC=1 vite build` em `dist-poc/`, servida por `vite preview` com a CSP de produção em cabeçalho (`.claude/launch.json`, `fluent-poc`).
+- Com `style-src 'self'`: página sem estilo, 14 `<style>` vazios bloqueados. Extração do plugin não aceita os `__styles` pré-compilados do Fluent (erro de build).
+- Com `style-src 'self' 'sha256-47DEQ…'` (hash do `<style>` vazio): tokens aplicados (`--colorBrandBackground` #0f6cbd), menu, diálogo e os três temas renderizam, contador de `securitypolicyviolation` em 0. Bundle da POC: 530 kB (151 kB gzip).
+- Validação: Chromium do painel do app, Windows 11. Sem build Tauri/WebView2 real. CSP com o hash aplicada em `tauri.conf.json` e `web-client.ts` com aprovação do usuário (2026-10-28); `web-client.test.ts` 5 pass, desktop `pnpm test` 36 pass, typecheck ok. Falta WebView2 real na primeira tela migrada. Estado: WAITING_VALIDATION.
+
+## ADR 0026 — primeira tela no Fluent (2026-10-28, branch `poc/fluent-ui`)
+- `FluentProvider` (`webDarkTheme`, fundo transparente) na raiz em `App.tsx`; o app segue só escuro até todas as telas migrarem. `ShellConsent` usa `Switch`/`Caption1`; `UpdateNotice` usa `Card`/`Button` com ícone Fluent. CSS morto removido (`.update-*`, `.shortcuts p/label`).
+- Validação (Windows 11): `pnpm typecheck`, `pnpm lint`, desktop `pnpm test` 36 pass, `pnpm build` (JS 1.313 kB, 361 kB gzip). `tauri build --no-bundle` e o `.exe` aberto com depuração remota do WebView2: `FluentProvider` com token `--colorBrandBackground` #115ea3, 9 regras Griffel inseridas, 0 mensagens de CSP no log após reload.
+- Falta: ver `ShellConsent` e `UpdateNotice` na tela (exige instância configurada e uma atualização publicada). Estado: WAITING_VALIDATION.
+
+## ADR 0026 — servidores e salas no Fluent (2026-10-28, branch `poc/fluent-ui`)
+- `MeetingApp.tsx`: botões de ícone da barra de salas (membros, criar sala, configurações, remover sala, desconectar pessoa) viraram `IconAction` (`meeting/fluent.tsx`: `Button` subtle + `Tooltip`); ícones da barra de servidores e das salas trocados por `@fluentui/react-icons`; "encerrada" é `Badge`; formulário de criar sala usa `Field`/`Input`/`Select`/`Button`. `.mobile-members-button` ganhou especificidade para vencer o `display` do Griffel.
+- Validação (Windows 11, 2026-10-28): typecheck, lint, desktop `pnpm test` 36 pass, `pnpm build`. Web local (API PGlite + `vite --mode web`, conta de teste): servidor com 3 salas (voz, temporária, texto), ícones e tooltips certos, lixeira no hover, formulário de criar sala abre. O CSS global antigo de `label`/`input`/`button` ainda pinta por cima de parte dos campos Fluent; some quando os estilos globais forem removidos no fim da migração.
+- Falta: `.exe` real e conferir mobile (375 px). Estado: WAITING_VALIDATION.
+
+## ADR 0026 — controles da sala no Fluent (2026-10-28, branch `poc/fluent-ui`)
+- Painel de voz e rodapé da conta: sair (`IconAction` com `CallEndRegular`), Câmera/Tela como `ToggleButton` (`Video*`, `ShareScreenStartRegular`), microfone `IconAction` (`Mic*`), ensurdecer `ToggleButton` + `Tooltip` de descrição.
+- Validação (Windows 11): typecheck, lint 0 achados, desktop `pnpm test` 36 pass, `pnpm build` (JS 1.425 kB, 391 kB gzip). Sem teste visual em chamada: a API local não tem LiveKit. Estado: WAITING_VALIDATION.
+
+## ADR 0026 — chat de texto no Fluent (2026-10-28, branch `poc/fluent-ui`)
+- `TextRoom`: cabeçalho (fixadas/buscar como toggle, Fechar), ações da mensagem, confirmações, composer (emoji/anexo) e botões de texto viraram `IconAction`/`Button`. `IconAction` ganhou `pressed` (vira `ToggleButton`) e `expanded`. Reações, resultados e lista de menções seguem nativos.
+- Validação (Windows 11): typecheck, desktop `pnpm test` 36 pass, `pnpm build` ok. Sem teste visual (precisa API + conta). Estado: WAITING_VALIDATION.
+
+## ADR 0026 — DMs no Fluent (2026-10-28, branch `poc/fluent-ui`)
+- `DirectMessages`: novo grupo e pessoas do grupo como `IconAction` (`AddRegular`, `PeopleAddRegular`); seletor de pessoas, cartão do membro, bloquear, renomear (`Input`), adicionar e sair do grupo como `Button`. Itens da lista de conversas seguem nativos.
+- Validação (Windows 11): typecheck, desktop `pnpm test` 36 pass, `pnpm build` ok. Sem teste visual (precisa API + conta). Estado: WAITING_VALIDATION.
+
+## ADR 0026 — menu da conta no Fluent (2026-10-28, branch `poc/fluent-ui`)
+- `details.account-menu` virou `Menu` (gatilho `SettingsRegular` com `Tooltip`; Perfil, Atualizar, Configurações, Trocar instância, Sair da conta com ícones). Fechamento por clique fora e Esc agora é do Fluent; CSS `.account-menu` removido do `App.css`.
+- Validação (Windows 11): typecheck, desktop `pnpm test` 36 pass, `pnpm build` ok. Sem teste visual (precisa API + conta), incluindo 375 px. Estado: WAITING_VALIDATION.
+
+## ADR 0026 — diálogos no Fluent (2026-10-28, branch `poc/fluent-ui`)
+- Novo `ConfirmDialog` (`fluent.tsx`, `modalType="alert"`, confirmar em vermelho, Esc/fundo cancelam salvo com pedido em andamento) para desconectar participante e remover sala/servidor (antes `inline-form`). Perfil virou `Dialog` com `DialogTitle` + fechar; conteúdo interno igual. Configurações do servidor e adicionar servidor seguem no modal antigo.
+- Validação (Windows 11): typecheck, eslint 0 achados, desktop `pnpm test` 36 pass, `pnpm build` ok. Sem teste visual (precisa API + conta). Estado: WAITING_VALIDATION.
+
+## ADR 0026 — modais restantes no Fluent (2026-10-28, branch `poc/fluent-ui`)
+- Adicionar servidor e configurações do servidor viraram `Dialog` (título + fechar, conteúdo igual). CSS `.modal-backdrop`/`.app-modal` removido; a regra móvel `.call-area:has(.modal-backdrop)` saiu porque o `Dialog` usa portal no `body`.
+- Validação (Windows 11): typecheck, eslint, desktop `pnpm test` 36 pass, `pnpm build` ok. Sem teste visual (precisa API + conta), incluindo 375 px. Estado: WAITING_VALIDATION.
+
+## ADR 0026 — teste visual das telas migradas (2026-10-28, branch `poc/fluent-ui`)
+- Web local (Chrome do app, API PGlite 3020 + vite 1460, conta de teste): adicionar servidor, criar sala, chat (enviar, ações por hover, fixar como toggle, painel de fixadas, remover inline), menu da conta, Perfil, configurações do servidor, `ConfirmDialog` de remover servidor/sala; 375 px: remover sala, menu, chat, novo grupo de DM. Funciona.
+- Corrigido no teste: `.danger-text` não pintava `Button` do Fluent (agora `.fui-Button.danger-text`); kick/remover sala trocavam o celular para a aba de chamada (sobra do `inline-form`); "Fechar" do chat em `size="small"`.
+- Não testado: conversa de DM (precisa 2ª conta), chamada (sem LiveKit), `.exe`. Notado, pré-existente: sala sem identificador dá "Os dados não foram aceitos"; cabeçalho do chat quebra linha a 800 px com membros aberto.
+
+## ADR 0026 — limpeza de CSS e ícones (2026-10-28, branch `poc/fluent-ui`)
+- Premissa do handoff corrigida: `Icons.tsx` ainda é usado e restam ~140 controles nativos (emojis, sons, cards, formulários), então apagar o CSS global quebraria a UI. Feito: regras globais de `button` passam a valer só para `button:not(.fui-Button)` (o Fluent não é mais pintado por cima); `.fui-Button.danger` para o botão vermelho do grupo de DM; 12 ícones sem uso removidos de `Icons.tsx`.
+- Validação (Windows 11): typecheck, eslint, desktop `pnpm test` 36 pass, `pnpm build` ok; tela conferida no web local (chat, configurações do servidor, vermelho de remover). Estado: WAITING_VALIDATION.
+
+## ADR 0026 — controles nativos restantes no Fluent (2026-10-28, branch `poc/fluent-ui`)
+- Migrados para `Button`/`IconAction`/`Field`+`Input`/`Select`/`Checkbox`/`Slider`: configurações (dispositivos, desfoque, notificações, exportar), login/instância/convite, perfil e servidor (campos, convite, presença), painel de dispositivos da chamada, cards, arquivos do chat, DMs, busca do chat, emojis, sons, nível de notificação. Ícones dentro de botões agora são `@fluentui/react-icons`; `Icons.tsx` fica só com logo, sinal, # e pessoas.
+- Mantidos nativos de propósito (layout próprio): abas móveis, trilho de servidores, linhas de sala/membro/chat/reação/menção/emoji, botões redondos `.ctl` do dock, Destaque/Grade, textareas do composer e edição, volume por card, seletores de arquivo.
+- Tema: `createDarkTheme` com rampa verde do accent (#15803d), senão o primário ficava azul. CSS global de `button`/`label` agora em `:where(:not(.fui-*))` (especificidade zero, não sobe acima das classes do app). `.icon-btn` removido; × dos membros com 44 px no móvel.
+- Validação (Windows 11): typecheck, eslint src, desktop `pnpm test` 36 pass, `pnpm build` ok; tela conferida no web local (configurações do servidor, página de configurações, painel de membros em 375 px). Sem chamada (LiveKit) nem `.exe`. Estado: WAITING_VALIDATION.
+
+## ADR 0026 — auditoria visual e padronização (web) (2026-10-28, branch `poc/fluent-ui`)
+- Escala única = rampas do Fluent: espaçamento 2/4/6/8/10/12/16/20/24/32, raio 4/6/8 (+círculo), fonte 10/12/14/16/20/24/28. Script encaixou 68 valores fora da régua no `App.css` (ex.: 13→14 px de fonte, 14→16 de padding, raio 10/16→8).
+- 77 seletores legados por descendente (`X span`, `X input`, `X button`…) ganharam `:where(:not([class*="fui-"]))`: não atingem mais o interior do Fluent (ex.: ícones de 12 px no cabeçalho do servidor). Mantidos de propósito: fonte 16 px anti-zoom do iOS e alinhamento de `.modal-section > button`.
+- Toque (≤900 px): todo `Button`, `Input`, `Select` e `MenuItem` do Fluent com 44 px. Desktop: todo botão de ícone 24 px com ícone de 20 px (medido no DOM).
+- Corrigido: seções dos diálogos alinhadas ao título (padding horizontal 0); seletor de notificação do chat em linha própria no celular (cortava texto); "Configurações" no celular agora troca para a aba onde a página aparece.
+- Validação (Windows 11): typecheck, eslint src, desktop `pnpm test` 36 pass, `pnpm build` ok; web local conferido em 1280 px e 375 px (login, salas, chat, menu, configurações, diálogos). Estado: WAITING_VALIDATION.
+- Desktop (`.exe` release do código atual, Windows 11, WebView2, 1456 px, só visualização na instância real): barra de salas, chat, membros, menu da conta (com Trocar instância) e configurações do servidor iguais ao web, ícones 20 px, sem quebras. Pendente estético: botões subtle e checkboxes ficam recuados ~8 px do texto da seção (padding interno do Fluent).
+- Alinhamento: checkbox do Fluent com `margin-inline-start: -8px` (caixa alinha ao texto); "Remover servidor" isolado virou `secondary`. Conferido no web; testes 36 pass, build ok.
+- Campos x botões: neutros do tema Fluent agora seguem a paleta do app (superfície #1f2423, borda #3a423f, hover/pressed), e a linha inferior do campo usa a mesma cor da borda. Campos e botões ficam com 32 px (44 px no toque), raio 4 e mesma borda. O contorno de foco global saiu dos campos Fluent, que agora mostram só o sublinhado verde. Conferido no web em 1280 e 375 px; testes 36 pass, build ok.
+
+## ADR 0026 — POC removido (2026-10-28, branch `poc/fluent-ui`)
+- Saíram `apps/desktop/fluent-poc.html`, `src/poc/FluentPoc.tsx`, o bloco `FLUENT_POC` do `vite.config.ts` e `dist-poc/` do `.gitignore`. Validação: typecheck, eslint, `pnpm test` 36 pass, `pnpm build` e `pnpm build:web` ok.

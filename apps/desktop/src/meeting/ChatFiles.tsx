@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { attachmentIsImage, sniffAttachmentImage, type ChatAttachment } from "@openmeet/shared";
 import { fetchAttachment, isTauri, saveAttachment } from "../shell/native";
-import { IconDownload } from "./Icons";
+import { Button } from "@fluentui/react-components";
+import { ArrowDownloadRegular } from "@fluentui/react-icons";
+import { IconAction } from "./fluent";
 
 // ADR 0024: files on a message. A picture the API measured is fetched with the session (Rust in the .exe,
 // cookie on the web), checked again here and shown from a blob: URL; anything else is only a download.
@@ -109,15 +111,11 @@ export function MessageFiles(props: {
               {attachment.name}
             </span>
             <span className="chat-file-size">{fileSize(attachment.size)}</span>
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label={`Baixar ${attachment.name}`}
-              title="Baixar"
+            <IconAction
+              label={`Baixar ${attachment.name}`}
+              icon={<ArrowDownloadRegular />}
               onClick={() => void download(props.origin, attachment).then(props.onSaved)}
-            >
-              <IconDownload size={18} />
-            </button>
+            />
           </div>
         ),
       )}
@@ -144,12 +142,12 @@ export function PictureViewer(props: {
       <img src={props.url} alt={props.attachment.name} onClick={(event) => event.stopPropagation()} />
       <div className="row" onClick={(event) => event.stopPropagation()}>
         <span className="chat-file-name">{props.attachment.name}</span>
-        <button type="button" onClick={() => void download(props.origin, props.attachment).then(props.onSaved)}>
+        <Button appearance="primary" onClick={() => void download(props.origin, props.attachment).then(props.onSaved)}>
           Baixar
-        </button>
-        <button type="button" className="ghost" autoFocus onClick={props.onClose}>
+        </Button>
+        <Button appearance="subtle" autoFocus onClick={props.onClose}>
           Fechar
-        </button>
+        </Button>
       </div>
     </div>
   );

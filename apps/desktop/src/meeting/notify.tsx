@@ -15,6 +15,7 @@ import {
   type NotifyLevel,
   type UnreadState,
 } from "@openmeet/shared";
+import { Select } from "@fluentui/react-components";
 import { notifyChat, setUnreadBadge } from "../shell/native";
 import type { ChatListener } from "./chat-events";
 
@@ -150,21 +151,20 @@ export function NotifyLevelPicker(props: {
   onChange: (level: NotifyLevel | null) => void;
 }) {
   return (
-    <label className="notify-level">
-      <span className="sr">{props.label}</span>
-      <select
-        aria-label={props.label}
-        title={props.label}
-        value={props.value ?? ""}
-        onChange={(event) => props.onChange(event.target.value === "" ? null : (event.target.value as NotifyLevel))}
-      >
-        {props.inherited !== null ? <option value="">Padrão ({LEVEL_LABEL[props.inherited].toLowerCase()})</option> : null}
-        {(Object.keys(LEVEL_LABEL) as NotifyLevel[]).map((level) => (
-          <option key={level} value={level}>
-            {LEVEL_LABEL[level]}
-          </option>
-        ))}
-      </select>
-    </label>
+    <Select
+      className="notify-level"
+      size="small"
+      aria-label={props.label}
+      title={props.label}
+      value={props.value ?? ""}
+      onChange={(_, data) => props.onChange(data.value === "" ? null : (data.value as NotifyLevel))}
+    >
+      {props.inherited !== null ? <option value="">Padrão ({LEVEL_LABEL[props.inherited].toLowerCase()})</option> : null}
+      {(Object.keys(LEVEL_LABEL) as NotifyLevel[]).map((level) => (
+        <option key={level} value={level}>
+          {LEVEL_LABEL[level]}
+        </option>
+      ))}
+    </Select>
   );
 }

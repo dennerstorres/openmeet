@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Button } from "@fluentui/react-components";
 import { Face } from "./images";
 import {
   applyPlayback,
@@ -122,15 +123,15 @@ function CardView(props: {
         </span>
         {props.speaking ? <span className="sr">falando</span> : null}
         {hearable && !props.playback.heard ? <span className="badge">mudo aqui</span> : null}
-        <button type="button" className="ghost" aria-pressed={props.pinned} onClick={props.onPin}>
+        <Button appearance="subtle" size="small" aria-pressed={props.pinned} onClick={props.onPin}>
           {props.pinned ? "Soltar" : "Fixar"}
-        </button>
+        </Button>
       </footer>
       {hearable && props.size !== "strip" ? (
         <div className="card-audio">
-          <button type="button" className="ghost" onClick={() => props.onLevel({ heard: !props.playback.heard })}>
+          <Button appearance="subtle" size="small" onClick={() => props.onLevel({ heard: !props.playback.heard })}>
             {props.playback.heard ? "Silenciar neste PC" : "Voltar a ouvir"}
-          </button>
+          </Button>
           <label>
             <span className="sr">Volume neste PC</span>
             <input

@@ -25,7 +25,7 @@ async function webRoot(): Promise<string> {
 test("the web CSP allows only self-hosted Wasm evaluation and the LiveKit domain", () => {
   assert.equal(
     webClientCsp(env),
-    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; connect-src 'self' wss://rtc.example.com; media-src 'self' blob: mediastream:; img-src 'self' blob: data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; connect-src 'self' wss://rtc.example.com; media-src 'self' blob: mediastream:; img-src 'self' blob: data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   );
   assert.equal(webClientCsp({}).includes("connect-src 'self';"), true);
   assert.equal(liveKitConnect({ LIVEKIT_URL: "ws://rtc.example.com" }), undefined);

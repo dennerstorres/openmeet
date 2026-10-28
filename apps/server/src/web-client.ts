@@ -49,7 +49,8 @@ export function webClientCsp(env: AppEnv): string {
   return [
     "default-src 'self'",
     "script-src 'self' 'wasm-unsafe-eval'",
-    "style-src 'self'",
+    // ADR 0026: hash of an empty <style>; Fluent/Griffel fills it through CSSOM insertRule.
+    "style-src 'self' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='",
     `connect-src 'self'${livekit ? ` ${livekit}` : ""}`,
     "media-src 'self' blob: mediastream:",
     "img-src 'self' blob: data:",

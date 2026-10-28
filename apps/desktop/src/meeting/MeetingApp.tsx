@@ -53,24 +53,54 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { holdMeetingLock } from "../shell/background";
 import { CardStage } from "./Cards";
 import { Face, ImagePicker } from "./images";
-import { SoundPanel, storedSoundVolume } from "./sounds";
+import { ConfirmDialog, IconAction } from "./fluent";
 import {
-  IconCamera,
-  IconClock,
-  IconGear,
-  IconHangUp,
-  IconHash,
-  IconHeadphones,
-  IconLogo,
-  IconMic,
-  IconPlus,
-  IconScreen,
-  IconSignal,
-  IconSpeaker,
-  IconTrash,
-  IconUsers,
-  IconChat,
-} from "./Icons";
+  Badge,
+  Button,
+  Checkbox,
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  DialogTitle,
+  Field,
+  Input,
+  Menu,
+  MenuDivider,
+  MenuItem,
+  MenuList,
+  MenuPopover,
+  MenuTrigger,
+  Select,
+  Slider,
+  ToggleButton,
+  Tooltip,
+} from "@fluentui/react-components";
+import {
+  AddRegular,
+  ArrowSyncRegular,
+  CallEndRegular,
+  ChatRegular,
+  ClockRegular,
+  DeleteRegular,
+  DismissRegular,
+  HeadphonesRegular,
+  MicOffRegular,
+  MicRegular,
+  NumberSymbolRegular,
+  PeopleRegular,
+  PersonRegular,
+  ServerRegular,
+  SettingsRegular,
+  ShareScreenStartRegular,
+  SignOutRegular,
+  Speaker2Regular,
+  SpeakerMuteRegular,
+  VideoOffRegular,
+  VideoRegular,
+} from "@fluentui/react-icons";
+import { SoundPanel, storedSoundVolume } from "./sounds";
+import { IconLogo, IconSignal } from "./Icons";
 import { ShellConsent } from "../shell/ShellConsent";
 import {
   createDesktopApi,
@@ -511,7 +541,7 @@ export function MeetingApp() {
     function closeMenus(event: PointerEvent): void {
       const target = event.target;
       if (!(target instanceof Node)) return;
-      document.querySelectorAll<HTMLDetailsElement>("details.account-menu[open], details.more[open]").forEach((menu) => {
+      document.querySelectorAll<HTMLDetailsElement>("details.more[open]").forEach((menu) => {
         if (!menu.contains(target)) menu.open = false;
       });
     }
@@ -918,7 +948,7 @@ export function MeetingApp() {
             >
               Salas
             </button>
-            <button type="button" aria-pressed={!mobileRooms} disabled={!inCall && !kickTarget && !textRoom && !openDm} onClick={() => setMobileRooms(false)}>
+            <button type="button" aria-pressed={!mobileRooms} disabled={!inCall && !textRoom && !openDm && !settingsOpen} onClick={() => setMobileRooms(false)}>
               {textRoom ? `#${textRoom.name}` : openDm ? "Conversa" : inCall ? "Voltar à chamada" : "Chamada"}
             </button>
           </nav>
@@ -939,7 +969,7 @@ export function MeetingApp() {
           aria-current={dmView ? "true" : undefined}
           onClick={() => setDmView(true)}
         >
-          <IconChat size={22} />
+          <ChatRegular fontSize={22} />
           <PillBadge mentions={dmBadge} unread={false} />
         </button>
         <span className="server-separator" aria-hidden="true" />
@@ -967,7 +997,7 @@ export function MeetingApp() {
           aria-label="Adicionar servidor"
           onClick={() => setCreating(creating === "server" ? null : "server")}
         >
-          <IconPlus size={22} />
+          <AddRegular fontSize={22} />
         </button>
       </nav>
 
@@ -995,37 +1025,13 @@ export function MeetingApp() {
               </div>
               <div className="room-head-actions">
                 {selectedServer ? (
-                  <button
-                    type="button"
-                    className="icon-btn mobile-members-button"
-                    aria-label="Mostrar membros"
-                    title="Mostrar membros"
-                    onClick={() => setMembersOpen(true)}
-                  >
-                    <IconUsers size={18} />
-                  </button>
+                  <IconAction className="mobile-members-button" label="Mostrar membros" icon={<PeopleRegular />} onClick={() => setMembersOpen(true)} />
                 ) : null}
                 {selectedServer && state.canCreate ? (
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    aria-label="Criar sala"
-                    title="Criar sala"
-                    onClick={() => setCreating(creating === "room" ? null : "room")}
-                  >
-                    <IconPlus size={18} />
-                  </button>
+                  <IconAction label="Criar sala" icon={<AddRegular />} onClick={() => setCreating(creating === "room" ? null : "room")} />
                 ) : null}
                 {selectedServer && (selectedServer.role === "owner" || selectedServer.role === "moderator") ? (
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    aria-label="Configurações do servidor"
-                    title="Configurações do servidor"
-                    onClick={() => setServerSettingsOpen(true)}
-                  >
-                    <IconGear size={18} />
-                  </button>
+                  <IconAction label="Configurações do servidor" icon={<SettingsRegular />} onClick={() => setServerSettingsOpen(true)} />
                 ) : null}
               </div>
             </header>
@@ -1068,25 +1074,34 @@ export function MeetingApp() {
                       });
                     }}
                   >
-                    {room.channel === "text" ? <IconHash /> : room.kind === "temporary" ? <IconClock /> : <IconSpeaker />}
+                    {room.channel === "text" ? (
+                      <NumberSymbolRegular fontSize={18} />
+                    ) : room.kind === "temporary" ? (
+                      <ClockRegular fontSize={18} />
+                    ) : (
+                      <Speaker2Regular fontSize={18} />
+                    )}
                     <span className="room-name">{room.name}</span>
                     <UnreadMark badge={chatBadge(unread.state, { kind: "room", id: room.id })} />
-                    {room.ended ? <span className="badge">encerrada</span> : room.kind === "temporary" ? <span className="sr">temporária</span> : null}
+                    {room.ended ? (
+                      <Badge appearance="tint" color="subtle" size="small">
+                        encerrada
+                      </Badge>
+                    ) : room.kind === "temporary" ? (
+                      <span className="sr">temporária</span>
+                    ) : null}
                   </button>
                   {state.canCreate ? (
-                    <button
-                      type="button"
-                      className="icon-btn danger-text room-remove"
+                    <IconAction
+                      className="room-remove"
+                      danger
                       disabled={state.pending}
-                      aria-label={`Remover a sala ${room.name}`}
-                      title={`Remover a sala ${room.name}`}
+                      label={`Remover a sala ${room.name}`}
+                      icon={<DeleteRegular />}
                       onClick={() => {
                         setRemoveTarget({ kind: "room", id: room.id, label: room.name });
-                        setMobileRooms(false);
                       }}
-                    >
-                      <IconTrash size={16} />
-                    </button>
+                    />
                   ) : null}
                   {(state.presence?.[room.id] ?? []).length > 0 ? (
                     <ul className="occupants" aria-label={`Na sala ${room.name}`}>
@@ -1101,19 +1116,15 @@ export function MeetingApp() {
                             </span>
                             <span className="room-name">{person.label}</span>
                             {(state.canCreate || state.role === "admin") && !media.participants.some((p) => p.local && p.identity === person.id) ? (
-                              <button
-                                type="button"
-                                className="icon-btn danger-text"
+                              <IconAction
+                                danger
                                 disabled={state.pending}
-                                aria-label={`Desconectar ${person.label} da sala`}
-                                title={`Desconectar ${person.label} da sala`}
+                                label={`Desconectar ${person.label} da sala`}
+                                icon={<CallEndRegular />}
                                 onClick={() => {
                                   setKickTarget({ roomId: room.id, userId: person.id, label: person.label });
-                                  setMobileRooms(false);
                                 }}
-                              >
-                                <IconHangUp size={16} />
-                              </button>
+                              />
                             ) : null}
                             {speaking ? <span className="sr"> falando</span> : null}
                           </li>
@@ -1138,39 +1149,35 @@ export function MeetingApp() {
                     });
                   }}
                 >
-                  <label>
-                    Nome
-                    <input value={roomName} onChange={(event) => setRoomName(event.currentTarget.value)} maxLength={80} autoFocus />
-                  </label>
-                  <label>
-                    Identificador
-                    <input value={roomSlug} onChange={(event) => setRoomSlug(event.currentTarget.value)} spellCheck={false} maxLength={64} />
-                  </label>
-                  <label>
-                    Canal
-                    <select value={roomChannel} onChange={(event) => setRoomChannel(event.currentTarget.value === "text" ? "text" : "voice")}>
+                  <Field label="Nome">
+                    <Input value={roomName} onChange={(_, data) => setRoomName(data.value)} maxLength={80} autoFocus />
+                  </Field>
+                  <Field label="Identificador">
+                    <Input value={roomSlug} onChange={(_, data) => setRoomSlug(data.value)} spellCheck={false} maxLength={64} />
+                  </Field>
+                  <Field label="Canal">
+                    <Select value={roomChannel} onChange={(_, data) => setRoomChannel(data.value === "text" ? "text" : "voice")}>
                       <option value="voice">Voz</option>
                       <option value="text">Texto</option>
-                    </select>
-                  </label>
+                    </Select>
+                  </Field>
                   {roomChannel === "voice" ? (
-                    <label>
-                      Tipo
-                      <select value={roomKind} onChange={(event) => setRoomKind(event.currentTarget.value)}>
+                    <Field label="Tipo">
+                      <Select value={roomKind} onChange={(_, data) => setRoomKind(data.value)}>
                         <option value="persistent">Persistente</option>
                         <option value="temporary">Temporária</option>
-                      </select>
-                    </label>
+                      </Select>
+                    </Field>
                   ) : (
                     <p className="hint">Sala de texto guarda as mensagens e é sempre persistente.</p>
                   )}
                   <div className="row">
-                    <button type="submit" disabled={state.pending}>
+                    <Button type="submit" appearance="primary" disabled={state.pending}>
                       Criar sala
-                    </button>
-                    <button type="button" className="ghost" onClick={() => setCreating(null)}>
+                    </Button>
+                    <Button appearance="subtle" onClick={() => setCreating(null)}>
                       Cancelar
-                    </button>
+                    </Button>
                   </div>
                 </form>
               ) : null
@@ -1189,25 +1196,20 @@ export function MeetingApp() {
                   {state.activeRoomName ?? "Reunião"} / {activeServer?.name ?? "servidor"}
                 </p>
               </div>
-              <button type="button" className="icon-btn" aria-label="Sair da sala" title="Sair da sala" onClick={leaveCall}>
-                <IconHangUp />
-              </button>
+              <IconAction label="Sair da sala" danger icon={<CallEndRegular />} onClick={leaveCall} />
             </div>
             <div className="voice-actions">
-              <button type="button" className={media.camera ? "on" : ""} disabled={!controlsEnabled || controlPending} onClick={toggleCamera}>
-                <IconCamera size={18} off={!media.camera} />
-                Câmera
-              </button>
-              <button
-                type="button"
-                className={media.screen ? "on" : ""}
-                aria-pressed={media.screen}
+              <ToggleButton
+                checked={media.camera}
+                icon={media.camera ? <VideoRegular /> : <VideoOffRegular />}
                 disabled={!controlsEnabled || controlPending}
-                onClick={toggleScreen}
+                onClick={toggleCamera}
               >
-                <IconScreen size={18} />
+                Câmera
+              </ToggleButton>
+              <ToggleButton checked={media.screen} icon={<ShareScreenStartRegular />} disabled={!controlsEnabled || controlPending} onClick={toggleScreen}>
                 Tela
-              </button>
+              </ToggleButton>
             </div>
           </section>
         ) : null}
@@ -1223,69 +1225,72 @@ export function MeetingApp() {
           </div>
           {inCall ? (
             <>
-              <button
-                type="button"
-                className={`icon-btn${media.microphone ? "" : " danger-text"}`}
-                aria-label={media.microphone ? "Desligar microfone" : "Ligar microfone"}
-                title={media.microphone ? "Desligar microfone" : "Ligar microfone"}
+              <IconAction
+                label={media.microphone ? "Desligar microfone" : "Ligar microfone"}
+                danger={!media.microphone}
                 disabled={!controlsEnabled || controlPending}
+                icon={media.microphone ? <MicRegular /> : <MicOffRegular />}
                 onClick={toggleMicrophone}
+              />
+              <Tooltip
+                content={deafened ? "Voltar a ouvir as pessoas neste PC" : "Cortar o som de todos neste PC. O microfone não muda."}
+                relationship="description"
+                withArrow
               >
-                <IconMic off={!media.microphone} />
-              </button>
-              <button
-                type="button"
-                className={`icon-btn${deafened ? " danger-text" : ""}`}
-                aria-label="Ensurdecer"
-                aria-pressed={deafened}
-                title={deafened ? "Voltar a ouvir as pessoas neste PC" : "Cortar o som de todos neste PC. O microfone não muda."}
-                onClick={toggleDeafen}
-              >
-                <IconHeadphones off={deafened} />
-              </button>
+                <ToggleButton
+                  appearance="subtle"
+                  size="small"
+                  aria-label="Ensurdecer"
+                  checked={deafened}
+                  icon={deafened ? <SpeakerMuteRegular /> : <HeadphonesRegular />}
+                  onClick={toggleDeafen}
+                />
+              </Tooltip>
             </>
           ) : null}
-          <details className="account-menu">
-            <summary className="icon-btn" aria-label="Conta" title="Conta">
-              <IconGear />
-            </summary>
-            <div className="menu">
-              {state.serverPresence ? (
-                <button
-                  type="button"
-                  className="ghost"
-                  onClick={(event) => {
-                    event.currentTarget.closest("details")?.removeAttribute("open");
-                    setNickname(state.serverPresence?.selfProfile.nickname ?? "");
-                    setProfileOpen(true);
+          <Menu positioning="above-end">
+            <MenuTrigger disableButtonEnhancement>
+              <Tooltip content="Conta" relationship="label" withArrow>
+                <Button appearance="subtle" size="small" icon={<SettingsRegular />} />
+              </Tooltip>
+            </MenuTrigger>
+            <MenuPopover>
+              <MenuList>
+                {state.serverPresence ? (
+                  <MenuItem
+                    icon={<PersonRegular />}
+                    onClick={() => {
+                      setNickname(state.serverPresence?.selfProfile.nickname ?? "");
+                      setProfileOpen(true);
+                    }}
+                  >
+                    Perfil
+                  </MenuItem>
+                ) : null}
+                <MenuItem icon={<ArrowSyncRegular />} disabled={state.pending} onClick={() => void model.reloadRooms()}>
+                  Atualizar
+                </MenuItem>
+                <MenuItem
+                  icon={<SettingsRegular />}
+                  onClick={() => {
+                    setSettingsOpen(true);
+                    setMobileRooms(false);
                   }}
                 >
-                  Perfil
-                </button>
-              ) : null}
-              <button type="button" className="ghost" onClick={() => void model.reloadRooms()} disabled={state.pending}>
-                Atualizar
-              </button>
-              <button
-                type="button"
-                className="ghost"
-                onClick={(event) => {
-                  event.currentTarget.closest("details")?.removeAttribute("open");
-                  setSettingsOpen(true);
-                }}
-              >
-                Configurações
-              </button>
-              {__WEB__ ? null : (
-                <button type="button" className="ghost" onClick={() => void model.changeInstance()}>
-                  Trocar instância
-                </button>
-              )}
-              <button type="button" className="ghost danger-text" onClick={() => void model.signOut()} disabled={state.pending}>
-                Sair da conta
-              </button>
-            </div>
-          </details>
+                  Configurações
+                </MenuItem>
+                {__WEB__ ? null : (
+                  <MenuItem icon={<ServerRegular />} onClick={() => void model.changeInstance()}>
+                    Trocar instância
+                  </MenuItem>
+                )}
+                <MenuDivider />
+                <MenuItem icon={<SignOutRegular />} disabled={state.pending} onClick={() => void model.signOut()}>
+                  Sair da conta
+                </MenuItem>
+              </MenuList>
+            </MenuPopover>
+          </Menu>
         </footer>
       </aside>
 
@@ -1296,9 +1301,7 @@ export function MeetingApp() {
               <strong>Membros</strong>
               <span>{state.serverPresence.members.length}</span>
             </div>
-            <button type="button" className="icon-btn" aria-label="Recolher membros" title="Recolher membros" onClick={() => setMembersOpen(false)}>
-              ×
-            </button>
+            <IconAction label="Recolher membros" icon={<DismissRegular />} onClick={() => setMembersOpen(false)} />
           </header>
           <ul>
             {state.serverPresence.members.map((member) => (
@@ -1331,14 +1334,12 @@ export function MeetingApp() {
             ))}
           </ul>
           {state.serverPresence.allowInvisible ? (
-            <label className="presence-option member-self-mode">
-              <input
-                type="checkbox"
-                checked={state.serverPresence.selfMode === "invisible"}
-                onChange={(event) => void model.setPresenceMode(event.currentTarget.checked ? "invisible" : "visible")}
-              />
-              Aparecer como invisível
-            </label>
+            <Checkbox
+              className="presence-option member-self-mode"
+              label="Aparecer como invisível"
+              checked={state.serverPresence.selfMode === "invisible"}
+              onChange={(_, data) => void model.setPresenceMode(data.checked === true ? "invisible" : "visible")}
+            />
           ) : null}
         </aside>
       ) : null}
@@ -1346,54 +1347,37 @@ export function MeetingApp() {
       <section className="call-area">
         {!membersOpen && selectedServer ? (
           <button type="button" className="members-toggle" aria-label="Mostrar membros" title="Mostrar membros" onClick={() => setMembersOpen(true)}>
-            <IconUsers size={19} />
+            <PeopleRegular fontSize={19} />
             <span>{state.serverPresence?.members.length ?? 0}</span>
           </button>
         ) : null}
-        {kickTarget ? (
-          <section className="inline-form" role="alertdialog" aria-label="Desconectar participante">
-            <p>Desconectar {kickTarget.label} desta sala? A pessoa continua no servidor e pode entrar novamente.</p>
-            <div className="row">
-              <button
-                type="button"
-                className="danger-text"
-                disabled={state.pending}
-                onClick={() => void model.kickParticipant(kickTarget.roomId, kickTarget.userId).then(() => setKickTarget(null))}
-              >
-                Desconectar da sala
-              </button>
-              <button type="button" className="ghost" disabled={state.pending} onClick={() => setKickTarget(null)}>
-                Cancelar
-              </button>
-            </div>
-          </section>
-        ) : null}
-        {removeTarget ? (
-          <section className="inline-form" role="alertdialog" aria-label={removeTarget.kind === "room" ? "Remover sala" : "Remover servidor"}>
-            <p>
-              {removeTarget.kind === "room"
-                ? `Remover a sala ${removeTarget.label}? Quem estiver nela será desconectado e os convites deixam de valer.`
-                : `Remover o servidor ${removeTarget.label}? Todas as salas serão encerradas, todos os membros perdem o acesso e os convites deixam de valer.`}
-            </p>
-            <div className="row">
-              <button
-                type="button"
-                className="danger-text"
-                disabled={state.pending}
-                onClick={() =>
-                  void (removeTarget.kind === "room" ? model.deleteRoom(removeTarget.id) : model.deleteServer(removeTarget.id)).then(() =>
-                    setRemoveTarget(null),
-                  )
-                }
-              >
-                {removeTarget.kind === "room" ? "Remover sala" : "Remover servidor"}
-              </button>
-              <button type="button" className="ghost" disabled={state.pending} onClick={() => setRemoveTarget(null)}>
-                Cancelar
-              </button>
-            </div>
-          </section>
-        ) : null}
+        <ConfirmDialog
+          open={kickTarget !== null}
+          title="Desconectar participante"
+          text={`Desconectar ${kickTarget?.label ?? ""} desta sala? A pessoa continua no servidor e pode entrar novamente.`}
+          confirm="Desconectar da sala"
+          pending={state.pending}
+          onConfirm={() => {
+            if (kickTarget) void model.kickParticipant(kickTarget.roomId, kickTarget.userId).then(() => setKickTarget(null));
+          }}
+          onCancel={() => setKickTarget(null)}
+        />
+        <ConfirmDialog
+          open={removeTarget !== null}
+          title={removeTarget?.kind === "server" ? "Remover servidor" : "Remover sala"}
+          text={
+            removeTarget?.kind === "server"
+              ? `Remover o servidor ${removeTarget.label}? Todas as salas serão encerradas, todos os membros perdem o acesso e os convites deixam de valer.`
+              : `Remover a sala ${removeTarget?.label ?? ""}? Quem estiver nela será desconectado e os convites deixam de valer.`
+          }
+          confirm={removeTarget?.kind === "server" ? "Remover servidor" : "Remover sala"}
+          pending={state.pending}
+          onConfirm={() => {
+            if (removeTarget)
+              void (removeTarget.kind === "room" ? model.deleteRoom(removeTarget.id) : model.deleteServer(removeTarget.id)).then(() => setRemoveTarget(null));
+          }}
+          onCancel={() => setRemoveTarget(null)}
+        />
         {notice ? <p className="error">{notice}</p> : null}
         {invitePanel}
         {mediaError ? <p className="error">{mediaError}</p> : null}
@@ -1464,9 +1448,9 @@ export function MeetingApp() {
                 <p className="eyebrow">Aplicativo</p>
                 <h1 id="settings-title">Configurações</h1>
               </div>
-              <button type="button" className="ghost" onClick={() => setSettingsOpen(false)}>
+              <Button appearance="subtle" onClick={() => setSettingsOpen(false)}>
                 Fechar
-              </button>
+              </Button>
             </header>
             <div className="settings-content">
               <div>
@@ -1490,30 +1474,26 @@ export function MeetingApp() {
                   disabled={inCall && (!controlsEnabled || controlPending)}
                   onChange={onDevice}
                 />
-                <label className="effect-toggle">
-                  <input
-                    type="checkbox"
-                    checked={media.backgroundBlur}
-                    disabled={!media.backgroundBlurSupported || controlPending}
-                    onChange={(event) => {
-                      const enabled = event.currentTarget.checked;
-                      void runControl("blur de fundo", () => session().setBackgroundBlur(enabled));
-                    }}
-                  />
-                  Desfocar fundo da câmera
-                </label>
+                <Checkbox
+                  className="effect-toggle"
+                  label="Desfocar fundo da câmera"
+                  checked={media.backgroundBlur}
+                  disabled={!media.backgroundBlurSupported || controlPending}
+                  onChange={(_, data) => {
+                    const enabled = data.checked === true;
+                    void runControl("blur de fundo", () => session().setBackgroundBlur(enabled));
+                  }}
+                />
                 {media.backgroundBlurSupported ? (
-                  <label>
-                    Intensidade do desfoque: {blurRadius}
-                    <input
-                      type="range"
+                  <Field label={`Intensidade do desfoque: ${blurRadius}`}>
+                    <Slider
                       min={BLUR_RADIUS_MIN}
                       max={BLUR_RADIUS_MAX}
                       step={1}
                       value={blurRadius}
                       aria-valuetext={`raio ${blurRadius} px`}
-                      onChange={(event) => {
-                        const value = clampBlurRadius(Number(event.currentTarget.value));
+                      onChange={(_, data) => {
+                        const value = clampBlurRadius(data.value);
                         setBlurRadius(value);
                         try {
                           localStorage.setItem(BLUR_RADIUS_KEY, String(value));
@@ -1525,16 +1505,16 @@ export function MeetingApp() {
                           .catch(() => setMediaError("Não foi possível ajustar o desfoque."));
                       }}
                     />
-                  </label>
+                  </Field>
                 ) : null}
                 {media.backgroundBlurSupported ? (
                   <p className="hint">O efeito é processado neste aparelho e pode aumentar o uso de bateria.</p>
                 ) : (
                   <p className="hint">Este navegador não oferece o processamento necessário para o blur.</p>
                 )}
-                <button type="button" disabled={inCall && !controlsEnabled} onClick={() => void refreshDevices()}>
+                <Button disabled={inCall && !controlsEnabled} onClick={() => void refreshDevices()}>
                   Atualizar dispositivos
-                </button>
+                </Button>
               </div>
               {consent ? (
                 <>
@@ -1552,22 +1532,20 @@ export function MeetingApp() {
                     <p className="hint">Avisos do navegador para menções e mensagens diretas quando esta aba não está na frente.</p>
                   </div>
                   <div className="settings-group">
-                    <label className="effect-toggle">
-                      <input
-                        type="checkbox"
-                        checked={webNotify}
-                        onChange={(event) => {
-                          if (!event.target.checked) {
-                            browserNotifications.disable();
-                            setWebNotify(false);
-                            return;
-                          }
-                          // The permission prompt only ever follows this click.
-                          void browserNotifications.enable().then(setWebNotify);
-                        }}
-                      />
-                      Mostrar notificações do navegador
-                    </label>
+                    <Checkbox
+                      className="effect-toggle"
+                      label="Mostrar notificações do navegador"
+                      checked={webNotify}
+                      onChange={(_, data) => {
+                        if (data.checked !== true) {
+                          browserNotifications.disable();
+                          setWebNotify(false);
+                          return;
+                        }
+                        // The permission prompt only ever follows this click.
+                        void browserNotifications.enable().then(setWebNotify);
+                      }}
+                    />
                   </div>
                 </>
               ) : null}
@@ -1588,317 +1566,307 @@ export function MeetingApp() {
                 ) : (
                   <p className="metrics">{inCall ? "Métricas ainda não disponíveis." : "As métricas aparecem durante uma chamada."}</p>
                 )}
-                <label className="export">
-                  <input
-                    type="checkbox"
-                    checked={exportConsent}
-                    onChange={(event) => {
-                      setExportConsent(event.currentTarget.checked);
-                    }}
-                  />
-                  Autorizar exportação do diagnóstico
-                </label>
-                <button type="button" disabled={!exportConsent} onClick={() => exportDiagnostic()}>
+                <Checkbox
+                  className="export"
+                  label="Autorizar exportação do diagnóstico"
+                  checked={exportConsent}
+                  onChange={(_, data) => {
+                    setExportConsent(data.checked === true);
+                  }}
+                />
+                <Button disabled={!exportConsent} onClick={() => exportDiagnostic()}>
                   Exportar diagnóstico
-                </button>
+                </Button>
               </div>
             </div>
           </section>
         ) : null}
         {creating === "server" ? (
-          <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.target === event.currentTarget && setCreating(null)}>
-            <section className="app-modal" role="dialog" aria-modal="true" aria-labelledby="add-server-title">
-              <header>
-                <div>
-                  <h1 id="add-server-title">Adicionar servidor</h1>
-                  <p>Crie um espaço novo ou entre usando um convite.</p>
-                </div>
-                <button type="button" className="icon-btn" aria-label="Fechar" onClick={() => setCreating(null)}>
-                  ×
-                </button>
-              </header>
-              {state.canCreateServer ? (
-                <form
-                  className="modal-section"
-                  onSubmit={(event: FormEvent) => {
-                    event.preventDefault();
-                    void model.createServer(serverName).then(() => {
-                      setServerName("");
-                      setCreating(null);
-                    });
-                  }}
-                >
-                  <div>
-                    <h2>Criar servidor</h2>
-                    <p className="hint">Você será o dono e poderá criar salas e convites.</p>
-                  </div>
-                  <label>
-                    Nome do servidor
-                    <input value={serverName} onChange={(event) => setServerName(event.currentTarget.value)} maxLength={80} autoFocus />
-                  </label>
-                  <button type="submit" className="primary" disabled={state.pending || serverName.trim().length === 0}>
-                    Criar servidor
-                  </button>
-                </form>
-              ) : null}
-              <form
-                className="modal-section"
-                onSubmit={(event: FormEvent) => {
-                  event.preventDefault();
-                  model.offerInvite(pastedInvite);
-                  setPastedInvite("");
-                  setCreating(null);
-                }}
-              >
-                <div>
-                  <h2>Entrar com convite</h2>
-                  <p className="hint">Cole o link ou o código recebido.</p>
-                </div>
-                <label>
-                  Convite
-                  <input
-                    value={pastedInvite}
-                    onChange={(event) => setPastedInvite(event.currentTarget.value)}
-                    placeholder="Link ou código do convite"
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                </label>
-                <button type="submit" disabled={state.pending || pastedInvite.trim().length === 0}>
-                  Entrar no servidor
-                </button>
-              </form>
-            </section>
-          </div>
-        ) : null}
-        {profileOpen && selectedServer && state.serverPresence ? (
-          <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.target === event.currentTarget && setProfileOpen(false)}>
-            <section className="app-modal profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-title">
-              <header>
-                <div>
-                  <h1 id="profile-title">Perfil</h1>
-                  <p>A foto da conta vale em todos os servidores. Cada servidor pode ter apelido e foto próprios.</p>
-                </div>
-                <button type="button" className="icon-btn" aria-label="Fechar" onClick={() => setProfileOpen(false)}>
-                  ×
-                </button>
-              </header>
-              <section className="modal-section">
-                <h2>Conta</h2>
-                <div className="image-row">
-                  <span className="profile-face" aria-hidden="true">
-                    <Face origin={state.origin} imageId={state.serverPresence.selfProfile.globalAvatarId} label={state.userLabel ?? "?"} />
-                  </span>
-                  <div className="image-copy">
-                    <strong>{state.userLabel}</strong>
-                    <div className="row">
-                      <ImagePicker
-                        label="Trocar foto"
-                        disabled={state.pending}
-                        onPick={(image) => void model.setAccountAvatar(image)}
-                        onError={setMediaError}
-                      />
-                      {state.serverPresence.selfProfile.globalAvatarId ? (
-                        <button type="button" className="ghost danger-text" disabled={state.pending} onClick={() => void model.setAccountAvatar(null)}>
-                          Remover
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              </section>
-              <section className="modal-section">
-                <div>
-                  <h2>Em {selectedServer.name}</h2>
-                  <p className="hint">Sem apelido ou foto aqui, vale o perfil da conta.</p>
-                </div>
-                <div className="image-row">
-                  <span className="profile-face" aria-hidden="true">
-                    <Face
-                      origin={state.origin}
-                      imageId={state.serverPresence.selfProfile.avatarId ?? state.serverPresence.selfProfile.globalAvatarId}
-                      label={state.serverPresence.selfProfile.nickname ?? state.userLabel ?? "?"}
-                    />
-                  </span>
-                  <div className="row">
-                    <ImagePicker
-                      label="Foto só aqui"
-                      disabled={state.pending}
-                      onPick={(avatar) => void model.setServerProfile({ avatar })}
-                      onError={setMediaError}
-                    />
-                    {state.serverPresence.selfProfile.avatarId ? (
-                      <button
-                        type="button"
-                        className="ghost danger-text"
-                        disabled={state.pending}
-                        onClick={() => void model.setServerProfile({ avatar: null })}
-                      >
-                        Remover
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-                <form
-                  className="nickname-form"
-                  onSubmit={(event: FormEvent) => {
-                    event.preventDefault();
-                    void model.setServerProfile({ nickname: nickname.trim() === "" ? null : nickname });
-                  }}
-                >
-                  <label>
-                    Apelido
-                    <input value={nickname} onChange={(event) => setNickname(event.currentTarget.value)} maxLength={80} placeholder={state.userLabel ?? ""} />
-                  </label>
-                  <div className="row">
-                    <button type="submit" disabled={state.pending || nickname.trim() === (state.serverPresence.selfProfile.nickname ?? "")}>
-                      Salvar apelido
-                    </button>
-                    {state.serverPresence.selfProfile.nickname !== null || state.serverPresence.selfProfile.avatarId !== null ? (
-                      <button
-                        type="button"
-                        className="ghost"
-                        disabled={state.pending}
-                        onClick={() => {
-                          setNickname("");
-                          void model.setServerProfile({ nickname: null, avatar: null });
-                        }}
-                      >
-                        Usar perfil da conta
-                      </button>
-                    ) : null}
-                  </div>
-                </form>
-              </section>
-            </section>
-          </div>
-        ) : null}
-        {serverSettingsOpen && selectedServer && state.serverPresence ? (
-          <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.target === event.currentTarget && setServerSettingsOpen(false)}>
-            <section className="app-modal server-settings-modal" role="dialog" aria-modal="true" aria-labelledby="server-settings-title">
-              <header>
-                <div>
-                  <h1 id="server-settings-title">Configurações de {selectedServer.name}</h1>
-                  <p>Gerencie convites e a privacidade de presença deste servidor.</p>
-                </div>
-                <button type="button" className="icon-btn" aria-label="Fechar" onClick={() => setServerSettingsOpen(false)}>
-                  ×
-                </button>
-              </header>
-              <section className="modal-section">
-                <div>
-                  <h2>Convite</h2>
-                  <p className="hint">O link vale por 24 horas e pode ser usado até 10 vezes.</p>
-                </div>
-                {state.createdInvite ? (
-                  <div className="invite-out">
-                    <input readOnly value={state.createdInvite} aria-label="Link de convite" onFocus={(event) => event.currentTarget.select()} />
-                    <div className="row">
-                      <button
-                        type="button"
-                        className="primary"
-                        onClick={() =>
-                          void navigator.clipboard
-                            .writeText(state.createdInvite ?? "")
-                            .then(() => setCopied(true))
-                            .catch(() => setMediaError("Não foi possível copiar. Selecione o link e copie."))
-                        }
-                      >
-                        {copied ? "Copiado" : "Copiar link"}
-                      </button>
-                      <button
-                        type="button"
-                        className="ghost"
-                        onClick={() => {
-                          setCopied(false);
-                          model.clearCreatedInvite();
-                        }}
-                      >
-                        Gerar outro
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    className="primary modal-action"
-                    disabled={state.pending}
-                    onClick={() => {
-                      setCopied(false);
-                      void model.createInvite();
-                    }}
-                  >
-                    Criar link de convite
-                  </button>
-                )}
-              </section>
-              {selectedServer.role === "owner" ? (
-                <section className="modal-section">
-                  <div>
-                    <h2>Ícone</h2>
-                    <p className="hint">Aparece na barra de servidores para todos os membros. PNG, JPEG ou WebP.</p>
-                  </div>
-                  <div className="image-row">
-                    <span className="profile-face server-face" aria-hidden="true">
-                      <Face origin={state.origin} imageId={selectedServer.iconId} label={selectedServer.name} />
-                    </span>
-                    <ImagePicker label="Escolher imagem" disabled={state.pending} onPick={(image) => void model.setServerIcon(image)} onError={setMediaError} />
-                    {selectedServer.iconId ? (
-                      <button type="button" className="ghost danger-text" disabled={state.pending} onClick={() => void model.setServerIcon(null)}>
-                        Remover
-                      </button>
-                    ) : null}
-                  </div>
-                </section>
-              ) : null}
-              {selectedServer.role === "owner" ? (
-                <section className="modal-section">
-                  <div>
-                    <h2>Privacidade de presença</h2>
-                    <p className="hint">Defina se membros podem ficar invisíveis e quem pode identificá-los.</p>
-                  </div>
-                  <label className="presence-option">
-                    <input
-                      type="checkbox"
-                      checked={state.serverPresence.allowInvisible}
-                      onChange={(event) => void model.setPresencePolicy(event.currentTarget.checked, state.serverPresence?.managersSeeInvisible ?? false)}
-                    />
-                    Permitir modo invisível
-                  </label>
-                  <label className="presence-option">
-                    <input
-                      type="checkbox"
-                      checked={state.serverPresence.managersSeeInvisible}
-                      disabled={!state.serverPresence.allowInvisible}
-                      onChange={(event) => void model.setPresencePolicy(true, event.currentTarget.checked)}
-                    />
-                    Dono e moderadores podem identificar membros invisíveis
-                  </label>
-                </section>
-              ) : null}
-              {selectedServer.role === "owner" ? (
-                <section className="modal-section">
-                  <div>
-                    <h2>Remover servidor</h2>
-                    <p className="hint">Encerra todas as salas e tira o acesso de todos os membros.</p>
-                  </div>
-                  <div className="row">
-                    <button
-                      type="button"
-                      className="danger-text"
-                      disabled={state.pending}
-                      onClick={() => {
-                        setRemoveTarget({ kind: "server", id: selectedServer.id, label: selectedServer.name });
-                        setServerSettingsOpen(false);
+          <Dialog open onOpenChange={(_, data) => !data.open && setCreating(null)}>
+            <DialogSurface className="" aria-describedby={undefined}>
+              <DialogBody>
+                <DialogTitle action={<IconAction label="Fechar" icon={<DismissRegular />} onClick={() => setCreating(null)} />}>Adicionar servidor</DialogTitle>
+                <DialogContent>
+                  <p className="hint">Crie um espaço novo ou entre usando um convite.</p>
+                  {state.canCreateServer ? (
+                    <form
+                      className="modal-section"
+                      onSubmit={(event: FormEvent) => {
+                        event.preventDefault();
+                        void model.createServer(serverName).then(() => {
+                          setServerName("");
+                          setCreating(null);
+                        });
                       }}
                     >
-                      Remover servidor
-                    </button>
-                  </div>
-                </section>
-              ) : null}
-            </section>
-          </div>
+                      <div>
+                        <h2>Criar servidor</h2>
+                        <p className="hint">Você será o dono e poderá criar salas e convites.</p>
+                      </div>
+                      <Field label="Nome do servidor">
+                        <Input value={serverName} onChange={(_, data) => setServerName(data.value)} maxLength={80} autoFocus />
+                      </Field>
+                      <Button type="submit" appearance="primary" disabled={state.pending || serverName.trim().length === 0}>
+                        Criar servidor
+                      </Button>
+                    </form>
+                  ) : null}
+                  <form
+                    className="modal-section"
+                    onSubmit={(event: FormEvent) => {
+                      event.preventDefault();
+                      model.offerInvite(pastedInvite);
+                      setPastedInvite("");
+                      setCreating(null);
+                    }}
+                  >
+                    <div>
+                      <h2>Entrar com convite</h2>
+                      <p className="hint">Cole o link ou o código recebido.</p>
+                    </div>
+                    <Field label="Convite">
+                      <Input
+                        value={pastedInvite}
+                        onChange={(_, data) => setPastedInvite(data.value)}
+                        placeholder="Link ou código do convite"
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                    </Field>
+                    <Button type="submit" appearance="primary" disabled={state.pending || pastedInvite.trim().length === 0}>
+                      Entrar no servidor
+                    </Button>
+                  </form>
+                </DialogContent>
+              </DialogBody>
+            </DialogSurface>
+          </Dialog>
+        ) : null}
+        {profileOpen && selectedServer && state.serverPresence ? (
+          <Dialog open onOpenChange={(_, data) => setProfileOpen(data.open)}>
+            <DialogSurface className="profile-modal" aria-describedby={undefined}>
+              <DialogBody>
+                <DialogTitle action={<IconAction label="Fechar" icon={<DismissRegular />} onClick={() => setProfileOpen(false)} />}>Perfil</DialogTitle>
+                <DialogContent>
+                  <p className="hint">A foto da conta vale em todos os servidores. Cada servidor pode ter apelido e foto próprios.</p>
+                  <section className="modal-section">
+                    <h2>Conta</h2>
+                    <div className="image-row">
+                      <span className="profile-face" aria-hidden="true">
+                        <Face origin={state.origin} imageId={state.serverPresence.selfProfile.globalAvatarId} label={state.userLabel ?? "?"} />
+                      </span>
+                      <div className="image-copy">
+                        <strong>{state.userLabel}</strong>
+                        <div className="row">
+                          <ImagePicker
+                            label="Trocar foto"
+                            disabled={state.pending}
+                            onPick={(image) => void model.setAccountAvatar(image)}
+                            onError={setMediaError}
+                          />
+                          {state.serverPresence.selfProfile.globalAvatarId ? (
+                            <Button appearance="subtle" className="danger-text" disabled={state.pending} onClick={() => void model.setAccountAvatar(null)}>
+                              Remover
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                  <section className="modal-section">
+                    <div>
+                      <h2>Em {selectedServer.name}</h2>
+                      <p className="hint">Sem apelido ou foto aqui, vale o perfil da conta.</p>
+                    </div>
+                    <div className="image-row">
+                      <span className="profile-face" aria-hidden="true">
+                        <Face
+                          origin={state.origin}
+                          imageId={state.serverPresence.selfProfile.avatarId ?? state.serverPresence.selfProfile.globalAvatarId}
+                          label={state.serverPresence.selfProfile.nickname ?? state.userLabel ?? "?"}
+                        />
+                      </span>
+                      <div className="row">
+                        <ImagePicker
+                          label="Foto só aqui"
+                          disabled={state.pending}
+                          onPick={(avatar) => void model.setServerProfile({ avatar })}
+                          onError={setMediaError}
+                        />
+                        {state.serverPresence.selfProfile.avatarId ? (
+                          <Button
+                            appearance="subtle"
+                            className="danger-text"
+                            disabled={state.pending}
+                            onClick={() => void model.setServerProfile({ avatar: null })}
+                          >
+                            Remover
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                    <form
+                      className="nickname-form"
+                      onSubmit={(event: FormEvent) => {
+                        event.preventDefault();
+                        void model.setServerProfile({ nickname: nickname.trim() === "" ? null : nickname });
+                      }}
+                    >
+                      <Field label="Apelido">
+                        <Input value={nickname} onChange={(_, data) => setNickname(data.value)} maxLength={80} placeholder={state.userLabel ?? ""} />
+                      </Field>
+                      <div className="row">
+                        <Button
+                          type="submit"
+                          appearance="primary"
+                          disabled={state.pending || nickname.trim() === (state.serverPresence.selfProfile.nickname ?? "")}
+                        >
+                          Salvar apelido
+                        </Button>
+                        {state.serverPresence.selfProfile.nickname !== null || state.serverPresence.selfProfile.avatarId !== null ? (
+                          <Button
+                            appearance="subtle"
+                            disabled={state.pending}
+                            onClick={() => {
+                              setNickname("");
+                              void model.setServerProfile({ nickname: null, avatar: null });
+                            }}
+                          >
+                            Usar perfil da conta
+                          </Button>
+                        ) : null}
+                      </div>
+                    </form>
+                  </section>
+                </DialogContent>
+              </DialogBody>
+            </DialogSurface>
+          </Dialog>
+        ) : null}
+        {serverSettingsOpen && selectedServer && state.serverPresence ? (
+          <Dialog open onOpenChange={(_, data) => !data.open && setServerSettingsOpen(false)}>
+            <DialogSurface className="server-settings-modal" aria-describedby={undefined}>
+              <DialogBody>
+                <DialogTitle action={<IconAction label="Fechar" icon={<DismissRegular />} onClick={() => setServerSettingsOpen(false)} />}>
+                  Configurações de {selectedServer.name}
+                </DialogTitle>
+                <DialogContent>
+                  <p className="hint">Gerencie convites e a privacidade de presença deste servidor.</p>
+                  <section className="modal-section">
+                    <div>
+                      <h2>Convite</h2>
+                      <p className="hint">O link vale por 24 horas e pode ser usado até 10 vezes.</p>
+                    </div>
+                    {state.createdInvite ? (
+                      <div className="invite-out">
+                        <Input readOnly value={state.createdInvite} aria-label="Link de convite" onFocus={(event) => event.currentTarget.select()} />
+                        <div className="row">
+                          <Button
+                            appearance="primary"
+                            onClick={() =>
+                              void navigator.clipboard
+                                .writeText(state.createdInvite ?? "")
+                                .then(() => setCopied(true))
+                                .catch(() => setMediaError("Não foi possível copiar. Selecione o link e copie."))
+                            }
+                          >
+                            {copied ? "Copiado" : "Copiar link"}
+                          </Button>
+                          <Button
+                            appearance="subtle"
+                            onClick={() => {
+                              setCopied(false);
+                              model.clearCreatedInvite();
+                            }}
+                          >
+                            Gerar outro
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button
+                        appearance="primary"
+                        className="modal-action"
+                        disabled={state.pending}
+                        onClick={() => {
+                          setCopied(false);
+                          void model.createInvite();
+                        }}
+                      >
+                        Criar link de convite
+                      </Button>
+                    )}
+                  </section>
+                  {selectedServer.role === "owner" ? (
+                    <section className="modal-section">
+                      <div>
+                        <h2>Ícone</h2>
+                        <p className="hint">Aparece na barra de servidores para todos os membros. PNG, JPEG ou WebP.</p>
+                      </div>
+                      <div className="image-row">
+                        <span className="profile-face server-face" aria-hidden="true">
+                          <Face origin={state.origin} imageId={selectedServer.iconId} label={selectedServer.name} />
+                        </span>
+                        <ImagePicker
+                          label="Escolher imagem"
+                          disabled={state.pending}
+                          onPick={(image) => void model.setServerIcon(image)}
+                          onError={setMediaError}
+                        />
+                        {selectedServer.iconId ? (
+                          <Button appearance="subtle" className="danger-text" disabled={state.pending} onClick={() => void model.setServerIcon(null)}>
+                            Remover
+                          </Button>
+                        ) : null}
+                      </div>
+                    </section>
+                  ) : null}
+                  {selectedServer.role === "owner" ? (
+                    <section className="modal-section">
+                      <div>
+                        <h2>Privacidade de presença</h2>
+                        <p className="hint">Defina se membros podem ficar invisíveis e quem pode identificá-los.</p>
+                      </div>
+                      <Checkbox
+                        className="presence-option"
+                        label="Permitir modo invisível"
+                        checked={state.serverPresence.allowInvisible}
+                        onChange={(_, data) => void model.setPresencePolicy(data.checked === true, state.serverPresence?.managersSeeInvisible ?? false)}
+                      />
+                      <Checkbox
+                        className="presence-option"
+                        label="Dono e moderadores podem identificar membros invisíveis"
+                        checked={state.serverPresence.managersSeeInvisible}
+                        disabled={!state.serverPresence.allowInvisible}
+                        onChange={(_, data) => void model.setPresencePolicy(true, data.checked === true)}
+                      />
+                    </section>
+                  ) : null}
+                  {selectedServer.role === "owner" ? (
+                    <section className="modal-section">
+                      <div>
+                        <h2>Remover servidor</h2>
+                        <p className="hint">Encerra todas as salas e tira o acesso de todos os membros.</p>
+                      </div>
+                      <div className="row">
+                        <Button
+                          appearance="secondary"
+                          className="danger-text"
+                          disabled={state.pending}
+                          onClick={() => {
+                            setRemoveTarget({ kind: "server", id: selectedServer.id, label: selectedServer.name });
+                            setServerSettingsOpen(false);
+                          }}
+                        >
+                          Remover servidor
+                        </Button>
+                      </div>
+                    </section>
+                  ) : null}
+                </DialogContent>
+              </DialogBody>
+            </DialogSurface>
+          </Dialog>
         ) : null}
         {inCall ? (
           <>
@@ -1936,9 +1904,9 @@ export function MeetingApp() {
                 </button>
               </div>
               {layout === "spotlight" ? (
-                <button type="button" className="ghost" onClick={() => setFullscreen(true)} disabled={placement.featuredId === null}>
+                <Button appearance="subtle" size="small" onClick={() => setFullscreen(true)} disabled={placement.featuredId === null}>
                   Tela cheia
-                </button>
+                </Button>
               ) : null}
             </header>
             {caption ? (
@@ -1975,9 +1943,8 @@ export function MeetingApp() {
             />
             <div className={`dock${isFullscreen ? " thin" : ""}`}>
               {media.audioPlayback ? null : (
-                <button
-                  type="button"
-                  className="primary"
+                <Button
+                  appearance="primary"
                   onClick={() =>
                     void session()
                       .startRemoteAudio()
@@ -1985,7 +1952,7 @@ export function MeetingApp() {
                   }
                 >
                   Ativar som
-                </button>
+                </Button>
               )}
               <button
                 type="button"
@@ -1995,7 +1962,7 @@ export function MeetingApp() {
                 disabled={!controlsEnabled || controlPending}
                 onClick={toggleMicrophone}
               >
-                <IconMic size={22} off={!media.microphone} />
+                {media.microphone ? <MicRegular fontSize={22} /> : <MicOffRegular fontSize={22} />}
               </button>
               <button
                 type="button"
@@ -2005,7 +1972,7 @@ export function MeetingApp() {
                 disabled={!controlsEnabled || controlPending}
                 onClick={toggleCamera}
               >
-                <IconCamera size={22} off={!media.camera} />
+                {media.camera ? <VideoRegular fontSize={22} /> : <VideoOffRegular fontSize={22} />}
               </button>
               <button
                 type="button"
@@ -2016,7 +1983,7 @@ export function MeetingApp() {
                 disabled={!controlsEnabled || controlPending}
                 onClick={toggleScreen}
               >
-                <IconScreen size={22} />
+                <ShareScreenStartRegular fontSize={22} />
               </button>
               <button
                 type="button"
@@ -2026,7 +1993,7 @@ export function MeetingApp() {
                 title={deafened ? "Voltar a ouvir as pessoas neste PC" : "Cortar o som de todos neste PC. O microfone não muda."}
                 onClick={toggleDeafen}
               >
-                <IconHeadphones size={22} off={deafened} />
+                {deafened ? <SpeakerMuteRegular fontSize={22} /> : <HeadphonesRegular fontSize={22} />}
               </button>
               {session().browser.screenAudio ? (
                 <label className="share-audio" title="Pede o som do PC junto com a imagem. Muda na próxima vez que compartilhar.">
@@ -2060,9 +2027,9 @@ export function MeetingApp() {
                 />
               ) : null}
               {isFullscreen ? (
-                <button type="button" className="ghost" onClick={() => setFullscreen(false)}>
+                <Button appearance="subtle" onClick={() => setFullscreen(false)}>
                   Sair da tela cheia
-                </button>
+                </Button>
               ) : (
                 <details
                   className="more"
@@ -2072,7 +2039,7 @@ export function MeetingApp() {
                   }}
                 >
                   <summary className="ctl" aria-label="Dispositivos e diagnóstico" title="Dispositivos e diagnóstico">
-                    <IconGear size={22} />
+                    <SettingsRegular fontSize={22} />
                   </summary>
                   <div className="more-body">
                     <button
@@ -2089,31 +2056,28 @@ export function MeetingApp() {
                       Fechar ajustes
                     </button>
                     <DeviceSelect label="Entrada" kind="audioinput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
-                    <label>
-                      Volume de entrada do microfone: {microphoneVolume}%
-                      <input
-                        type="range"
+                    <Field label={`Volume de entrada do microfone: ${microphoneVolume}%`}>
+                      <Slider
                         min={0}
                         max={200}
                         step={1}
                         value={microphoneVolume}
                         disabled={!controlsEnabled || controlPending}
                         aria-valuetext={`${microphoneVolume}%`}
-                        onChange={(event) => {
-                          const value = Number(event.currentTarget.value);
+                        onChange={(_, data) => {
+                          const value = data.value;
                           session().setMicrophoneVolume(value / 100);
                           setMicrophoneVolume(value);
                         }}
                       />
-                    </label>
+                    </Field>
                     <p className="hint">100% mantém o nível original. Acima disso, o som pode distorcer. 0% corta sua voz.</p>
-                    <label>
-                      Efeito de voz
-                      <select
+                    <Field label="Efeito de voz">
+                      <Select
                         value={media.voiceEffect}
                         disabled={controlPending}
-                        onChange={(event) => {
-                          const value = event.currentTarget.value;
+                        onChange={(_, data) => {
+                          const value = data.value;
                           if (!isVoiceEffect(value)) return;
                           session()
                             .setVoiceEffect(value)
@@ -2125,12 +2089,14 @@ export function MeetingApp() {
                             {VOICE_EFFECT_LABEL[effect]}
                           </option>
                         ))}
-                      </select>
-                    </label>
-                    <label className="effect-toggle">
-                      <input type="checkbox" checked={media.voiceMonitor} onChange={(event) => session().setVoiceMonitor(event.currentTarget.checked)} />
-                      Ouvir minha voz
-                    </label>
+                      </Select>
+                    </Field>
+                    <Checkbox
+                      className="effect-toggle"
+                      label="Ouvir minha voz"
+                      checked={media.voiceMonitor}
+                      onChange={(_, data) => session().setVoiceMonitor(data.checked === true)}
+                    />
                     <p className="hint">Todos na sala ouvem o efeito. Para se ouvir, use fone: no alto-falante a voz volta para o microfone.</p>
                     {(() => {
                       // ADR 0022: an input of this PC played to the room as its own card.
@@ -2140,13 +2106,12 @@ export function MeetingApp() {
                       return (
                         <fieldset className="radio-controls">
                           <legend>Rádio</legend>
-                          <label>
-                            Entrada do rádio
-                            <select
+                          <Field label="Entrada do rádio">
+                            <Select
                               value={chosen}
                               disabled={!controlsEnabled || controlPending || inputs.length === 0}
-                              onChange={(event) => {
-                                const value = event.currentTarget.value;
+                              onChange={(_, data) => {
+                                const value = data.value;
                                 setRadioInput(value);
                                 if (media.radio) void runControl("rádio", () => session().setRadio(value));
                               }}
@@ -2156,16 +2121,15 @@ export function MeetingApp() {
                                   {device.label}
                                 </option>
                               ))}
-                            </select>
-                          </label>
-                          <button
-                            type="button"
-                            className={media.radio ? "on" : ""}
+                            </Select>
+                          </Field>
+                          <Button
+                            appearance={media.radio ? "primary" : "secondary"}
                             disabled={!controlsEnabled || controlPending || chosen === ""}
                             onClick={() => void runControl("rádio", () => session().setRadio(media.radio ? null : chosen))}
                           >
                             {media.radio ? "Desligar rádio" : "Ligar rádio"}
-                          </button>
+                          </Button>
                           {chosen !== "" && chosen === micId ? (
                             <p className="hint">Essa é a mesma entrada do microfone: sua voz iria junto com a música.</p>
                           ) : null}
@@ -2176,21 +2140,20 @@ export function MeetingApp() {
                         </fieldset>
                       );
                     })()}
-                    <button
-                      type="button"
+                    <Button
                       onClick={(event) => {
                         event.currentTarget.closest("details")?.removeAttribute("open");
                         setSettingsOpen(true);
                       }}
                     >
                       Saída, câmera e diagnóstico
-                    </button>
+                    </Button>
                   </div>
                 </details>
               )}
               <span className="dock-sep" aria-hidden="true" />
               <button type="button" className="ctl leave" aria-label="Sair da sala" title="Sair da sala" onClick={leaveCall}>
-                <IconHangUp size={24} />
+                <CallEndRegular fontSize={24} />
               </button>
             </div>
           </>
@@ -2233,13 +2196,12 @@ function DeviceSelect({
   const options = devices.filter((device) => device.kind === kind);
   const active = options.find((device) => device.active);
   return (
-    <label>
-      {label}
-      <select
+    <Field label={label}>
+      <Select
         value={active?.deviceId ?? ""}
         disabled={disabled}
-        onChange={(event) => {
-          onChange(kind, event.currentTarget.value);
+        onChange={(_, data) => {
+          onChange(kind, data.value);
         }}
       >
         <option value="">padrão</option>
@@ -2248,17 +2210,17 @@ function DeviceSelect({
             {device.active ? `${device.label} (ativo)` : device.label}
           </option>
         ))}
-      </select>
-    </label>
+      </Select>
+    </Field>
   );
 }
 
 function WebInstanceStep({ pending, onRetry }: { pending: boolean; onRetry: () => void }) {
   return (
     <div className="stack">
-      <button type="button" disabled={pending} onClick={onRetry}>
+      <Button appearance="primary" disabled={pending} onClick={onRetry}>
         Tentar de novo
-      </button>
+      </Button>
     </div>
   );
 }
@@ -2283,13 +2245,12 @@ function InstanceStep({
       }}
     >
       <p>A senha só é enviada depois que este endereço confirmar a instância.</p>
-      <label>
-        Endereço
-        <input value={address} onChange={(event) => onAddress(event.currentTarget.value)} autoComplete="url" spellCheck={false} />
-      </label>
-      <button type="submit" disabled={pending}>
+      <Field label="Endereço">
+        <Input value={address} onChange={(_, data) => onAddress(data.value)} autoComplete="url" spellCheck={false} />
+      </Field>
+      <Button type="submit" appearance="primary" disabled={pending}>
         Confirmar instância
-      </button>
+      </Button>
       {import.meta.env.DEV ? <a href="?poc=1">Prova de mídia</a> : null}
     </form>
   );
@@ -2322,40 +2283,36 @@ function AccountStep(props: {
       }}
     >
       {props.bootstrapOpen ? (
-        <label>
-          Token de instalação
-          <input value={props.setupToken} onChange={(event) => props.onSetupToken(event.currentTarget.value)} autoComplete="off" spellCheck={false} />
-        </label>
+        <Field label="Token de instalação">
+          <Input value={props.setupToken} onChange={(_, data) => props.onSetupToken(data.value)} autoComplete="off" spellCheck={false} />
+        </Field>
       ) : null}
-      <label>
-        Usuário
-        <input value={props.username} onChange={(event) => props.onUsername(event.currentTarget.value)} autoComplete="username" />
-      </label>
+      <Field label="Usuário">
+        <Input value={props.username} onChange={(_, data) => props.onUsername(data.value)} autoComplete="username" />
+      </Field>
       {props.bootstrapOpen ? (
-        <label>
-          Nome
-          <input value={props.displayName} onChange={(event) => props.onDisplayName(event.currentTarget.value)} autoComplete="name" />
-        </label>
+        <Field label="Nome">
+          <Input value={props.displayName} onChange={(_, data) => props.onDisplayName(data.value)} autoComplete="name" />
+        </Field>
       ) : null}
-      <label>
-        Senha
-        <input
+      <Field label="Senha">
+        <Input
           type="password"
           value={props.password}
-          onChange={(event) => props.onPassword(event.currentTarget.value)}
+          onChange={(_, data) => props.onPassword(data.value)}
           autoComplete={props.bootstrapOpen ? "new-password" : "current-password"}
         />
-      </label>
-      <button type="submit" disabled={props.pending}>
+      </Field>
+      <Button type="submit" appearance="primary" disabled={props.pending}>
         {props.bootstrapOpen ? "Criar administrador" : "Entrar"}
-      </button>
+      </Button>
       {props.googleLogin && !props.bootstrapOpen ? (
         props.googleWaiting ? (
           <div className="google-wait" role="status">
             <p>Conclua a entrada no navegador que abriu. Esta tela continua sozinha.</p>
-            <button type="button" className="ghost" onClick={props.onCancelGoogle}>
+            <Button appearance="subtle" onClick={props.onCancelGoogle}>
               Cancelar
-            </button>
+            </Button>
           </div>
         ) : (
           <button type="button" className="google" disabled={props.pending} onClick={props.onGoogle}>
@@ -2363,11 +2320,7 @@ function AccountStep(props: {
           </button>
         )
       ) : null}
-      {props.onChange ? (
-        <button type="button" onClick={props.onChange}>
-          Trocar instância
-        </button>
-      ) : null}
+      {props.onChange ? <Button onClick={props.onChange}>Trocar instância</Button> : null}
     </form>
   );
 }
@@ -2389,9 +2342,9 @@ function InvitePanel(props: {
           O convite é de <strong>{props.offer.host}</strong>. Abra o link do convite no navegador para entrar por esse endereço.
         </p>
         <div className="row">
-          <button type="button" className="ghost" onClick={props.onDecline}>
+          <Button appearance="subtle" onClick={props.onDecline}>
             Fechar
-          </button>
+          </Button>
         </div>
       </section>
     );
@@ -2411,12 +2364,12 @@ function InvitePanel(props: {
           </p>
         )}
         <div className="row">
-          <button type="button" className="primary" disabled={props.pending} onClick={props.onAccept}>
+          <Button appearance="primary" disabled={props.pending} onClick={props.onAccept}>
             {props.offer.sameInstance ? "Aceitar convite" : `Abrir ${props.offer.host}`}
-          </button>
-          <button type="button" className="ghost" onClick={props.onDecline}>
+          </Button>
+          <Button appearance="subtle" onClick={props.onDecline}>
             Recusar
-          </button>
+          </Button>
         </div>
       </section>
     );

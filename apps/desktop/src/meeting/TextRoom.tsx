@@ -27,7 +27,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEv
 import { isTauri, openChatLink } from "../shell/native";
 import type { ChatListener } from "./chat-events";
 import { MessageFiles, PictureViewer, fileSize } from "./ChatFiles";
-import { IconHash, IconPaperclip, IconPencil, IconPin, IconReply, IconSearch, IconSmile, IconTrash, IconUsers } from "./Icons";
+import { IconHash, IconUsers } from "./Icons";
+import { IconAction } from "./fluent";
+import { Button, Input } from "@fluentui/react-components";
+import { ArrowReplyRegular, AttachRegular, DeleteRegular, EditRegular, EmojiRegular, PinRegular, SearchRegular } from "@fluentui/react-icons";
 import { Face, base64 } from "./images";
 import { Markdown } from "./Markdown";
 import { EmojiPicker, ReactionLabel, reactionText, useEmojiSet } from "./emojis";
@@ -521,29 +524,16 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
         {chat.kind === "room" ? <IconHash size={20} /> : <IconUsers size={20} />}
         <h1 id="text-room-title">{chat.name}</h1>
         {actions}
-        <button
-          type="button"
-          className="icon-btn"
-          aria-label="Mensagens fixadas"
-          title="Mensagens fixadas"
-          aria-pressed={panel === "pins"}
-          onClick={() => void openPanel("pins")}
-        >
-          <IconPin size={18} />
-        </button>
-        <button
-          type="button"
-          className="icon-btn"
-          aria-label={chat.kind === "room" ? "Buscar nesta sala" : "Buscar nesta conversa"}
-          title={chat.kind === "room" ? "Buscar nesta sala" : "Buscar nesta conversa"}
-          aria-pressed={panel === "search"}
+        <IconAction label="Mensagens fixadas" pressed={panel === "pins"} icon={<PinRegular />} onClick={() => void openPanel("pins")} />
+        <IconAction
+          label={chat.kind === "room" ? "Buscar nesta sala" : "Buscar nesta conversa"}
+          pressed={panel === "search"}
+          icon={<SearchRegular />}
           onClick={() => void openPanel("search")}
-        >
-          <IconSearch size={18} />
-        </button>
-        <button type="button" className="ghost" onClick={onClose}>
+        />
+        <Button appearance="subtle" size="small" onClick={onClose}>
           Fechar
-        </button>
+        </Button>
       </header>
       {pendingLink ? (
         <div className="link-confirm" role="alertdialog" aria-label="Abrir link externo">
@@ -552,8 +542,8 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
           </p>
           <p className="link-full">{pendingLink}</p>
           <div className="row">
-            <button
-              type="button"
+            <Button
+              appearance="primary"
               onClick={() => {
                 const url = pendingLink;
                 setPendingLink(null);
@@ -561,10 +551,10 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
               }}
             >
               Abrir link
-            </button>
-            <button type="button" className="ghost" onClick={() => setPendingLink(null)}>
+            </Button>
+            <Button appearance="subtle" onClick={() => setPendingLink(null)}>
               Cancelar
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}
@@ -584,9 +574,9 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
         >
           {hasMore ? (
             <li className="message-more">
-              <button type="button" className="ghost" disabled={loading} onClick={() => void loadOlder()}>
+              <Button appearance="subtle" disabled={loading} onClick={() => void loadOlder()}>
                 Carregar mensagens anteriores
-              </button>
+              </Button>
             </li>
           ) : !loading ? (
             <li className="message-start">
@@ -612,7 +602,7 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
               >
                 {message.replyTo ? (
                   <button type="button" className="message-reply" onClick={() => void jumpTo(message.replyTo?.id ?? message.id)}>
-                    <IconReply size={14} />
+                    <ArrowReplyRegular fontSize={14} />
                     <strong>{person(message.replyTo.authorId).label}</strong>
                     <span>{message.replyTo.deleted ? "mensagem removida" : plainBody(message.replyTo.body, label)}</span>
                   </button>
@@ -719,60 +709,42 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
                   {removing === message.id ? (
                     <div className="message-confirm" role="alertdialog" aria-label="Remover mensagem">
                       <span>Remover esta mensagem? Não dá para desfazer.</span>
-                      <button type="button" className="danger-text" onClick={() => void remove(message.id)}>
+                      <Button appearance="subtle" size="small" className="danger-text" onClick={() => void remove(message.id)}>
                         Remover
-                      </button>
-                      <button type="button" className="ghost" onClick={() => setRemoving(null)}>
+                      </Button>
+                      <Button appearance="subtle" size="small" onClick={() => setRemoving(null)}>
                         Cancelar
-                      </button>
+                      </Button>
                     </div>
                   ) : null}
                 </div>
                 {!message.deleted && !isEditing && !readOnly ? (
                   <div className="message-actions">
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      aria-label="Responder"
-                      title="Responder"
+                    <IconAction
+                      label="Responder"
+                      icon={<ArrowReplyRegular />}
                       onClick={() => {
                         setReplyTo(message);
                         composerRef.current?.focus();
                       }}
-                    >
-                      <IconReply size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      aria-label="Reagir"
-                      title="Reagir"
-                      aria-expanded={picker === message.id}
+                    />
+                    <IconAction
+                      label="Reagir"
+                      expanded={picker === message.id}
+                      icon={<EmojiRegular />}
                       onClick={() => setPicker(picker === message.id ? null : message.id)}
-                    >
-                      <IconSmile size={16} />
-                    </button>
+                    />
                     {chat.canPin ? (
-                      <button
-                        type="button"
-                        className="icon-btn"
-                        aria-label={message.pinned ? "Desafixar" : "Fixar"}
-                        title={message.pinned ? "Desafixar" : "Fixar"}
-                        aria-pressed={message.pinned}
+                      <IconAction
+                        label={message.pinned ? "Desafixar" : "Fixar"}
+                        pressed={message.pinned}
+                        icon={<PinRegular />}
                         onClick={() => void togglePin(message)}
-                      >
-                        <IconPin size={16} />
-                      </button>
+                      />
                     ) : null}
-                    {canEditMessage(message, userId) ? (
-                      <button type="button" className="icon-btn" aria-label="Editar" title="Editar" onClick={() => startEdit(message)}>
-                        <IconPencil size={16} />
-                      </button>
-                    ) : null}
+                    {canEditMessage(message, userId) ? <IconAction label="Editar" icon={<EditRegular />} onClick={() => startEdit(message)} /> : null}
                     {canDeleteMessage(message, userId, manager) ? (
-                      <button type="button" className="icon-btn danger-text" aria-label="Remover" title="Remover" onClick={() => setRemoving(message.id)}>
-                        <IconTrash size={16} />
-                      </button>
+                      <IconAction label="Remover" danger icon={<DeleteRegular />} onClick={() => setRemoving(message.id)} />
                     ) : null}
                   </div>
                 ) : null}
@@ -808,14 +780,14 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
                 void search(false);
               }}
             >
-              <input
+              <Input
                 type="search"
                 value={query}
                 maxLength={100}
                 autoFocus
                 placeholder="Palavras da mensagem"
                 aria-label="Buscar nesta sala"
-                onChange={(event) => setQuery(event.currentTarget.value)}
+                onChange={(_, data) => setQuery(data.value)}
               />
             </form>
             {results === null ? null : results.messages.length === 0 ? (
@@ -834,17 +806,17 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
               </ul>
             )}
             {results?.hasMore ? (
-              <button type="button" className="ghost" onClick={() => void search(true)}>
+              <Button appearance="subtle" onClick={() => void search(true)}>
                 Mais resultados
-              </button>
+              </Button>
             ) : null}
           </aside>
         ) : null}
       </div>
       {detached ? (
-        <button type="button" className="back-to-latest" onClick={() => void backToLatest()}>
+        <Button size="small" className="back-to-latest" onClick={() => void backToLatest()}>
           Ver mensagens mais recentes
-        </button>
+        </Button>
       ) : null}
       <p className="typing" aria-live="polite">
         {typingNames.length > 0 ? typingLine(typingNames) : ""}
@@ -864,9 +836,9 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
               <span>
                 Respondendo a <strong>{person(replyTo.authorId).label}</strong>
               </span>
-              <button type="button" className="ghost" onClick={() => setReplyTo(null)}>
+              <Button appearance="subtle" size="small" onClick={() => setReplyTo(null)}>
                 Cancelar
-              </button>
+              </Button>
             </p>
           ) : null}
           {suggest ? (
@@ -900,9 +872,7 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
                   <span className="chat-file-size">
                     {file.state === "uploading" ? "enviando…" : file.state === "failed" ? "falhou" : fileSize(file.attachment?.size ?? file.size)}
                   </span>
-                  <button type="button" className="icon-btn" aria-label={`Tirar ${file.name}`} title="Tirar" onClick={() => dropFile(file.key)}>
-                    <IconTrash size={16} />
-                  </button>
+                  <IconAction label={`Tirar ${file.name}`} icon={<DeleteRegular />} onClick={() => dropFile(file.key)} />
                 </li>
               ))}
             </ul>
@@ -910,9 +880,9 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
           {notice ? (
             <p className="composer-notice" role="status">
               {notice}
-              <button type="button" className="ghost" onClick={() => setNotice(null)}>
+              <Button appearance="subtle" size="small" onClick={() => setNotice(null)}>
                 Ok
-              </button>
+              </Button>
             </p>
           ) : null}
           {composerEmoji ? (
@@ -936,26 +906,20 @@ export function TextRoom({ model, chat, origin, userId, manager, person, members
               onClose={() => setComposerEmoji(false)}
             />
           ) : null}
-          <button
-            type="button"
-            className="icon-btn composer-emoji"
-            aria-label="Inserir emoji"
-            title="Inserir emoji"
-            aria-expanded={composerEmoji}
+          <IconAction
+            label="Inserir emoji"
+            className="composer-emoji"
+            expanded={composerEmoji}
+            icon={<EmojiRegular />}
             onClick={() => setComposerEmoji(!composerEmoji)}
-          >
-            <IconSmile size={18} />
-          </button>
-          <button
-            type="button"
-            className="icon-btn composer-attach"
-            aria-label="Anexar arquivos"
-            title="Anexar arquivos"
+          />
+          <IconAction
+            label="Anexar arquivos"
+            className="composer-attach"
             disabled={files.length >= ATTACHMENTS_PER_MESSAGE}
+            icon={<AttachRegular />}
             onClick={() => fileInputRef.current?.click()}
-          >
-            <IconPaperclip size={18} />
-          </button>
+          />
           <input
             ref={fileInputRef}
             type="file"
