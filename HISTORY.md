@@ -709,3 +709,7 @@ Próxima tarefa:
 ## ADR 0026 — menu da conta no Fluent (2026-10-28, branch `poc/fluent-ui`)
 - `details.account-menu` virou `Menu` (gatilho `SettingsRegular` com `Tooltip`; Perfil, Atualizar, Configurações, Trocar instância, Sair da conta com ícones). Fechamento por clique fora e Esc agora é do Fluent; CSS `.account-menu` removido do `App.css`.
 - Validação (Windows 11): typecheck, desktop `pnpm test` 36 pass, `pnpm build` ok. Sem teste visual (precisa API + conta), incluindo 375 px. Estado: WAITING_VALIDATION.
+
+## ADR 0026 — diálogos no Fluent (2026-10-28, branch `poc/fluent-ui`)
+- Novo `ConfirmDialog` (`fluent.tsx`, `modalType="alert"`, confirmar em vermelho, Esc/fundo cancelam salvo com pedido em andamento) para desconectar participante e remover sala/servidor (antes `inline-form`). Perfil virou `Dialog` com `DialogTitle` + fechar; conteúdo interno igual. Configurações do servidor e adicionar servidor seguem no modal antigo.
+- Validação (Windows 11): typecheck, eslint 0 achados, desktop `pnpm test` 36 pass, `pnpm build` ok. Sem teste visual (precisa API + conta). Estado: WAITING_VALIDATION.

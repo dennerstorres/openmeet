@@ -53,8 +53,27 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { holdMeetingLock } from "../shell/background";
 import { CardStage } from "./Cards";
 import { Face, ImagePicker } from "./images";
-import { IconAction } from "./fluent";
-import { Badge, Button, Field, Input, Menu, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger, Select, ToggleButton, Tooltip } from "@fluentui/react-components";
+import { ConfirmDialog, IconAction } from "./fluent";
+import {
+  Badge,
+  Button,
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  DialogTitle,
+  Field,
+  Input,
+  Menu,
+  MenuDivider,
+  MenuItem,
+  MenuList,
+  MenuPopover,
+  MenuTrigger,
+  Select,
+  ToggleButton,
+  Tooltip,
+} from "@fluentui/react-components";
 import {
   AddRegular,
   ArrowSyncRegular,
@@ -62,6 +81,7 @@ import {
   ChatRegular,
   ClockRegular,
   DeleteRegular,
+  DismissRegular,
   HeadphonesRegular,
   MicOffRegular,
   MicRegular,
@@ -1329,50 +1349,33 @@ export function MeetingApp() {
             <span>{state.serverPresence?.members.length ?? 0}</span>
           </button>
         ) : null}
-        {kickTarget ? (
-          <section className="inline-form" role="alertdialog" aria-label="Desconectar participante">
-            <p>Desconectar {kickTarget.label} desta sala? A pessoa continua no servidor e pode entrar novamente.</p>
-            <div className="row">
-              <button
-                type="button"
-                className="danger-text"
-                disabled={state.pending}
-                onClick={() => void model.kickParticipant(kickTarget.roomId, kickTarget.userId).then(() => setKickTarget(null))}
-              >
-                Desconectar da sala
-              </button>
-              <button type="button" className="ghost" disabled={state.pending} onClick={() => setKickTarget(null)}>
-                Cancelar
-              </button>
-            </div>
-          </section>
-        ) : null}
-        {removeTarget ? (
-          <section className="inline-form" role="alertdialog" aria-label={removeTarget.kind === "room" ? "Remover sala" : "Remover servidor"}>
-            <p>
-              {removeTarget.kind === "room"
-                ? `Remover a sala ${removeTarget.label}? Quem estiver nela será desconectado e os convites deixam de valer.`
-                : `Remover o servidor ${removeTarget.label}? Todas as salas serão encerradas, todos os membros perdem o acesso e os convites deixam de valer.`}
-            </p>
-            <div className="row">
-              <button
-                type="button"
-                className="danger-text"
-                disabled={state.pending}
-                onClick={() =>
-                  void (removeTarget.kind === "room" ? model.deleteRoom(removeTarget.id) : model.deleteServer(removeTarget.id)).then(() =>
-                    setRemoveTarget(null),
-                  )
-                }
-              >
-                {removeTarget.kind === "room" ? "Remover sala" : "Remover servidor"}
-              </button>
-              <button type="button" className="ghost" disabled={state.pending} onClick={() => setRemoveTarget(null)}>
-                Cancelar
-              </button>
-            </div>
-          </section>
-        ) : null}
+        <ConfirmDialog
+          open={kickTarget !== null}
+          title="Desconectar participante"
+          text={`Desconectar ${kickTarget?.label ?? ""} desta sala? A pessoa continua no servidor e pode entrar novamente.`}
+          confirm="Desconectar da sala"
+          pending={state.pending}
+          onConfirm={() => {
+            if (kickTarget) void model.kickParticipant(kickTarget.roomId, kickTarget.userId).then(() => setKickTarget(null));
+          }}
+          onCancel={() => setKickTarget(null)}
+        />
+        <ConfirmDialog
+          open={removeTarget !== null}
+          title={removeTarget?.kind === "server" ? "Remover servidor" : "Remover sala"}
+          text={
+            removeTarget?.kind === "server"
+              ? `Remover o servidor ${removeTarget.label}? Todas as salas serão encerradas, todos os membros perdem o acesso e os convites deixam de valer.`
+              : `Remover a sala ${removeTarget?.label ?? ""}? Quem estiver nela será desconectado e os convites deixam de valer.`
+          }
+          confirm={removeTarget?.kind === "server" ? "Remover servidor" : "Remover sala"}
+          pending={state.pending}
+          onConfirm={() => {
+            if (removeTarget)
+              void (removeTarget.kind === "room" ? model.deleteRoom(removeTarget.id) : model.deleteServer(removeTarget.id)).then(() => setRemoveTarget(null));
+          }}
+          onCancel={() => setRemoveTarget(null)}
+        />
         {notice ? <p className="error">{notice}</p> : null}
         {invitePanel}
         {mediaError ? <p className="error">{mediaError}</p> : null}
@@ -1651,106 +1654,108 @@ export function MeetingApp() {
           </div>
         ) : null}
         {profileOpen && selectedServer && state.serverPresence ? (
-          <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.target === event.currentTarget && setProfileOpen(false)}>
-            <section className="app-modal profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-title">
-              <header>
-                <div>
-                  <h1 id="profile-title">Perfil</h1>
-                  <p>A foto da conta vale em todos os servidores. Cada servidor pode ter apelido e foto próprios.</p>
-                </div>
-                <button type="button" className="icon-btn" aria-label="Fechar" onClick={() => setProfileOpen(false)}>
-                  ×
-                </button>
-              </header>
-              <section className="modal-section">
-                <h2>Conta</h2>
-                <div className="image-row">
-                  <span className="profile-face" aria-hidden="true">
-                    <Face origin={state.origin} imageId={state.serverPresence.selfProfile.globalAvatarId} label={state.userLabel ?? "?"} />
-                  </span>
-                  <div className="image-copy">
-                    <strong>{state.userLabel}</strong>
-                    <div className="row">
-                      <ImagePicker
-                        label="Trocar foto"
-                        disabled={state.pending}
-                        onPick={(image) => void model.setAccountAvatar(image)}
-                        onError={setMediaError}
-                      />
-                      {state.serverPresence.selfProfile.globalAvatarId ? (
-                        <button type="button" className="ghost danger-text" disabled={state.pending} onClick={() => void model.setAccountAvatar(null)}>
-                          Remover
-                        </button>
-                      ) : null}
+          <Dialog open onOpenChange={(_, data) => setProfileOpen(data.open)}>
+            <DialogSurface className="profile-modal" aria-describedby={undefined}>
+              <DialogBody>
+                <DialogTitle action={<IconAction label="Fechar" icon={<DismissRegular />} onClick={() => setProfileOpen(false)} />}>Perfil</DialogTitle>
+                <DialogContent>
+                  <p className="hint">A foto da conta vale em todos os servidores. Cada servidor pode ter apelido e foto próprios.</p>
+                  <section className="modal-section">
+                    <h2>Conta</h2>
+                    <div className="image-row">
+                      <span className="profile-face" aria-hidden="true">
+                        <Face origin={state.origin} imageId={state.serverPresence.selfProfile.globalAvatarId} label={state.userLabel ?? "?"} />
+                      </span>
+                      <div className="image-copy">
+                        <strong>{state.userLabel}</strong>
+                        <div className="row">
+                          <ImagePicker
+                            label="Trocar foto"
+                            disabled={state.pending}
+                            onPick={(image) => void model.setAccountAvatar(image)}
+                            onError={setMediaError}
+                          />
+                          {state.serverPresence.selfProfile.globalAvatarId ? (
+                            <button type="button" className="ghost danger-text" disabled={state.pending} onClick={() => void model.setAccountAvatar(null)}>
+                              Remover
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </section>
-              <section className="modal-section">
-                <div>
-                  <h2>Em {selectedServer.name}</h2>
-                  <p className="hint">Sem apelido ou foto aqui, vale o perfil da conta.</p>
-                </div>
-                <div className="image-row">
-                  <span className="profile-face" aria-hidden="true">
-                    <Face
-                      origin={state.origin}
-                      imageId={state.serverPresence.selfProfile.avatarId ?? state.serverPresence.selfProfile.globalAvatarId}
-                      label={state.serverPresence.selfProfile.nickname ?? state.userLabel ?? "?"}
-                    />
-                  </span>
-                  <div className="row">
-                    <ImagePicker
-                      label="Foto só aqui"
-                      disabled={state.pending}
-                      onPick={(avatar) => void model.setServerProfile({ avatar })}
-                      onError={setMediaError}
-                    />
-                    {state.serverPresence.selfProfile.avatarId ? (
-                      <button
-                        type="button"
-                        className="ghost danger-text"
-                        disabled={state.pending}
-                        onClick={() => void model.setServerProfile({ avatar: null })}
-                      >
-                        Remover
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-                <form
-                  className="nickname-form"
-                  onSubmit={(event: FormEvent) => {
-                    event.preventDefault();
-                    void model.setServerProfile({ nickname: nickname.trim() === "" ? null : nickname });
-                  }}
-                >
-                  <label>
-                    Apelido
-                    <input value={nickname} onChange={(event) => setNickname(event.currentTarget.value)} maxLength={80} placeholder={state.userLabel ?? ""} />
-                  </label>
-                  <div className="row">
-                    <button type="submit" disabled={state.pending || nickname.trim() === (state.serverPresence.selfProfile.nickname ?? "")}>
-                      Salvar apelido
-                    </button>
-                    {state.serverPresence.selfProfile.nickname !== null || state.serverPresence.selfProfile.avatarId !== null ? (
-                      <button
-                        type="button"
-                        className="ghost"
-                        disabled={state.pending}
-                        onClick={() => {
-                          setNickname("");
-                          void model.setServerProfile({ nickname: null, avatar: null });
-                        }}
-                      >
-                        Usar perfil da conta
-                      </button>
-                    ) : null}
-                  </div>
-                </form>
-              </section>
-            </section>
-          </div>
+                  </section>
+                  <section className="modal-section">
+                    <div>
+                      <h2>Em {selectedServer.name}</h2>
+                      <p className="hint">Sem apelido ou foto aqui, vale o perfil da conta.</p>
+                    </div>
+                    <div className="image-row">
+                      <span className="profile-face" aria-hidden="true">
+                        <Face
+                          origin={state.origin}
+                          imageId={state.serverPresence.selfProfile.avatarId ?? state.serverPresence.selfProfile.globalAvatarId}
+                          label={state.serverPresence.selfProfile.nickname ?? state.userLabel ?? "?"}
+                        />
+                      </span>
+                      <div className="row">
+                        <ImagePicker
+                          label="Foto só aqui"
+                          disabled={state.pending}
+                          onPick={(avatar) => void model.setServerProfile({ avatar })}
+                          onError={setMediaError}
+                        />
+                        {state.serverPresence.selfProfile.avatarId ? (
+                          <button
+                            type="button"
+                            className="ghost danger-text"
+                            disabled={state.pending}
+                            onClick={() => void model.setServerProfile({ avatar: null })}
+                          >
+                            Remover
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                    <form
+                      className="nickname-form"
+                      onSubmit={(event: FormEvent) => {
+                        event.preventDefault();
+                        void model.setServerProfile({ nickname: nickname.trim() === "" ? null : nickname });
+                      }}
+                    >
+                      <label>
+                        Apelido
+                        <input
+                          value={nickname}
+                          onChange={(event) => setNickname(event.currentTarget.value)}
+                          maxLength={80}
+                          placeholder={state.userLabel ?? ""}
+                        />
+                      </label>
+                      <div className="row">
+                        <button type="submit" disabled={state.pending || nickname.trim() === (state.serverPresence.selfProfile.nickname ?? "")}>
+                          Salvar apelido
+                        </button>
+                        {state.serverPresence.selfProfile.nickname !== null || state.serverPresence.selfProfile.avatarId !== null ? (
+                          <button
+                            type="button"
+                            className="ghost"
+                            disabled={state.pending}
+                            onClick={() => {
+                              setNickname("");
+                              void model.setServerProfile({ nickname: null, avatar: null });
+                            }}
+                          >
+                            Usar perfil da conta
+                          </button>
+                        ) : null}
+                      </div>
+                    </form>
+                  </section>
+                </DialogContent>
+              </DialogBody>
+            </DialogSurface>
+          </Dialog>
         ) : null}
         {serverSettingsOpen && selectedServer && state.serverPresence ? (
           <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.target === event.currentTarget && setServerSettingsOpen(false)}>
