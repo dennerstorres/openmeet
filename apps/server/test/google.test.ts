@@ -3,6 +3,7 @@ import test from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { buildApp } from "../src/app.js";
 import { googleConfig, readIdToken, type GoogleTokens } from "../src/auth/google.js";
+import { hashSecret } from "../src/auth/tokens.js";
 import { applyMigrations, type MigrationClient } from "../src/db/migrate.js";
 import { redactInviteUrl } from "../src/invite-page.js";
 
@@ -39,6 +40,20 @@ function pgliteClient(db: PGlite): MigrationClient {
     },
   };
   return client;
+}
+
+const INVITE = "i".repeat(43);
+
+/** A live server invite: a Google sign-in that creates an account must carry one. */
+async function seedInvite(db: MigrationClient, code = INVITE): Promise<string> {
+  const owner = await db.query("insert into users (username, password_hash, display_name, role) values ('dono', 'x', 'Dono', 'admin') returning id");
+  const server = await db.query("insert into servers (name, created_by) values ('Amigos', $1) returning id", [owner.rows[0]?.id]);
+  await db.query("insert into server_invites (server_id, code_hash, created_by, expires_at) values ($1, $2, $3, now() + interval '1 day')", [
+    server.rows[0]?.id,
+    hashSecret(code),
+    owner.rows[0]?.id,
+  ]);
+  return code;
 }
 
 function idToken(claims: Record<string, unknown>): string {
@@ -84,6 +99,7 @@ test("the browser round trip makes a participant, shows no token, and the app co
   const pg = new PGlite();
   const db = pgliteClient(pg);
   await applyMigrations(db);
+  await seedInvite(db);
   let nextClaims: (nonce: string) => Record<string, unknown> = (nonce) => claimsFor(nonce);
   const exchanged: { code: string; verifier: string }[] = [];
   let currentNonce = "";
@@ -95,7 +111,7 @@ test("the browser round trip makes a participant, shows no token, and the app co
   };
   const app = await buildApp({ logger: false, env, db, googleTokens });
   async function begin(): Promise<{ state: string; poll: string; url: URL }> {
-    const started = await app.inject({ method: "POST", url: "/api/v1/auth/google/start" });
+    const started = await app.inject({ method: "POST", url: "/api/v1/auth/google/start", payload: { invite: INVITE } });
     assert.equal(started.statusCode, 201);
     assert.equal(started.body.includes(clientSecret), false);
     const body = started.json() as { authUrl: string; poll: string };
@@ -155,7 +171,7 @@ test("the browser round trip makes a participant, shows no token, and the app co
     await app.inject({ method: "GET", url: `/api/v1/auth/google/callback?state=${second.state}&code=google-code-2` });
     const sameUser = await app.inject({ method: "POST", url: "/api/v1/auth/google/poll", payload: { poll: second.poll } });
     assert.equal((sameUser.json() as { user: { id: string } }).user.id, session.user.id);
-    const accounts = await db.query("select count(*)::int as n from users");
+    const accounts = await db.query("select count(*)::int as n from users where role = 'participant'");
     assert.equal(accounts.rows[0]?.n, 1);
 
     for (const [label, claims] of [
@@ -203,6 +219,7 @@ test("a second Google account with the same e-mail name gets its own username", 
   const pg = new PGlite();
   const db = pgliteClient(pg);
   await applyMigrations(db);
+  await seedInvite(db);
   let sub = "a";
   let nonce = "";
   const app = await buildApp({
@@ -215,7 +232,10 @@ test("a second Google account with the same e-mail name gets its own username", 
     const names: string[] = [];
     for (const next of ["a", "b"]) {
       sub = next;
-      const started = (await app.inject({ method: "POST", url: "/api/v1/auth/google/start" })).json() as { authUrl: string; poll: string };
+      const started = (await app.inject({ method: "POST", url: "/api/v1/auth/google/start", payload: { invite: INVITE } })).json() as {
+        authUrl: string;
+        poll: string;
+      };
       const url = new URL(started.authUrl);
       nonce = url.searchParams.get("nonce") ?? "";
       await app.inject({ method: "GET", url: `/api/v1/auth/google/callback?state=${url.searchParams.get("state")}&code=c` });
@@ -236,11 +256,15 @@ test("in the browser the poll answers with cookies and a body without tokens", a
   const pg = new PGlite();
   const db = pgliteClient(pg);
   await applyMigrations(db);
+  await seedInvite(db);
   let nonce = "";
   const app = await buildApp({ logger: false, env, db, googleTokens: { exchange: async () => ({ idToken: idToken(claimsFor(nonce)) }) } });
   const web = { "x-openmeet-web": "1", origin: "https://api.example.com" };
   try {
-    const started = (await app.inject({ method: "POST", url: "/api/v1/auth/google/start", headers: web })).json() as { authUrl: string; poll: string };
+    const started = (await app.inject({ method: "POST", url: "/api/v1/auth/google/start", headers: web, payload: { invite: INVITE } })).json() as {
+      authUrl: string;
+      poll: string;
+    };
     const url = new URL(started.authUrl);
     nonce = url.searchParams.get("nonce") ?? "";
     const pending = await app.inject({ method: "POST", url: "/api/v1/auth/google/poll", headers: web, payload: { poll: started.poll } });
@@ -279,4 +303,42 @@ test("claims are checked one by one and the callback query is not logged", () =>
   assert.throws(() => readIdToken("not-a-jwt", config, "n", 0));
   assert.throws(() => readIdToken(idToken(claimsFor("n", { email: 3 })), config, "n", 0));
   assert.equal(redactInviteUrl("/api/v1/auth/google/callback?state=abc&code=xyz"), "/api/v1/auth/google/callback?[redacted]");
+});
+
+test("a closed instance turns away an unknown Google account without an invite, and lets a known one back in", async () => {
+  const pg = new PGlite();
+  const db = pgliteClient(pg);
+  await applyMigrations(db);
+  await seedInvite(db);
+  let nonce = "";
+  const app = await buildApp({ logger: false, env, db, googleTokens: { exchange: async () => ({ idToken: idToken(claimsFor(nonce)) }) } });
+  async function round(payload: Record<string, string>): Promise<{ page: string; poll: number; error: unknown }> {
+    const started = (await app.inject({ method: "POST", url: "/api/v1/auth/google/start", payload })).json() as { authUrl: string; poll: string };
+    const url = new URL(started.authUrl);
+    nonce = url.searchParams.get("nonce") ?? "";
+    const back = await app.inject({ method: "GET", url: `/api/v1/auth/google/callback?state=${url.searchParams.get("state")}&code=c` });
+    const polled = await app.inject({ method: "POST", url: "/api/v1/auth/google/poll", payload: { poll: started.poll } });
+    return { page: back.body, poll: polled.statusCode, error: (polled.json() as { error?: unknown }).error };
+  }
+  try {
+    const users = async () => Number((await db.query("select count(*)::int as n from users")).rows[0]?.n);
+    const before = await users();
+    for (const payload of [{}, { invite: "x".repeat(43) }, { invite: "not-a-code" }]) {
+      const refused = await round(payload);
+      assert.equal(refused.poll, 403);
+      assert.equal(refused.error, "invite_required");
+      assert.equal(refused.page.includes("Precisa de convite"), true);
+    }
+    await db.query("update server_invites set revoked_at = now()");
+    assert.equal((await round({ invite: INVITE })).error, "invite_required");
+    assert.equal(await users(), before);
+
+    await db.query("update server_invites set revoked_at = null");
+    assert.equal((await round({ invite: INVITE })).poll, 200);
+    assert.equal(await users(), before + 1);
+    assert.equal((await round({})).poll, 200, "an account that exists signs in without an invite");
+  } finally {
+    await app.close();
+    await pg.close();
+  }
 });

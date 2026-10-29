@@ -76,7 +76,7 @@ Referências: https://docs.livekit.io/transport/self-hosting/ e https://docs.liv
 3. Grave no `infra/compose/.env`, fora do Git: `GOOGLE_CLIENT_ID=...` e `GOOGLE_CLIENT_SECRET=...`.
 4. Recrie o serviço `api`. `GET /api/v1/instance` passa a responder `googleLogin: true` e o botão aparece no aplicativo.
 
-Sem as duas chaves o botão some e as rotas do Google respondem 404. A URI de retorno vem de `API_DOMAIN`, ou de `GOOGLE_REDIRECT_URI` quando definida; nunca do cabeçalho Host. A primeira entrada com Google cria um participante sem servidor; o convite continua obrigatório. O primeiro administrador continua nascendo pelo token de instalação.
+Sem as duas chaves o botão some e as rotas do Google respondem 404. A URI de retorno vem de `API_DOMAIN`, ou de `GOOGLE_REDIRECT_URI` quando definida; nunca do cabeçalho Host. Instância fechada: o Google só cria conta para quem entra a partir de um link de convite válido (não revogado, não expirado, com uso restante). Sem convite, conta Google desconhecida é recusada com `invite_required` e nada é criado; quem já tem conta entra normalmente. O primeiro administrador continua nascendo pelo token de instalação.
 
 ## Salas de texto, DM e emoji (ADR 0024)
 

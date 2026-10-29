@@ -345,12 +345,16 @@ export const oauthLogins = pgTable(
     nonce: text("nonce").notNull(),
     userId: uuid("user_id").references(() => users.id),
     failure: text("failure"),
+    inviteHash: text("invite_hash"),
     completedAt: timestamp("completed_at", { withTimezone: true, mode: "date" }),
     consumedAt: timestamp("consumed_at", { withTimezone: true, mode: "date" }),
     expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
     createdAt: createdAt(),
   },
-  (table) => [check("oauth_logins_failure_length", sql`${table.failure} is null or char_length(${table.failure}) between 1 and 64`)],
+  (table) => [
+    check("oauth_logins_failure_length", sql`${table.failure} is null or char_length(${table.failure}) between 1 and 64`),
+    check("oauth_logins_invite_hash_length", sql`${table.inviteHash} is null or char_length(${table.inviteHash}) between 1 and 128`),
+  ],
 );
 
 // ADR 0024. A direct DM is unique per pair through direct_key ("<smaller uuid>:<larger uuid>").

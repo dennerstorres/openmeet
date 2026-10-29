@@ -317,7 +317,9 @@ export class MeetingModel {
         this.error = "google_unconfigured";
         return;
       }
-      const started = await this.api.request(origin, "POST", "/api/v1/auth/google/start", {}, null);
+      // A closed instance creates a Google account only for someone holding an invite to it.
+      const invite = this.pendingInvite?.origin === origin ? { invite: this.pendingInvite.code } : {};
+      const started = await this.api.request(origin, "POST", "/api/v1/auth/google/start", invite, null);
       if (generation !== this.generation) return;
       if (started.status !== 201) {
         this.error = readErrorCode(started.body);

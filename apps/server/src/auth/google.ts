@@ -27,7 +27,9 @@ export interface GoogleTokens {
   exchange(input: { code: string; verifier: string; config: GoogleConfig }): Promise<{ idToken: string }>;
 }
 
-export type GoogleFailure = "google_denied" | "google_failed" | "account_disabled";
+export type GoogleFailure = "google_denied" | "google_failed" | "account_disabled" | "invite_required";
+
+const INVITE_CODE = /^[A-Za-z0-9_-]{43}$/;
 
 export interface GoogleIdentity {
   subject: string;
@@ -91,16 +93,21 @@ function secretValue(): string {
   return randomBytes(32).toString("base64url");
 }
 
-export async function startGoogleLogin(db: MigrationClient, config: GoogleConfig): Promise<{ authUrl: string; poll: string; expiresIn: number }> {
+/** `invite` is the server invite the app holds; without one, Google only signs in accounts that already exist. */
+export async function startGoogleLogin(
+  db: MigrationClient,
+  config: GoogleConfig,
+  invite?: string,
+): Promise<{ authUrl: string; poll: string; expiresIn: number }> {
   const state = secretValue();
   const poll = secretValue();
   const verifier = secretValue();
   const nonce = secretValue();
   await db.query("delete from oauth_logins where expires_at < now() - interval '1 day'");
   await db.query(
-    `insert into oauth_logins (state_hash, poll_hash, pkce_verifier, nonce, expires_at)
-     values ($1, $2, $3, $4, now() + ($5 * interval '1 minute'))`,
-    [hashSecret(state), hashSecret(poll), verifier, nonce, LOGIN_MINUTES],
+    `insert into oauth_logins (state_hash, poll_hash, pkce_verifier, nonce, invite_hash, expires_at)
+     values ($1, $2, $3, $4, $5, now() + ($6 * interval '1 minute'))`,
+    [hashSecret(state), hashSecret(poll), verifier, nonce, invite !== undefined && INVITE_CODE.test(invite) ? hashSecret(invite) : null, LOGIN_MINUTES],
   );
   const url = new URL(AUTHORIZE_URL);
   url.search = new URLSearchParams({
@@ -148,7 +155,7 @@ export async function finishGoogleLogin(
   const found = await db.query(
     `update oauth_logins set completed_at = now()
      where state_hash = $1 and completed_at is null and expires_at > now()
-     returning id, pkce_verifier, nonce`,
+     returning id, pkce_verifier, nonce, invite_hash`,
     [hashSecret(query.state)],
   );
   const row = found.rows[0];
@@ -166,14 +173,19 @@ export async function finishGoogleLogin(
   } catch {
     return fail("google_failed");
   }
-  const userId = await accountFor(db, identity);
+  const inviteHash = typeof row.invite_hash === "string" ? row.invite_hash : undefined;
+  const userId = await accountFor(db, identity, inviteHash);
+  if (userId === "invite_required") return fail("invite_required");
   if (userId === undefined) return fail("account_disabled");
   await db.query("update oauth_logins set user_id = $1 where id = $2", [userId, loginId]);
   return "done";
 }
 
-/** The first Google sign-in makes a participant. Never an admin, never a member of any server. */
-async function accountFor(db: MigrationClient, identity: GoogleIdentity): Promise<string | undefined> {
+/**
+ * The first Google sign-in makes a participant, and only with a live server invite in hand:
+ * an unknown Google account without one gets nothing. Never an admin, never a member of any server.
+ */
+async function accountFor(db: MigrationClient, identity: GoogleIdentity, inviteHash: string | undefined): Promise<string | undefined | "invite_required"> {
   const known = await db.query(
     `select u.id, u.disabled_at is not null as disabled
      from user_identities i join users u on u.id = i.user_id
@@ -185,6 +197,11 @@ async function accountFor(db: MigrationClient, identity: GoogleIdentity): Promis
     const disabled = existing.disabled === true || existing.disabled === "t";
     return disabled || typeof existing.id !== "string" ? undefined : existing.id;
   }
+  if (inviteHash === undefined) return "invite_required";
+  const invite = await db.query("select 1 from server_invites where code_hash = $1 and revoked_at is null and expires_at > now() and use_count < max_uses", [
+    inviteHash,
+  ]);
+  if (invite.rows.length === 0) return "invite_required";
   const displayName = cleanName(identity.name) ?? cleanName(identity.email.split("@")[0]) ?? "Participante";
   // A random password nobody knows: the account has no usable password until an admin sets one.
   const passwordHash = await hashPassword(secretValue());

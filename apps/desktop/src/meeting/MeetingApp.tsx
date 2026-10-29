@@ -187,6 +187,7 @@ const ERROR_TEXT: Record<string, string> = {
   google_denied: "O Google não confirmou a entrada.",
   google_failed: "Não foi possível entrar com o Google. Tente de novo ou use usuário e senha.",
   google_expired: "O pedido de entrada com o Google expirou. Tente de novo.",
+  invite_required: "Esta instância é fechada. Entre com o Google a partir do link de convite que recebeu.",
   account_disabled: "Esta conta está desativada nesta instância.",
   server_not_found: "O servidor não está disponível.",
   invalid_invite: "O convite não vale.",

@@ -19,6 +19,7 @@ const MESSAGES: Record<string, [string, string]> = {
   google_denied: ["Entrada cancelada", "O Google não confirmou a entrada. Volte ao OpenMeet e tente de novo."],
   google_failed: ["Não deu certo", "A conta Google não pôde ser confirmada. Volte ao OpenMeet e tente de novo, ou entre com usuário e senha."],
   account_disabled: ["Conta desativada", "Esta conta não pode entrar nesta instância."],
+  invite_required: ["Precisa de convite", "Esta instância é fechada. Abra o link de convite que recebeu e entre com o Google a partir dele."],
   expired: ["Pedido expirado", "Este pedido de entrada já foi usado ou expirou. Volte ao OpenMeet e comece de novo."],
 };
 
@@ -75,7 +76,7 @@ export function registerGoogle(
       return reply
         .code(201)
         .header("cache-control", "no-store")
-        .send(await startGoogleLogin(db, config));
+        .send(await startGoogleLogin(db, config, typeof request.body === "object" && request.body !== null ? query(request.body, "invite") : undefined));
     } catch {
       request.log.error({ code: "google_start_failed" }, "google start failed");
       return reply.code(503).send({ error: "google_failed" });

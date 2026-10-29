@@ -749,3 +749,7 @@ Próxima tarefa:
 ## S-02 — tela de usuários da instância (2026-10-29, branch `main`)
 - Configurações ganham "Usuários da instância", só para o administrador: criar conta (usuário, nome, senha, participante/moderador), listar, trocar senha, desativar/reativar. Usa as rotas `/api/v1/admin/users*` que já existiam; o filtro de caminhos do cliente passou a aceitá-las (`packages/shared/src/instance.ts`). Novos: `packages/shared/src/accounts.ts`, `apps/desktop/src/meeting/Accounts.tsx`, teste `packages/shared/test/accounts.test.ts`.
 - Validação (Windows 11): `pnpm typecheck` ok, eslint ok, shared accounts/instance/meeting 38 pass. Não conferido no navegador (sem Postgres/API local). Estado: WAITING_VALIDATION.
+
+## ADR 0010 — Google só cria conta com convite (2026-10-29, branch `main`)
+- Conta Google desconhecida só nasce se o login começou com um convite de servidor válido. `POST /auth/google/start` aceita `invite`; o hash fica em `oauth_logins.invite_hash` (migration `0012_google_invite.sql`). Sem convite: `invite_required` na página e no poll, nenhum usuário criado. Conta existente entra sem convite. O cliente manda o convite pendente da mesma instância.
+- Validação (Windows 11): `pnpm typecheck` ok, eslint ok, server google/schema/invite 14 pass, shared 78 pass. Não testado contra o Google real. Estado: WAITING_VALIDATION.
