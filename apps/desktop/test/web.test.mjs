@@ -68,8 +68,12 @@ test("the web build emits the PWA manifest and icons; the desktop build does not
         for (const icon of manifest.icons) assert.ok(files.includes(icon.src.slice(1)), icon.src);
         assert.ok(manifest.icons.some((icon) => icon.purpose === "maskable"));
         assert.match(html, /<link rel="manifest" href="\/manifest.webmanifest">/);
+        const sw = await readFile(path.join(outDir, "sw.js"), "utf8");
+        assert.doesNotMatch(sw, /__OPENMEET_BUILD__/);
+        assert.match(sw, /const BUILD = "[0-9a-f]{16}"/);
       } else {
         assert.equal(files.includes("manifest.webmanifest"), false);
+        assert.equal(files.includes("sw.js"), false);
         assert.equal(
           files.some((file) => file.startsWith("pwa/")),
           false,

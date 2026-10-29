@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { griffel } from "@griffel/vite-plugin";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -57,7 +58,11 @@ function webManifest(): Plugin {
         next();
       });
     },
-    generateBundle() {
+    generateBundle(_options, bundle) {
+      // ADR 0027: the worker carries an id of this build, so each deploy installs a new worker and cache.
+      const build = createHash("sha256").update(Object.keys(bundle).sort().join(",")).digest("hex").slice(0, 16);
+      const worker = readFileSync(fileURLToPath(new URL("./pwa/sw.js", import.meta.url)), "utf8").replace("__OPENMEET_BUILD__", build);
+      this.emitFile({ type: "asset", fileName: "sw.js", source: worker });
       this.emitFile({ type: "asset", fileName: "manifest.webmanifest", source: JSON.stringify(WEB_MANIFEST) });
       for (const icon of icons) {
         this.emitFile({ type: "asset", fileName: `pwa/${icon}`, source: readFileSync(fileURLToPath(new URL(`./pwa/${icon}`, import.meta.url))) });

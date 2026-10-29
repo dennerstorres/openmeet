@@ -132,6 +132,7 @@ import { createChatFeed, createChatHub, createWebTransport, type ChatTransport }
 import { TextRoom, type ChatPerson } from "./TextRoom";
 import { DmChat, DmList, MemberCard, useDirectMessages } from "./DirectMessages";
 import { NotifyLevelPicker, useUnread, useWindowFocus } from "./notify";
+import { setInCall } from "../web/pwa";
 
 const idleSnapshot: PocSnapshot = {
   phase: "idle",
@@ -662,6 +663,10 @@ export function MeetingApp() {
 
   const notice = errorText(state.error);
   const inCall = state.step === "meeting";
+  // ADR 0027: a new web build waits for the call to end before it is offered.
+  useEffect(() => {
+    if (__WEB__) setInCall(inCall);
+  }, [inCall]);
   const controlsEnabled = publicationControlsEnabled(media.phase);
   const elapsedMs = meetingElapsedMs(connectedAt, now, inCall ? media.phase : "idle");
   const elapsedLabel = elapsedMs === null ? null : formatElapsed(elapsedMs);

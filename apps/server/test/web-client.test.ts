@@ -17,6 +17,7 @@ async function webRoot(): Promise<string> {
   await writeFile(path.join(root, "assets", "index-EfGh5678.css"), "body{}");
   await writeFile(path.join(root, "icon.svg"), "<svg/>");
   await writeFile(path.join(root, "manifest.webmanifest"), "{}");
+  await writeFile(path.join(root, "sw.js"), "self");
   await mkdir(path.join(root, "media", "vision"), { recursive: true });
   await writeFile(path.join(root, "media", "vision", "vision_wasm_internal.wasm"), "\0asm");
   await writeFile(path.join(root, "media", "selfie_segmenter.tflite"), "model");
@@ -66,6 +67,10 @@ test("index.html has the CSP and no cache; hashed assets cache for a year", asyn
     assert.equal(manifest.statusCode, 200);
     assert.equal(manifest.headers["content-type"], "application/manifest+json");
     assert.equal(manifest.headers["cache-control"], "no-cache");
+    // The worker script must be revalidated on every check, or a deploy would not reach open tabs.
+    const sw = await app.inject({ method: "GET", url: "/sw.js" });
+    assert.equal(sw.statusCode, 200);
+    assert.equal(sw.headers["cache-control"], "no-cache");
 
     // Background blur loads the MediaPipe Wasm and the model; without them it aborts on fetch.
     const wasm = await app.inject({ method: "GET", url: "/media/vision/vision_wasm_internal.wasm" });

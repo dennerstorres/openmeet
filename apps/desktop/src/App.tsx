@@ -3,6 +3,7 @@ import { FluentProvider, createDarkTheme, makeStyles, type BrandVariants } from 
 import { MeetingApp } from "./meeting/MeetingApp";
 import { UpdateNotice } from "./shell/UpdateNotice";
 import { DesktopOffer } from "./web/DesktopOffer";
+import { WebUpdateNotice } from "./web/WebUpdateNotice";
 import "./App.css";
 
 // S-13: the media proof never ships in the installer. A production build replaces DEV with false,
@@ -69,7 +70,14 @@ export default function App() {
   ) : (
     <FluentProvider theme={theme} className={styles.provider}>
       <MeetingApp />
-      {__WEB__ ? <DesktopOffer /> : <UpdateNotice />}
+      {__WEB__ ? (
+        <>
+          <DesktopOffer />
+          <WebUpdateNotice />
+        </>
+      ) : (
+        <UpdateNotice />
+      )}
     </FluentProvider>
   );
 }
