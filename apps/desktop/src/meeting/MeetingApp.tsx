@@ -103,6 +103,7 @@ import {
   VideoRegular,
 } from "@fluentui/react-icons";
 import { SoundPanel, storedSoundVolume } from "./sounds";
+import { AccountsPanel } from "./Accounts";
 import { IconLogo, IconSignal } from "./Icons";
 import { ShellConsent } from "../shell/ShellConsent";
 import {
@@ -191,7 +192,8 @@ const ERROR_TEXT: Record<string, string> = {
   invalid_invite: "O convite não vale.",
   room_ended: "A sala está encerrada.",
   room_not_found: "A sala não está disponível.",
-  conflict: "Já existe uma sala com este identificador.",
+  conflict: "Esse identificador já está em uso.",
+  invalid_username: "O usuário aceita só letras, números, _ e -, até 64.",
   invalid_body: "Os dados não foram aceitos.",
   auth_unconfigured: "A instância ainda não tem banco nem segredo.",
   room_unconfigured: "A instância ainda não emite mídia.",
@@ -1600,6 +1602,7 @@ export function MeetingApp() {
                   </div>
                 </>
               ) : null}
+              {state.role === "admin" ? <AccountsPanel model={model} selfId={state.userId} pending={state.pending} /> : null}
               <div>
                 <h2>Diagnóstico</h2>
                 <p className="hint">Versão e qualidade da conexão, para relatar um problema.</p>

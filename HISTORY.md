@@ -745,3 +745,7 @@ Próxima tarefa:
 
 ## ADR 0026 — POC removido (2026-10-28, branch `poc/fluent-ui`)
 - Saíram `apps/desktop/fluent-poc.html`, `src/poc/FluentPoc.tsx`, o bloco `FLUENT_POC` do `vite.config.ts` e `dist-poc/` do `.gitignore`. Validação: typecheck, eslint, `pnpm test` 36 pass, `pnpm build` e `pnpm build:web` ok.
+
+## S-02 — tela de usuários da instância (2026-10-29, branch `main`)
+- Configurações ganham "Usuários da instância", só para o administrador: criar conta (usuário, nome, senha, participante/moderador), listar, trocar senha, desativar/reativar. Usa as rotas `/api/v1/admin/users*` que já existiam; o filtro de caminhos do cliente passou a aceitá-las (`packages/shared/src/instance.ts`). Novos: `packages/shared/src/accounts.ts`, `apps/desktop/src/meeting/Accounts.tsx`, teste `packages/shared/test/accounts.test.ts`.
+- Validação (Windows 11): `pnpm typecheck` ok, eslint ok, shared accounts/instance/meeting 38 pass. Não conferido no navegador (sem Postgres/API local). Estado: WAITING_VALIDATION.

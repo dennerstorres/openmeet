@@ -98,6 +98,7 @@ export {
 export type { NotifyLevel, UnreadChat, UnreadState } from "./unread.js";
 export { SOUND_MAX_BYTES, SOUND_MAX_MS, SOUND_NAME_MAX, SOUND_SAMPLE_RATE, encodeSound, parseOwnSounds, parseSoundLibrary, sniffSound } from "./sound.js";
 export type { OwnSound, SoundInfo, SoundSummary } from "./sound.js";
+export { parseAccounts, type InstanceAccount } from "./accounts.js";
 export { instanceLink, inviteFromFragment, inviteLink, invitePageLink, isInviteCode, parseInstanceLink, parseInvite } from "./invite.js";
 export type { InviteLink } from "./invite.js";
 export { MeetingModel, MemorySessionVault, vaultSessionBroker } from "./meeting.js";

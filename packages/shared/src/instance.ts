@@ -365,6 +365,10 @@ function instancePath(path: string): string {
       path,
     );
   if (dm?.[1] !== undefined && UUID.test(dm[1])) return path;
+  // S-02: instance accounts, admin only on the server.
+  if (path === "/api/v1/admin/users") return path;
+  const account = /^\/api\/v1\/admin\/users\/([0-9a-f-]{36})\/(?:password|disable|enable)$/i.exec(path);
+  if (account?.[1] !== undefined && UUID.test(account[1])) return path;
   const block = /^\/api\/v1\/users\/([0-9a-f-]{36})\/block$/i.exec(path);
   if (block?.[1] !== undefined && UUID.test(block[1])) return path;
   // ADR 0024: a file goes up to a text room or a DM and comes back by its own id.

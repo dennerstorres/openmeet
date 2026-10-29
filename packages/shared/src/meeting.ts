@@ -1,6 +1,7 @@
 import { parseUnreadChat, parseUnreadState, type NotifyLevel, type UnreadChat, type UnreadState } from "./unread.js";
 import { PocInputError } from "./poc.js";
 import { inviteHost, inviteLink, parseInvite, type InviteLink } from "./invite.js";
+import { parseAccounts, type InstanceAccount } from "./accounts.js";
 import { parseOwnSounds, parseSoundLibrary, type OwnSound, type SoundSummary } from "./sound.js";
 import {
   chatPath,
@@ -699,6 +700,24 @@ export class MeetingModel {
 
   async deleteSound(soundId: string): Promise<boolean> {
     return (await this.memberCall("POST", `/api/v1/sounds/${soundId}/delete`, {})) !== null;
+  }
+
+  // S-02: instance accounts. The API refuses anyone but the administrator.
+  async listAccounts(): Promise<InstanceAccount[] | null> {
+    const body = await this.memberCall("GET", "/api/v1/admin/users", null);
+    return body === null ? null : parseAccounts(body);
+  }
+
+  async createAccount(input: { username: string; password: string; displayName: string; role: "participant" | "moderator" }): Promise<boolean> {
+    return (await this.memberCall("POST", "/api/v1/admin/users", input, 201)) !== null;
+  }
+
+  async resetAccountPassword(userId: string, password: string): Promise<boolean> {
+    return (await this.memberCall("POST", `/api/v1/admin/users/${userId}/password`, { password }, 204)) !== null;
+  }
+
+  async setAccountDisabled(userId: string, disabled: boolean): Promise<boolean> {
+    return (await this.memberCall("POST", `/api/v1/admin/users/${userId}/${disabled ? "disable" : "enable"}`, {}, 204)) !== null;
   }
 
   /** ADR 0024: the emojis of every server the caller belongs to, or null when they could not be read. */
