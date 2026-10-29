@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { griffel } from "@griffel/vite-plugin";
+import { readFileSync } from "node:fs";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 const host = process.env.TAURI_DEV_HOST;
@@ -18,10 +19,64 @@ function webShell(): Plugin {
   };
 }
 
+// ADR 0027: only the web build is an installable PWA. The manifest and its icons are emitted here, not from
+// public/, so the .exe bundle never carries them.
+const WEB_MANIFEST = {
+  name: "OpenMeet",
+  short_name: "OpenMeet",
+  id: "/",
+  start_url: "/",
+  scope: "/",
+  display: "standalone",
+  background_color: "#1e1f22",
+  theme_color: "#16a34a",
+  lang: "pt-BR",
+  icons: [
+    { src: "/pwa/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+    { src: "/pwa/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+    { src: "/pwa/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+  ],
+};
+
+function webManifest(): Plugin {
+  const icons = ["icon-192.png", "icon-512.png", "icon-maskable-512.png"];
+  return {
+    name: "openmeet-web-manifest",
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        const url = request.url?.split("?")[0];
+        if (url === "/manifest.webmanifest") {
+          response.setHeader("content-type", "application/manifest+json");
+          return response.end(JSON.stringify(WEB_MANIFEST));
+        }
+        const icon = url?.startsWith("/pwa/") ? url.slice(5) : undefined;
+        if (icon !== undefined && icons.includes(icon)) {
+          response.setHeader("content-type", "image/png");
+          return response.end(readFileSync(fileURLToPath(new URL(`./pwa/${icon}`, import.meta.url))));
+        }
+        next();
+      });
+    },
+    generateBundle() {
+      this.emitFile({ type: "asset", fileName: "manifest.webmanifest", source: JSON.stringify(WEB_MANIFEST) });
+      for (const icon of icons) {
+        this.emitFile({ type: "asset", fileName: `pwa/${icon}`, source: readFileSync(fileURLToPath(new URL(`./pwa/${icon}`, import.meta.url))) });
+      }
+    },
+    transformIndexHtml() {
+      return [
+        { tag: "link", attrs: { rel: "manifest", href: "/manifest.webmanifest" }, injectTo: "head" },
+        { tag: "link", attrs: { rel: "apple-touch-icon", href: "/pwa/icon-192.png" }, injectTo: "head" },
+        { tag: "meta", attrs: { name: "theme-color", content: WEB_MANIFEST.theme_color }, injectTo: "head" },
+      ];
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
   // ADR 0026: Griffel extracts our own makeStyles at build time; Fluent's precompiled styles still load at runtime.
-  plugins: mode === "web" ? [webShell(), react(), griffel()] : [react(), griffel()],
+  plugins: mode === "web" ? [webShell(), webManifest(), react(), griffel()] : [react(), griffel()],
   define: { __WEB__: JSON.stringify(mode === "web") },
   build: mode === "web" ? { outDir: "dist-web" } : {},
 

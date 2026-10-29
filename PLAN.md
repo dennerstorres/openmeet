@@ -2,7 +2,7 @@
 
 Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, `VERIFIED`, `DONE`, `BLOCKED`.
 
-F14 — PWA e push no cliente web: ADR 0027 aceito em 2026-10-29, SPEC item 24. F14-02 e F14-04 READY; nada implementado.
+F14 — PWA e push no cliente web: ADR 0027 aceito em 2026-10-29, SPEC item 24. F14-02 WAITING_VALIDATION na `task/F14-02-manifest` (falta instalar no Chrome real e revisão; o Chrome só oferece instalar com o SW da F14-03). F14-04 READY.
 
 F13 — Salas de texto, DM e emoji próprio: ADR 0024 aceito em 2026-10-27, SPEC item 23. F13-02 a F13-13 na `main`; F13-14 (docs e revisão da fase) na `task/F13-14-docs`, sem merge. F13-02 a F13-05 e F13-11 IMPLEMENTED; F13-06 a F13-10 e F13-12 a F13-14 WAITING_VALIDATION. Falta o teste do usuário no `.exe`, na web e atrás do proxy real; roteiro em `HANDOFF.md`. Escopo em `plans/phase-13-salas-de-texto.md`.
 
@@ -134,7 +134,7 @@ F09-08 — Presença dos membros do servidor: WAITING_VALIDATION. Implementada e
 | F13-13 | Chat | Não lidas e notificação | F13-08,F13-12 | WAITING_VALIDATION | Claude | G4,G12 |
 | F13-14 | Chat | Docs e revisão independente | F13-09,F13-10,F13-13 | WAITING_VALIDATION | Claude | G10,G12 |
 | F14-01 | PWA | Aceite do ADR 0027 e SPEC | — | DONE | Humano | — |
-| F14-02 | PWA | Manifest, ícones e CSP (worker/manifest) | F14-01,F12-04 | READY | Grok | G12 |
+| F14-02 | PWA | Manifest, ícones e CSP (worker/manifest) | F14-01,F12-04 | WAITING_VALIDATION | Grok | G12 |
 | F14-03 | PWA | Service worker com cache seguro e aviso de nova versão | F14-02 | PENDING | Grok | G12 |
 | F14-04 | PWA | Migração e rotas de inscrição push | F14-01 | READY | Grok | G4,G10 |
 | F14-05 | PWA | Envio de push em menção, DM e resposta | F14-04,F13-13 | PENDING | Grok | G4,G10 |

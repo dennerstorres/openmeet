@@ -53,6 +53,35 @@ test("the web bundle has no native shell, no instance picker and no media proof"
   assert.ok(text.includes("x-openmeet-web"));
 });
 
+// ADR 0027: only the web build is installable; the .exe carries no manifest.
+test("the web build emits the PWA manifest and icons; the desktop build does not", async () => {
+  for (const mode of ["web", "production"]) {
+    const outDir = await mkdtemp(path.join(tmpdir(), "openmeet-pwa-"));
+    try {
+      await build({ root, mode, logLevel: "silent", build: { outDir, emptyOutDir: true } });
+      const files = (await readdir(outDir, { recursive: true })).map((file) => file.split(path.sep).join("/"));
+      const html = await readFile(path.join(outDir, "index.html"), "utf8");
+      if (mode === "web") {
+        const manifest = JSON.parse(await readFile(path.join(outDir, "manifest.webmanifest"), "utf8"));
+        assert.equal(manifest.start_url, "/");
+        assert.equal(manifest.display, "standalone");
+        for (const icon of manifest.icons) assert.ok(files.includes(icon.src.slice(1)), icon.src);
+        assert.ok(manifest.icons.some((icon) => icon.purpose === "maskable"));
+        assert.match(html, /<link rel="manifest" href="\/manifest.webmanifest">/);
+      } else {
+        assert.equal(files.includes("manifest.webmanifest"), false);
+        assert.equal(
+          files.some((file) => file.startsWith("pwa/")),
+          false,
+        );
+        assert.doesNotMatch(html, /manifest/);
+      }
+    } finally {
+      await rm(outDir, { recursive: true, force: true });
+    }
+  }
+});
+
 test("the desktop bundle keeps the native shell", async () => {
   const text = await bundleText("production");
   for (const needle of ["session_login", "instance_call", "shell_tracks", "invite_take", "Informe o endereço"]) {

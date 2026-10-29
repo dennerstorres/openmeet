@@ -54,6 +54,9 @@ export function webClientCsp(env: AppEnv): string {
     `connect-src 'self'${livekit ? ` ${livekit}` : ""}`,
     "media-src 'self' blob: mediastream:",
     "img-src 'self' blob: data:",
+    // ADR 0027: the PWA manifest and its service worker come only from this origin.
+    "manifest-src 'self'",
+    "worker-src 'self'",
     "base-uri 'none'",
     "frame-ancestors 'none'",
     "form-action 'self'",

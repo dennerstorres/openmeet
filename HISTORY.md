@@ -1,5 +1,9 @@
 # HISTORY — registro cronológico
 
+### 2026-10-29 — F14-02, manifest e ícones do PWA — Claude
+Branch `task/F14-02-manifest`, a partir da `main` 0472c83. ADR 0027. Plugin `openmeet-web-manifest` no `vite.config.ts`, só no modo `web`: emite `manifest.webmanifest` e `pwa/icon-{192,512,maskable-512}.png` (gerados do desenho de `public/icon.svg`) e injeta `link rel=manifest`, `apple-touch-icon` e `theme-color`. O `.exe` não leva nada disso. CSP web ganha `manifest-src 'self'` e `worker-src 'self'`.
+Windows 11, 2026-10-29: `node --test test/web.test.mjs` (6 de 7; a falha "atalhos globais" no bundle web já existia na `main`, fora do escopo), `web-client.test.ts` (5/5), `tsc --noEmit` em desktop e server. Navegador interno em `vite --mode web`: link do manifest, manifest e os três ícones com 200. Falta: instalar de fato (depende da F14-03) e revisão.
+
 ### 2026-10-28 — release 0.2.7 — Claude
 Branch `main`, após merge da `fix/camera-mic-desfoque` (OverconstrainedError da câmera/mic, .wasm do desfoque no web, captura que termina depois de sair da sala é parada). Versão 0.2.6 → 0.2.7 nos quatro arquivos, por pedido do usuário. Push da `main` e tag `v0.2.7`. Bug do ícone de câmera na aba ainda não validado no fluxo real.
 Release 0.2.7: run 40691187103 concluída com sucesso; GitHub Release `v0.2.7` com `OpenMeet_0.2.7_x64-setup.exe`, `.sig`, `latest.json` e `SHA256SUMS`.

@@ -16,6 +16,7 @@ async function webRoot(): Promise<string> {
   await writeFile(path.join(root, "assets", "index-AbCd1234.js"), "console.log(1)");
   await writeFile(path.join(root, "assets", "index-EfGh5678.css"), "body{}");
   await writeFile(path.join(root, "icon.svg"), "<svg/>");
+  await writeFile(path.join(root, "manifest.webmanifest"), "{}");
   await mkdir(path.join(root, "media", "vision"), { recursive: true });
   await writeFile(path.join(root, "media", "vision", "vision_wasm_internal.wasm"), "\0asm");
   await writeFile(path.join(root, "media", "selfie_segmenter.tflite"), "model");
@@ -25,7 +26,7 @@ async function webRoot(): Promise<string> {
 test("the web CSP allows only self-hosted Wasm evaluation and the LiveKit domain", () => {
   assert.equal(
     webClientCsp(env),
-    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; connect-src 'self' wss://rtc.example.com; media-src 'self' blob: mediastream:; img-src 'self' blob: data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; connect-src 'self' wss://rtc.example.com; media-src 'self' blob: mediastream:; img-src 'self' blob: data:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   );
   assert.equal(webClientCsp({}).includes("connect-src 'self';"), true);
   assert.equal(liveKitConnect({ LIVEKIT_URL: "ws://rtc.example.com" }), undefined);
@@ -59,6 +60,12 @@ test("index.html has the CSP and no cache; hashed assets cache for a year", asyn
     const icon = await app.inject({ method: "GET", url: "/icon.svg" });
     assert.equal(icon.statusCode, 200);
     assert.equal(icon.headers["cache-control"], "no-cache");
+
+    // ADR 0027: the manifest is revalidated so a new build's icons and name reach installed apps.
+    const manifest = await app.inject({ method: "GET", url: "/manifest.webmanifest" });
+    assert.equal(manifest.statusCode, 200);
+    assert.equal(manifest.headers["content-type"], "application/manifest+json");
+    assert.equal(manifest.headers["cache-control"], "no-cache");
 
     // Background blur loads the MediaPipe Wasm and the model; without them it aborts on fetch.
     const wasm = await app.inject({ method: "GET", url: "/media/vision/vision_wasm_internal.wasm" });
