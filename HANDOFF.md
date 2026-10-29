@@ -23,13 +23,13 @@ Data: 2026-10-29. Branch: `main` local (ee6d2a3), **sem push para o remoto**.
 - Push só para menção, DM e resposta (ADR 0024). Não enviar se a pessoa tem aba com foco (o SW confere).
 - O mesmo navegador entrando em outra conta move a inscrição para a conta nova.
 
+## F14-05 (IMPLEMENTED, 2026-10-29)
+- `web-push` 3.6.7; `pushMessage` em `apps/server/src/rooms/push.ts`, disparado após responder em `POST /rooms/:id/messages` e `POST /dms/:id/messages`.
+- Regra: sala só menção/resposta; DM qualquer mensagem em "all"; respeita "none" e bloqueio. 404/410 apaga, 2xx marca `last_used_at`.
+- Payload JSON: `{type, authorName, chat:{kind,id}, serverId, roomName, excerpt, messageId}` — é o contrato do `sw.js` na F14-06.
+- Servidor 125/125, typecheck e lint ok.
+
 ## Próximos passos
-1. **F14-05** (READY), envio de push no servidor:
-   - Lib `web-push` (verificar a versão e fixar no lockfile), ou implementar VAPID/aes128gcm à mão.
-   - Achar o ponto onde a F13-13 decide notificar (menção/DM/resposta, respeitando `notify_prefs` e bloqueios); ver `apps/server/src/rooms/unread.ts`, `messages.ts` e `events.ts`.
-   - Enviar para as inscrições do destinatário com payload mínimo (tipo, autor, sala, trecho curto e id da conversa).
-   - Apagar a inscrição em 404/410 e atualizar `last_used_at`.
-   - Testar com um sender injetável (sem rede).
-2. **F14-06**: no cliente web, opção "Ativar notificações" (permissão só por clique) usando `/api/v1/push/key`. `pushManager.subscribe` → POST; logout → DELETE antes de sair. No `sw.js`: handlers `push` (pula se houver cliente com foco) e `notificationclick` (abre ou foca na conversa).
-3. **F14-07** (humano): instalar no Chrome; testar atualização com chamada aberta e push em Chrome, Firefox e Android.
-4. Revisão independente de F14-02 a F14-04 e `git push` da main, quando o usuário autorizar.
+1. **F14-06**: no cliente web, opção "Ativar notificações" (permissão só por clique) usando `/api/v1/push/key`. `pushManager.subscribe` → POST; logout → DELETE antes de sair. No `sw.js`: handlers `push` (pula se houver cliente com foco) e `notificationclick` (abre ou foca na conversa, usando `chat` e `serverId` do payload).
+2. **F14-07** (humano): instalar no Chrome; testar atualização com chamada aberta e push em Chrome, Firefox e Android.
+3. Revisão independente de F14-02 a F14-05 e `git push` da main, quando o usuário autorizar.

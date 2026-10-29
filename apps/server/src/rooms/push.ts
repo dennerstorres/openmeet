@@ -70,3 +70,135 @@ export async function deletePushSubscription(db: MigrationClient, actor: PublicU
   if (!endpoint) throw new RoomError("invalid_subscription");
   await db.query("delete from push_subscriptions where user_id = $1 and endpoint = $2", [actor.id, endpoint]);
 }
+
+// ADR 0027 (F14-05): who gets a push for a new message, and the send itself. The rule follows the
+// client's shouldNotify (F13-13) but narrower: only a mention, a reply to you, or a DM at level "all".
+
+/** What the service worker gets. Short on purpose: the push service sees its size, never the text. */
+export interface PushPayload {
+  type: "mention" | "reply" | "dm";
+  authorName: string;
+  chat: { kind: "room" | "dm"; id: string };
+  serverId: string | null;
+  roomName: string | null;
+  excerpt: string;
+  messageId: string;
+}
+
+export interface PushTarget {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}
+
+/** Sends one encrypted push; answers the push service's status code. Tests inject one without network. */
+export type PushSender = (target: PushTarget, payload: string) => Promise<number>;
+
+export interface PushMessage {
+  id: string;
+  roomId: string | null;
+  dmId?: string | null;
+  body: string;
+  deleted: boolean;
+  mentions: readonly string[];
+  mentionsEveryone: boolean;
+  replyTo: { authorId: string } | null;
+}
+
+const EXCERPT_CHARS = 120;
+const MENTION_TOKEN = /<@[0-9a-f-]{36}>/g;
+
+export function pushExcerpt(body: string): string {
+  const flat = body.replace(MENTION_TOKEN, "@").replace(/\s+/g, " ").trim();
+  return flat.length > EXCERPT_CHARS ? `${flat.slice(0, EXCERPT_CHARS - 1)}…` : flat;
+}
+
+/** The real sender, or undefined while the instance has no VAPID pair. */
+export async function webPushSender(env: AppEnv): Promise<PushSender | undefined> {
+  const publicKey = vapidPublicKey(env);
+  const privateKey = env.VAPID_PRIVATE_KEY?.trim();
+  if (!publicKey || !privateKey) return undefined;
+  const subject = env.VAPID_SUBJECT?.trim() || "mailto:admin@localhost";
+  const webpush = (await import("web-push")).default;
+  return async (target, payload) => {
+    try {
+      const sent = await webpush.sendNotification({ endpoint: target.endpoint, keys: { p256dh: target.p256dh, auth: target.auth } }, payload, {
+        vapidDetails: { subject, publicKey, privateKey },
+        TTL: 3600,
+        urgency: "high",
+        timeout: 10_000,
+      });
+      return sent.statusCode;
+    } catch (error) {
+      // WebPushError carries the push service's answer; anything else (network, timeout) is a 0.
+      const status = typeof error === "object" && error !== null && "statusCode" in error ? Number(error.statusCode) : 0;
+      return Number.isFinite(status) ? status : 0;
+    }
+  };
+}
+
+/**
+ * The recipients of one message and why: never the author, never someone who blocked the author, never
+ * a chat silenced at "none". Rooms push only a mention or a reply; DMs also push any message at "all".
+ */
+async function recipients(db: MigrationClient, authorId: string, message: PushMessage): Promise<{ userId: string; type: PushPayload["type"] }[]> {
+  const found = message.dmId
+    ? await db.query(
+        `select d.user_id::text as user_id, coalesce(p.level::text, 'all') as level
+         from dm_members d left join notify_prefs p on p.user_id = d.user_id and p.dm_id = d.dm_id
+         where d.dm_id = $1 and d.left_at is null and d.user_id <> $2
+           and not exists (select 1 from user_blocks b where b.user_id = d.user_id and b.blocked_id = $2)`,
+        [message.dmId, authorId],
+      )
+    : await db.query(
+        `select m.user_id::text as user_id, coalesce(rp.level::text, sp.level::text, 'mentions') as level
+         from rooms r
+         join servers s on s.id = r.server_id and s.deleted_at is null
+         join server_members m on m.server_id = r.server_id and m.removed_at is null
+         left join notify_prefs rp on rp.user_id = m.user_id and rp.room_id = r.id
+         left join notify_prefs sp on sp.user_id = m.user_id and sp.server_id = r.server_id
+         where r.id = $1 and r.deleted_at is null and m.user_id <> $2
+           and not exists (select 1 from user_blocks b where b.user_id = m.user_id and b.blocked_id = $2)`,
+        [message.roomId ?? "", authorId],
+      );
+  return found.rows.flatMap((row): { userId: string; type: PushPayload["type"] }[] => {
+    const userId = typeof row.user_id === "string" ? row.user_id : undefined;
+    if (!userId || row.level === "none") return [];
+    if (message.mentionsEveryone || message.mentions.includes(userId)) return [{ userId, type: "mention" }];
+    if (message.replyTo?.authorId === userId) return [{ userId, type: "reply" }];
+    if (message.dmId && row.level === "all") return [{ userId, type: "dm" }];
+    return [];
+  });
+}
+
+/** Sends the pushes of one new message. A gone subscription (404/410) is dropped; a delivered one is stamped. */
+export async function pushMessage(db: MigrationClient, send: PushSender, author: PublicUser, message: PushMessage): Promise<void> {
+  if (message.deleted) return;
+  const targets = await recipients(db, author.id, message);
+  if (targets.length === 0) return;
+  const room = message.roomId ? (await db.query("select name, server_id::text as server_id from rooms where id = $1", [message.roomId])).rows[0] : undefined;
+  const base = {
+    authorName: author.displayName,
+    chat: message.dmId ? { kind: "dm" as const, id: message.dmId } : { kind: "room" as const, id: message.roomId ?? "" },
+    serverId: typeof room?.server_id === "string" ? room.server_id : null,
+    roomName: typeof room?.name === "string" ? room.name : null,
+    excerpt: pushExcerpt(message.body),
+    messageId: message.id,
+  };
+  const subscriptions = await db.query("select user_id::text as user_id, endpoint, p256dh, auth from push_subscriptions where user_id = any($1::uuid[])", [
+    targets.map((target) => target.userId),
+  ]);
+  const typeOf = new Map(targets.map((target) => [target.userId, target.type]));
+  await Promise.all(
+    subscriptions.rows.map(async (row) => {
+      const target = { endpoint: String(row.endpoint), p256dh: String(row.p256dh), auth: String(row.auth) };
+      const payload: PushPayload = { type: typeOf.get(String(row.user_id)) ?? "mention", ...base };
+      const status = await send(target, JSON.stringify(payload));
+      if (status === 404 || status === 410) {
+        await db.query("delete from push_subscriptions where endpoint = $1", [target.endpoint]);
+      } else if (status >= 200 && status < 300) {
+        await db.query("update push_subscriptions set last_used_at = now() where endpoint = $1", [target.endpoint]);
+      }
+    }),
+  );
+}

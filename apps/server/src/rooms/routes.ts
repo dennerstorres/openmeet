@@ -71,7 +71,7 @@ import {
   type MessageView,
 } from "./messages.js";
 import { markRead, readOwnMessage, setNotifyLevel, unreadState } from "./unread.js";
-import { deletePushSubscription, savePushSubscription, vapidPublicKey } from "./push.js";
+import { deletePushSubscription, type PushSender, pushMessage, savePushSubscription, vapidPublicKey, webPushSender } from "./push.js";
 import { addDmMember, getDm, leaveDm, listBlocks, listDms, openDm, renameDm, setBlock, type DmView } from "./dms.js";
 import { deleteEmoji, listMyEmojis, listServerEmojis, readEmoji, renameEmoji, uploadEmoji } from "./emojis.js";
 import { deleteSound, importSound, listLibrary, listOwnSounds, readSound, removeFromLibrary, renameSound, uploadSound } from "./sounds.js";
@@ -203,7 +203,7 @@ function param(request: FastifyRequest, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
-export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationClient | undefined, media: RoomMedia | undefined): void {
+export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationClient | undefined, media: RoomMedia | undefined, pushSender?: PushSender): void {
   const platformPresence = new PlatformPresence();
   const uploads = createAttemptGate(10, 60_000);
   function allowUpload(actor: PublicUser): void {
@@ -809,6 +809,25 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
     }
   }
 
+  // ADR 0027 (F14-05): pushes go out after the answer, so a slow push service never slows a message down.
+  // A failure is logged by code only: the endpoint and the text stay out of the log.
+  const sender = pushSender ? Promise.resolve(pushSender) : webPushSender(env);
+  const pushing = new Set<Promise<void>>();
+  app.addHook("onClose", async () => {
+    await Promise.allSettled([...pushing]);
+  });
+  function queuePush(request: FastifyRequest, actor: PublicUser, message: MessageView): void {
+    if (!db) return;
+    const job = sender
+      .then((send) => (send ? pushMessage(db, send, actor, message) : undefined))
+      .catch((error: unknown) => {
+        const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "error";
+        request.log.error({ code }, "push failed");
+      })
+      .finally(() => pushing.delete(job));
+    pushing.add(job);
+  }
+
   // ADR 0024: server emojis. Base64 in JSON like images and sounds; the picker reloads on emoji.updated.
   const emojiUploads = createAttemptGate(30, 10 * 60_000);
   const EMOJI_BASE64_MAX = Math.ceil(EMOJI_MAX_BYTES / 3) * 4;
@@ -989,6 +1008,7 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
       });
       await readOwnMessage(db, actor.id, message);
       await publishMessage(request, "message.created", message);
+      queuePush(request, actor, message);
       return reply.code(201).header("cache-control", "no-store").send(message);
     } catch (error) {
       return sendError(request, reply, error);
@@ -1254,6 +1274,7 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
       const message = await sendMessage(db, actor, param(request, "id"), input, "dm");
       await readOwnMessage(db, actor.id, message);
       await publishMessage(request, "message.created", message);
+      queuePush(request, actor, message);
       return reply.code(201).header("cache-control", "no-store").send(message);
     } catch (error) {
       return sendError(request, reply, error);

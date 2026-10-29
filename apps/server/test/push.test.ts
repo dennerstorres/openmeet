@@ -172,3 +172,146 @@ test("an account keeps at most 20 subscriptions, newest first, and writes are ra
   assert.ok(limited);
   await w.app.close();
 });
+
+// ADR 0027 (F14-05): who gets a push for a new message, with a sender that never touches the network.
+async function chatWorld(status = 201) {
+  const db = pgliteClient(new PGlite());
+  await applyMigrations(db);
+  const sent: { endpoint: string; payload: Record<string, unknown> }[] = [];
+  const pushSender = async (target: { endpoint: string }, payload: string) => {
+    sent.push({ endpoint: target.endpoint, payload: JSON.parse(payload) as Record<string, unknown> });
+    return status;
+  };
+  const app: FastifyInstance = await buildApp({ logger: false, env, db, pushSender });
+  const created = await app.inject({
+    method: "POST",
+    url: "/api/v1/auth/bootstrap",
+    payload: { token: bootstrapToken, username: "admin", password, displayName: "Admin" },
+  });
+  const admin = (created.json() as { accessToken: string }).accessToken;
+  const people: Record<string, { id: string; token: string }> = {};
+  for (const name of ["ana", "bia"]) {
+    const user = await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/users",
+      headers: auth(admin),
+      payload: { username: name, password, displayName: name === "ana" ? "Ana" : "Bia", role: "participant" },
+    });
+    const login = await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { username: name, password } });
+    people[name] = { id: (user.json() as { id: string }).id, token: (login.json() as { accessToken: string }).accessToken };
+  }
+  const ana = people.ana as { id: string; token: string };
+  const bia = people.bia as { id: string; token: string };
+  const server = await app.inject({ method: "POST", url: "/api/v1/servers", headers: auth(admin), payload: { name: "Família" } });
+  const serverId = (server.json() as { id: string }).id;
+  const room = await app.inject({
+    method: "POST",
+    url: `/api/v1/servers/${serverId}/rooms`,
+    headers: auth(admin),
+    payload: { name: "Geral", slug: "geral", kind: "persistent", channel: "text" },
+  });
+  const roomId = (room.json() as { id: string }).id;
+  for (const who of [ana, bia]) {
+    await db.query("insert into server_members (server_id, user_id, role) values ($1, $2, 'participant')", [serverId, who.id]);
+  }
+  for (const [who, name] of [
+    [ana, "ana"],
+    [bia, "bia"],
+  ] as const) {
+    const ok = await app.inject({
+      method: "POST",
+      url: "/api/v1/push/subscriptions",
+      headers: auth(who.token),
+      payload: { endpoint: `https://fcm.googleapis.com/fcm/send/${name}`, keys: { p256dh, auth: authKey } },
+    });
+    assert.equal(ok.statusCode, 204);
+  }
+  const say = async (token: string, url: string, payload: Record<string, unknown>) => {
+    const response = await app.inject({ method: "POST", url, headers: auth(token), payload });
+    assert.equal(response.statusCode, 201, response.body);
+    return response.json() as { id: string };
+  };
+  // Pushes leave after the answer; closing the app waits for them.
+  const settle = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  };
+  return { app, db, admin, ana, bia, serverId, roomId, sent, say, settle };
+}
+
+test("a room pushes only a mention or a reply, never to the author", async () => {
+  const w = await chatWorld();
+  await w.say(w.admin, `/api/v1/rooms/${w.roomId}/messages`, { body: "bom dia a todos" });
+  await w.settle();
+  assert.equal(w.sent.length, 0);
+
+  await w.say(w.ana.token, `/api/v1/rooms/${w.roomId}/messages`, { body: `oi <@${w.bia.id}>, olha   isso` });
+  await w.settle();
+  assert.equal(w.sent.length, 1);
+  assert.equal(w.sent[0]?.endpoint, "https://fcm.googleapis.com/fcm/send/bia");
+  const payload = w.sent[0]?.payload ?? {};
+  assert.equal(payload.type, "mention");
+  assert.equal(payload.authorName, "Ana");
+  assert.equal(payload.roomName, "Geral");
+  assert.equal(payload.serverId, w.serverId);
+  assert.equal(payload.excerpt, "oi @, olha isso");
+  assert.deepEqual(payload.chat, { kind: "room", id: w.roomId });
+
+  const original = await w.say(w.bia.token, `/api/v1/rooms/${w.roomId}/messages`, { body: "alguém?" });
+  w.sent.length = 0;
+  await w.say(w.ana.token, `/api/v1/rooms/${w.roomId}/messages`, { body: "eu", replyToId: original.id });
+  await w.settle();
+  assert.deepEqual(
+    w.sent.map((item) => [item.endpoint.split("/").pop(), item.payload.type]),
+    [["bia", "reply"]],
+  );
+  await w.app.close();
+});
+
+test("a DM pushes every message at 'all', nothing at 'none', and never to who blocked the author", async () => {
+  const w = await chatWorld();
+  const dm = await w.app.inject({ method: "POST", url: "/api/v1/dms", headers: auth(w.admin), payload: { userIds: [w.ana.id, w.bia.id], name: "Trio" } });
+  assert.equal(dm.statusCode, 201, dm.body);
+  const dmId = (dm.json() as { id: string }).id;
+  await w.say(w.admin, `/api/v1/dms/${dmId}/messages`, { body: "jantar?" });
+  await w.settle();
+  assert.deepEqual(w.sent.map((item) => item.endpoint.split("/").pop()).sort(), ["ana", "bia"]);
+  assert.equal(w.sent[0]?.payload.type, "dm");
+  assert.deepEqual(w.sent[0]?.payload.chat, { kind: "dm", id: dmId });
+
+  const silenced = await w.app.inject({
+    method: "POST",
+    url: "/api/v1/notify-prefs",
+    headers: auth(w.ana.token),
+    payload: { scope: "dm", id: dmId, level: "none" },
+  });
+  assert.equal(silenced.statusCode, 200, silenced.body);
+  const adminId = (await w.db.query("select id::text as id from users where username = 'admin'")).rows[0]?.id as string;
+  const blocked = await w.app.inject({ method: "POST", url: `/api/v1/users/${adminId}/block`, headers: auth(w.bia.token), payload: { blocked: true } });
+  assert.ok(blocked.statusCode < 300, blocked.body);
+  w.sent.length = 0;
+  await w.say(w.admin, `/api/v1/dms/${dmId}/messages`, { body: `<@${w.ana.id}> <@${w.bia.id}> e aí?` });
+  await w.settle();
+  assert.equal(w.sent.length, 0);
+  await w.app.close();
+});
+
+test("a gone subscription is dropped and a delivered one is stamped", async () => {
+  const gone = await chatWorld(410);
+  await gone.say(gone.ana.token, `/api/v1/rooms/${gone.roomId}/messages`, { body: `<@${gone.bia.id}>` });
+  await gone.app.close();
+  const left = (await gone.db.query("select endpoint from push_subscriptions order by endpoint")).rows.map((row) => row.endpoint);
+  assert.deepEqual(left, ["https://fcm.googleapis.com/fcm/send/ana"]);
+
+  const ok = await chatWorld(201);
+  await ok.say(ok.ana.token, `/api/v1/rooms/${ok.roomId}/messages`, { body: `<@${ok.bia.id}> ${"x".repeat(400)}` });
+  await ok.app.close();
+  const rows = (await ok.db.query("select endpoint, last_used_at is not null as used from push_subscriptions order by endpoint")).rows;
+  assert.deepEqual(
+    rows.map((row) => [row.endpoint, row.used]),
+    [
+      ["https://fcm.googleapis.com/fcm/send/ana", false],
+      ["https://fcm.googleapis.com/fcm/send/bia", true],
+    ],
+  );
+  assert.ok(String(ok.sent[0]?.payload.excerpt).length <= 120);
+});
