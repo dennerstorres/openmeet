@@ -154,6 +154,25 @@ async function startSession(
   };
 }
 
+export interface SessionClient {
+  kind: "web" | "desktop";
+  version: string | null;
+  agent: string | null;
+}
+
+// ADR 0028: the session row just issued records which client holds it.
+export async function recordClient(db: MigrationClient, secret: string, accessToken: string, client: SessionClient): Promise<void> {
+  const claims = readAccessToken(secret, accessToken);
+  if (!claims) return;
+  await db.query("update refresh_sessions set client_kind = $1, client_version = $2, client_agent = $3 where id = $4 and user_id = $5", [
+    client.kind,
+    client.version,
+    client.agent,
+    claims.sessionId,
+    claims.userId,
+  ]);
+}
+
 /** Starts a session for an account found some other way (ADR 0010). Run it inside the caller transaction. */
 export async function startSessionFor(db: MigrationClient, secret: string, userId: string, action: string): Promise<SessionBody> {
   const user = await findUserById(db, userId);

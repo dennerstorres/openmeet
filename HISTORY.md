@@ -784,3 +784,10 @@ Próxima tarefa:
 ## ADR 0010 — páginas públicas de privacidade e termos (2026-10-29, branch `main`)
 - A API serve `/privacidade` e `/termos` (HTML estático, sem script, CSP `default-src 'none'`), links pedidos pela tela de consentimento do Google. Novo `apps/server/src/legal-pages.ts` e teste `legal-pages.test.ts`; DEPLOYMENT.md cita os links.
 - Validação (Windows 11): server tsc ok, eslint ok, teste 1 pass. Texto genérico para instância privada; operador deve revisar. Estado: WAITING_VALIDATION.
+
+## 2026-10-29 — Sessões por aparelho (ADR 0028)
+- Branch `main`. Migration `0014_session_client.sql`: `refresh_sessions` guarda tipo de cliente (web/desktop, decidido pelo servidor), versão (`x-openmeet-version`) e user agent.
+- `GET /api/v1/admin/users` devolve `sessions` por conta; o painel web lista cada aparelho com versão, navegador/sistema e último acesso.
+- Desktop esconde o painel de contas (rotas admin bloqueadas por S-06); usa `__WEB__` para não vazar código nativo no bundle web.
+- Testes (Windows 11): shared 79/79, server 125+/0 falhas, desktop 44/1 — a falha "atalhos globais" no bundle web é anterior (DesktopOffer, RF-27).
+- Pendente: verificação manual no navegador e no .exe; sessões antigas aparecem como "Cliente desconhecido" até o próximo refresh.

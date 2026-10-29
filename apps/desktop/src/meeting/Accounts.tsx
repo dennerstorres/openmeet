@@ -1,8 +1,52 @@
 import { Badge, Button, Field, Input, Select } from "@fluentui/react-components";
-import type { InstanceAccount, MeetingModel } from "@openmeet/shared";
+import type { AccountDevice, InstanceAccount, MeetingModel } from "@openmeet/shared";
 import { useEffect, useState, type FormEvent } from "react";
 
 const ROLE_LABEL: Record<string, string> = { admin: "administrador", moderator: "moderador", participant: "participante" };
+
+// ADR 0028: a short name for the browser and system in a user agent.
+function describeAgent(agent: string | null): string | null {
+  if (agent === null) return null;
+  const desktop = /^OpenMeet-Desktop\/\S+ \((\w+)\)/.exec(agent);
+  if (desktop) return desktop[1] === "windows" ? "Windows" : (desktop[1] ?? null);
+  const browser = /Edg\//.test(agent)
+    ? "Edge"
+    : /Firefox\//.test(agent)
+      ? "Firefox"
+      : /Chrome\//.test(agent)
+        ? "Chrome"
+        : /Safari\//.test(agent)
+          ? "Safari"
+          : null;
+  const system = /Android/.test(agent)
+    ? "Android"
+    : /iPhone|iPad/.test(agent)
+      ? "iOS"
+      : /Windows/.test(agent)
+        ? "Windows"
+        : /Mac OS X/.test(agent)
+          ? "macOS"
+          : /Linux/.test(agent)
+            ? "Linux"
+            : null;
+  if (browser && system) return `${browser} no ${system}`;
+  return browser ?? system;
+}
+
+function ago(iso: string): string {
+  const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (!Number.isFinite(minutes)) return "";
+  if (minutes < 20) return "ativo agora";
+  if (minutes < 60) return `visto há ${minutes} min`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `visto há ${hours} h`;
+  return `visto há ${Math.round(hours / 24)} d`;
+}
+
+function describeSession(session: AccountDevice): string {
+  const kind = session.client === "desktop" ? "Desktop" : session.client === "web" ? "Web" : "Cliente desconhecido";
+  return [session.version ? `${kind} ${session.version}` : kind, describeAgent(session.agent), ago(session.lastSeenAt)].filter((part) => part).join(" · ");
+}
 
 /** S-02: the administrator creates, disables and resets instance accounts. */
 export function AccountsPanel({ model, selfId, pending }: { model: MeetingModel; selfId: string | null; pending: boolean }) {
@@ -106,6 +150,17 @@ export function AccountsPanel({ model, selfId, pending }: { model: MeetingModel;
                       </Badge>
                     ) : null}
                   </div>
+                  {account.sessions.length > 0 ? (
+                    <ul className="accounts-sessions">
+                      {account.sessions.map((session) => (
+                        <li key={`${session.signedInAt}-${session.lastSeenAt}`} className="hint" title={session.agent ?? undefined}>
+                          {describeSession(session)}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="accounts-sessions hint">Nenhuma sessão aberta.</p>
+                  )}
                   {managed ? (
                     <div className="row">
                       <Button size="small" disabled={disabled} onClick={() => setResetId(resetId === account.id ? null : account.id)}>

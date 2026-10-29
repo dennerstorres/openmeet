@@ -80,6 +80,8 @@ async fn post(origin: &str, path: &str, body: &Value) -> Result<(u16, Value), St
         .post(format!("{origin}{path}"))
         .header("accept", "application/json")
         .header("content-type", "application/json")
+        .header("user-agent", format!("OpenMeet-Desktop/{} ({})", env!("CARGO_PKG_VERSION"), std::env::consts::OS))
+        .header("x-openmeet-version", env!("CARGO_PKG_VERSION"))
         .body(body.to_string())
         .send()
         .await

@@ -4,7 +4,7 @@ import type { AppEnv } from "../poc-join.js";
 import { finishGoogleLogin, googleConfig, liveGoogleTokens, pollGoogleLogin, startGoogleLogin, type GoogleTokens } from "./google.js";
 import { clientAddress, headerValue, ProxyRejected, type AttemptPolicy } from "./limit.js";
 import { AuthError } from "./service.js";
-import { sendSession, webMode } from "./web-session.js";
+import { noteClient, sendSession, webMode } from "./web-session.js";
 
 const PAGE_HEADERS = {
   "cache-control": "no-store",
@@ -107,6 +107,7 @@ export function registerGoogle(
       const result = await pollGoogleLogin(db, secret, poll ?? "");
       if (result.status === "pending") return reply.code(202).header("cache-control", "no-store").send({ status: "pending" });
       if (result.status === "failed") return reply.code(403).header("cache-control", "no-store").send({ error: result.failure });
+      await noteClient(request, env, db, secret, result.session);
       return sendSession(request, reply, env, 200, result.session);
     } catch (error) {
       if (error instanceof AuthError) return reply.code(401).send({ error: "invalid_session" });

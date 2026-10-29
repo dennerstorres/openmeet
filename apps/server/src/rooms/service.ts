@@ -124,6 +124,10 @@ function isTrue(value: unknown): boolean {
   return value === true || value === "t" || value === "true" || value === 1;
 }
 
+function stamp(value: unknown): string {
+  return value instanceof Date ? value.toISOString() : String(value);
+}
+
 export function text(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
@@ -193,17 +197,49 @@ export interface AccountRow {
   displayName: string;
   role: string;
   disabled: boolean;
+  sessions: AccountSession[];
+}
+
+// ADR 0028: one live session family is one signed-in device.
+export interface AccountSession {
+  client: "web" | "desktop" | null;
+  version: string | null;
+  agent: string | null;
+  signedInAt: string;
+  lastSeenAt: string;
 }
 
 export async function listAccounts(db: MigrationClient, actor: PublicUser): Promise<AccountRow[]> {
   if (actor.role !== "admin") throw new RoomError("forbidden");
   const listed = await db.query("select id, username, display_name, role, disabled_at is not null as disabled from users order by username, id");
+  const live = await db.query(
+    `select s.user_id, s.client_kind, s.client_version, s.client_agent, s.created_at as last_seen,
+       (select min(f.created_at) from refresh_sessions f where f.family_id = s.family_id) as signed_in
+     from refresh_sessions s
+     where s.revoked_at is null and s.expires_at > now()
+     order by s.created_at desc`,
+  );
+  const sessions = new Map<string, AccountSession[]>();
+  for (const row of live.rows) {
+    const userId = text(row.user_id);
+    if (!userId) continue;
+    const kind = text(row.client_kind);
+    const held = sessions.get(userId) ?? [];
+    held.push({
+      client: kind === "web" || kind === "desktop" ? kind : null,
+      version: text(row.client_version) ?? null,
+      agent: text(row.client_agent) ?? null,
+      signedInAt: stamp(row.signed_in),
+      lastSeenAt: stamp(row.last_seen),
+    });
+    sessions.set(userId, held);
+  }
   return listed.rows.flatMap((row) => {
     const id = text(row.id);
     const username = text(row.username);
     const displayName = text(row.display_name);
     const role = text(row.role);
-    return id && username && displayName && role ? [{ id, username, displayName, role, disabled: isTrue(row.disabled) }] : [];
+    return id && username && displayName && role ? [{ id, username, displayName, role, disabled: isTrue(row.disabled), sessions: sessions.get(id) ?? [] }] : [];
   });
 }
 

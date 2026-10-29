@@ -1,7 +1,8 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { AppEnv } from "../poc-join.js";
 import { ACCESS_TOKEN_TTL_SECONDS } from "./tokens.js";
-import { AuthError, type SessionBody } from "./service.js";
+import { AuthError, recordClient, type SessionBody } from "./service.js";
+import type { MigrationClient } from "../db/migrate.js";
 
 // ADR 0014: the web client keeps its session in two HttpOnly cookies. The .exe keeps using Bearer.
 export const ACCESS_COOKIE = "om_access";
@@ -10,6 +11,8 @@ const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
 const ACCESS_PATH = "/api";
 const REFRESH_PATH = "/api/v1/auth";
 const WEB_HEADER = "x-openmeet-web";
+const VERSION_HEADER = "x-openmeet-version";
+const VERSION = /^[0-9A-Za-z.+-]{1,32}$/;
 const DOMAIN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 const SAFE_METHODS = new Set(["GET", "HEAD"]);
 
@@ -112,6 +115,21 @@ export function sendSession(request: FastifyRequest, reply: FastifyReply, env: A
   reply.code(status).header("cache-control", "no-store");
   if (webMode(request, env) === "web") return reply.send(setSessionCookies(reply, session));
   return reply.send(session);
+}
+
+/** ADR 0028: notes which client got this session. A failure here never blocks the sign-in. */
+export async function noteClient(request: FastifyRequest, env: AppEnv, db: MigrationClient, secret: string, session: SessionBody): Promise<void> {
+  const version = single(request.headers[VERSION_HEADER]);
+  const agent = single(request.headers["user-agent"]);
+  try {
+    await recordClient(db, secret, session.accessToken, {
+      kind: webMode(request, env) === "web" ? "web" : "desktop",
+      version: version !== undefined && VERSION.test(version) ? version : null,
+      agent: agent ? agent.slice(0, 256) : null,
+    });
+  } catch {
+    request.log.warn({ code: "session_client_failed" }, "session client not recorded");
+  }
 }
 
 export function rejectForeignWeb(request: { method: string; headers: Headers }, env: AppEnv): void {

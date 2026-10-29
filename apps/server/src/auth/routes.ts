@@ -4,7 +4,7 @@ import type { MigrationClient } from "../db/migrate.js";
 import { clientAddress, headerValue, ProxyRejected, type AttemptPolicy } from "./limit.js";
 import type { RoomMedia } from "../rooms/media.js";
 import { AuthError, type AuthErrorCode, bootstrapAdmin, bootstrapClosed, changePassword, currentUser, login, logout, refreshSession } from "./service.js";
-import { clearSessionCookies, readCookie, REFRESH_COOKIE, rejectForeignWeb, requireAccessToken, sendSession, webMode } from "./web-session.js";
+import { clearSessionCookies, noteClient, readCookie, REFRESH_COOKIE, rejectForeignWeb, requireAccessToken, sendSession, webMode } from "./web-session.js";
 
 const STATUS: Record<AuthErrorCode, number> = {
   auth_unconfigured: 503,
@@ -89,6 +89,7 @@ export function registerAuth(
         },
         () => attempts.bootstrap.allow(`bootstrap:${ip}`, attempts.now()),
       );
+      await noteClient(request, env, database, secret, session);
       return sendSession(request, reply, env, 201, session);
     } catch (error) {
       return sendAuthError(request, reply, error);
@@ -108,6 +109,7 @@ export function registerAuth(
         const ipOk = attempts.loginIp.allow(`ip:${ip}`, attempts.now());
         return userOk && ipOk;
       });
+      await noteClient(request, env, database, secret, session);
       return sendSession(request, reply, env, 200, session);
     } catch (error) {
       return sendAuthError(request, reply, error);
@@ -129,6 +131,7 @@ export function registerAuth(
         const tokenOk = attempts.refreshToken.allow(`refresh-token:${tokenKey}`, attempts.now());
         return ipOk && tokenOk;
       });
+      await noteClient(request, env, database, secret, session);
       return sendSession(request, reply, env, 200, session);
     } catch (error) {
       // A reused or unknown refresh ends the web session: the cookies go with it.
@@ -169,6 +172,7 @@ export function registerAuth(
         { currentPassword: requireField(request.body, "currentPassword"), newPassword: requireField(request.body, "newPassword") },
         () => attempts.loginIp.allow(`password:${ip}`, attempts.now()),
       );
+      await noteClient(request, env, database, secret, session);
       return sendSession(request, reply, env, 200, session);
     } catch (error) {
       return sendAuthError(request, reply, error);

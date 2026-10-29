@@ -20,8 +20,40 @@ test("parseAccounts keeps only well-formed rows", () => {
     null,
   ]);
   assert.deepEqual(rows, [
-    { id: ID, username: "ana", displayName: "Ana", role: "participant", disabled: true },
-    { id: ID, username: "bob", displayName: "Bob", role: "moderator", disabled: false },
+    { id: ID, username: "ana", displayName: "Ana", role: "participant", disabled: true, sessions: [] },
+    { id: ID, username: "bob", displayName: "Bob", role: "moderator", disabled: false, sessions: [] },
   ]);
   assert.deepEqual(parseAccounts({}), []);
+});
+
+test("parseAccounts reads each signed-in device (ADR 0028)", () => {
+  const [row] = parseAccounts([
+    {
+      id: ID,
+      username: "ana",
+      displayName: "Ana",
+      role: "participant",
+      sessions: [
+        {
+          client: "desktop",
+          version: "0.2.15",
+          agent: "OpenMeet-Desktop/0.2.15 (windows)",
+          signedInAt: "2026-10-29T10:00:00.000Z",
+          lastSeenAt: "2026-10-29T11:00:00.000Z",
+        },
+        { client: "tv", version: "", signedInAt: "2026-10-29T10:00:00.000Z", lastSeenAt: "2026-10-29T10:00:00.000Z" },
+        { client: "web" },
+      ],
+    },
+  ]);
+  assert.deepEqual(row?.sessions, [
+    {
+      client: "desktop",
+      version: "0.2.15",
+      agent: "OpenMeet-Desktop/0.2.15 (windows)",
+      signedInAt: "2026-10-29T10:00:00.000Z",
+      lastSeenAt: "2026-10-29T11:00:00.000Z",
+    },
+    { client: null, version: null, agent: null, signedInAt: "2026-10-29T10:00:00.000Z", lastSeenAt: "2026-10-29T10:00:00.000Z" },
+  ]);
 });

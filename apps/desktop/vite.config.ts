@@ -78,11 +78,13 @@ function webManifest(): Plugin {
   };
 }
 
+const appVersion = (JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")) as { version: string }).version;
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
   // ADR 0026: Griffel extracts our own makeStyles at build time; Fluent's precompiled styles still load at runtime.
   plugins: mode === "web" ? [webShell(), webManifest(), react(), griffel()] : [react(), griffel()],
-  define: { __WEB__: JSON.stringify(mode === "web") },
+  define: { __WEB__: JSON.stringify(mode === "web"), __APP_VERSION__: JSON.stringify(appVersion) },
   build: mode === "web" ? { outDir: "dist-web" } : {},
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

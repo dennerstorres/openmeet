@@ -16,6 +16,9 @@ async function readResult(response: Response): Promise<ApiResult> {
   }
 }
 
+// ADR 0028: tests import this module without Vite, where the define is absent.
+const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev";
+
 /** A session answer for the model: the marker in place of any token the body could carry. */
 function withMarker(result: ApiResult): ApiResult {
   if (result.status !== 200 && result.status !== 201) return result;
@@ -40,7 +43,7 @@ export function createWebSession(fetchImpl: typeof fetch = globalThis.fetch.bind
     const prepared = prepareInstanceRequest(origin, origin, method, path, body, null);
     const init: RequestInit = {
       method: prepared.method,
-      headers: { ...prepared.headers, "x-openmeet-web": "1" },
+      headers: { ...prepared.headers, "x-openmeet-web": "1", "x-openmeet-version": APP_VERSION },
       credentials: "same-origin",
       redirect: "error",
       cache: "no-store",

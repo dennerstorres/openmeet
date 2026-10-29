@@ -66,9 +66,18 @@ export const refreshSessions = pgTable(
     revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "date" }),
     replacedBy: uuid("replaced_by").references((): AnyPgColumn => refreshSessions.id),
     familyId: uuid("family_id").notNull(),
+    clientKind: text("client_kind"),
+    clientVersion: text("client_version"),
+    clientAgent: text("client_agent"),
     createdAt: createdAt(),
   },
-  (table) => [index("refresh_sessions_family").on(table.familyId), check("refresh_sessions_token_hash_present", sql`char_length(${table.tokenHash}) > 0`)],
+  (table) => [
+    index("refresh_sessions_family").on(table.familyId),
+    check("refresh_sessions_token_hash_present", sql`char_length(${table.tokenHash}) > 0`),
+    check("refresh_sessions_client_kind", sql`${table.clientKind} is null or ${table.clientKind} in ('web', 'desktop')`),
+    check("refresh_sessions_client_version_length", sql`${table.clientVersion} is null or char_length(${table.clientVersion}) between 1 and 32`),
+    check("refresh_sessions_client_agent_length", sql`${table.clientAgent} is null or char_length(${table.clientAgent}) <= 256`),
+  ],
 );
 
 export const servers = pgTable(

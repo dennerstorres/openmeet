@@ -225,6 +225,25 @@ test("disable keeps disabled_at through an SFU failure; enable waits for the cut
       ],
     );
     assert.equal((await w.app.inject({ method: "GET", url: "/api/v1/admin/users", headers: auth(member.accessToken) })).statusCode, 403);
+    // ADR 0028: each signed-in device of an account is listed with its client and version.
+    const tagged = await w.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      headers: { "x-openmeet-version": "0.2.15", "user-agent": "OpenMeet-Desktop/0.2.15 (windows)" },
+      payload: { username: "other", password: memberPassword },
+    });
+    assert.equal(tagged.statusCode, 200);
+    const devices = await w.app.inject({ method: "GET", url: "/api/v1/admin/users", headers: auth(w.admin.accessToken) });
+    const others = (devices.json() as { username: string; sessions: { client: string | null; version: string | null; agent: string | null }[] }[]).find(
+      (row) => row.username === "other",
+    );
+    assert.deepEqual(
+      others?.sessions.map((device) => [device.client, device.version, device.agent]).sort(),
+      [
+        ["desktop", "0.2.15", "OpenMeet-Desktop/0.2.15 (windows)"],
+        ["desktop", null, "lightMyRequest"],
+      ].sort(),
+    );
     const self = await w.app.inject({
       method: "POST",
       url: `/api/v1/admin/users/${(listed.json() as { id: string }[])[0]?.id}/disable`,

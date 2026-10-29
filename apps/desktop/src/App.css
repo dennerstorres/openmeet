@@ -1004,6 +1004,19 @@ a {
   border-top: 1px solid var(--line);
 }
 
+.accounts-sessions {
+  order: 1;
+  flex-basis: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.accounts-list .accounts-sessions li {
+  padding: 0;
+  border: 0;
+}
+
 .accounts-who {
   display: flex;
   flex-wrap: wrap;

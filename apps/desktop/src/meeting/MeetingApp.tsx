@@ -1634,7 +1634,7 @@ export function MeetingApp() {
                   </div>
                 </>
               ) : null}
-              {state.role === "admin" && isTauri() ? (
+              {state.role === "admin" && !__WEB__ ? (
                 <>
                   <div>
                     <h2>Usuários da instância</h2>
@@ -1644,7 +1644,7 @@ export function MeetingApp() {
                   </div>
                 </>
               ) : null}
-              {state.role === "admin" && !isTauri() ? <AccountsPanel model={model} selfId={state.userId} pending={state.pending} /> : null}
+              {state.role === "admin" && __WEB__ ? <AccountsPanel model={model} selfId={state.userId} pending={state.pending} /> : null}
               <div>
                 <h2>Diagnóstico</h2>
                 <p className="hint">Versão e qualidade da conexão, para relatar um problema.</p>
