@@ -173,6 +173,95 @@ export const notifyChat: typeof Native.notifyChat = async (title, body, chat) =>
   };
 };
 
+// ADR 0027 (F14-06): a click on a push opens the chat. An open tab gets it from the service worker; a new
+// tab gets it once in `?chat=room:<id>`, which is removed from the address at once.
+const CHAT_PARAM = /^(room|dm):([0-9a-f-]{36})$/i;
+let openedChat: Native.NotifiedChat | null = (() => {
+  if (typeof window === "undefined") return null;
+  const url = new URL(window.location.href);
+  const found = CHAT_PARAM.exec(url.searchParams.get("chat") ?? "");
+  if (!found) return null;
+  url.searchParams.delete("chat");
+  window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  return { kind: found[1]?.toLowerCase() === "dm" ? "dm" : "room", id: (found[2] ?? "").toLowerCase() };
+})();
+
+export const takeOpenedChat: typeof Native.takeOpenedChat = () => {
+  const chat = openedChat;
+  openedChat = null;
+  return chat;
+};
+
+if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("message", (event: MessageEvent) => {
+    const data = event.data as { type?: unknown; chat?: { kind?: unknown; id?: unknown } } | null;
+    if (data?.type !== "openmeet:open-chat" || typeof data.chat?.id !== "string") return;
+    if (data.chat.kind !== "room" && data.chat.kind !== "dm") return;
+    const chat: Native.NotifiedChat = { kind: data.chat.kind, id: data.chat.id };
+    for (const handler of openChatHandlers) handler(chat);
+  });
+}
+
+function pushKeyBytes(key: string): Uint8Array<ArrayBuffer> {
+  const base64 = (key + "=".repeat((4 - (key.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = window.atob(base64);
+  const bytes = new Uint8Array(new ArrayBuffer(raw.length));
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  return bytes;
+}
+
+function sameKey(subscription: PushSubscription, key: Uint8Array): boolean {
+  const current = subscription.options.applicationServerKey;
+  if (!current) return false;
+  const bytes = new Uint8Array(current);
+  return bytes.length === key.length && bytes.every((byte, i) => byte === key[i]);
+}
+
+async function pushRegistration(): Promise<ServiceWorkerRegistration | null> {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
+  // Only the production web build registers a worker; without one there is nothing to push to.
+  return (await navigator.serviceWorker.getRegistration("/")) ?? null;
+}
+
+export const webPush: typeof Native.webPush = {
+  // Never prompts: it runs after the click that granted the permission, or at sign-in when it was granted
+  // before. The server moves the subscription to whoever signs in on this browser.
+  sync: async (api) => {
+    try {
+      if (!browserNotifications.enabled()) return false;
+      const registration = await pushRegistration();
+      const publicKey = registration ? await api.key() : null;
+      if (!registration || !publicKey) return false;
+      const key = pushKeyBytes(publicKey);
+      let subscription = await registration.pushManager.getSubscription();
+      // A new VAPID pair on the server makes the old subscription useless.
+      if (subscription && !sameKey(subscription, key)) {
+        await subscription.unsubscribe();
+        subscription = null;
+      }
+      subscription ??= await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+      const json = subscription.toJSON();
+      const p256dh = json.keys?.p256dh;
+      const auth = json.keys?.auth;
+      if (!json.endpoint || !p256dh || !auth) return false;
+      return await api.save({ endpoint: json.endpoint, keys: { p256dh, auth } });
+    } catch {
+      return false;
+    }
+  },
+  // Before sign-out or when turned off: the server forgets this browser first, then the browser lets go.
+  stop: async (api) => {
+    try {
+      const subscription = await (await pushRegistration())?.pushManager.getSubscription();
+      if (!subscription) return;
+      await api.drop(subscription.endpoint);
+      await subscription.unsubscribe();
+    } catch {
+      // A browser that cannot unsubscribe is dropped by the server on the next 404/410.
+    }
+  },
+};
+
 export const listenOpenChat: typeof Native.listenOpenChat = async (handler) => {
   openChatHandlers.add(handler);
   return () => openChatHandlers.delete(handler);

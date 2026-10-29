@@ -2,7 +2,7 @@
 
 Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, `VERIFIED`, `DONE`, `BLOCKED`.
 
-F14 — PWA e push no cliente web: ADR 0027 aceito em 2026-10-29, SPEC item 24. Na `main`: F14-02 e F14-03 WAITING_VALIDATION (falta instalar no Chrome real, teste com chamada aberta, deploy real e revisão); F14-04 IMPLEMENTED (migração 0013 e rotas); F14-05 IMPLEMENTED (envio com `web-push` 3.6.7). F14-06 READY.
+F14 — PWA e push no cliente web: ADR 0027 aceito em 2026-10-29, SPEC item 24. Na `main`: F14-02 e F14-03 WAITING_VALIDATION (falta instalar no Chrome real, teste com chamada aberta, deploy real e revisão); F14-04 IMPLEMENTED (migração 0013 e rotas); F14-05 IMPLEMENTED (envio com `web-push` 3.6.7); F14-06 WAITING_VALIDATION (opção na UI e handlers no `sw.js`, falta push real no navegador). F14-07 READY (humano).
 
 F13 — Salas de texto, DM e emoji próprio: ADR 0024 aceito em 2026-10-27, SPEC item 23. F13-02 a F13-13 na `main`; F13-14 (docs e revisão da fase) na `task/F13-14-docs`, sem merge. F13-02 a F13-05 e F13-11 IMPLEMENTED; F13-06 a F13-10 e F13-12 a F13-14 WAITING_VALIDATION. Falta o teste do usuário no `.exe`, na web e atrás do proxy real; roteiro em `HANDOFF.md`. Escopo em `plans/phase-13-salas-de-texto.md`.
 
@@ -138,7 +138,7 @@ F09-08 — Presença dos membros do servidor: WAITING_VALIDATION. Implementada e
 | F14-03 | PWA | Service worker com cache seguro e aviso de nova versão | F14-02 | WAITING_VALIDATION | Grok | G12 |
 | F14-04 | PWA | Migração e rotas de inscrição push | F14-01 | IMPLEMENTED | Grok | G4,G10 |
 | F14-05 | PWA | Envio de push em menção, DM e resposta | F14-04,F13-13 | IMPLEMENTED | Grok | G4,G10 |
-| F14-06 | PWA | Ativar push na UI e clique abre a conversa | F14-03,F14-05 | READY | Grok | G12 |
+| F14-06 | PWA | Ativar push na UI e clique abre a conversa | F14-03,F14-05 | WAITING_VALIDATION | Grok | G12 |
 | F14-07 | PWA | Prova: atualização com app aberto e push em Chrome, Firefox e Android | F14-06 | PENDING | Humano | G12 |
 
 ## Estado em 2026-10-19

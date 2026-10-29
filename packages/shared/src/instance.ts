@@ -360,6 +360,8 @@ function instancePath(path: string): string {
   if (path === "/api/v1/dms" || path === "/api/v1/blocks") return path;
   // ADR 0024 (F13-13): unread counts and notification levels.
   if (path === "/api/v1/unread" || path === "/api/v1/notify-prefs") return path;
+  // ADR 0027 (F14-06): Web Push key and the browser's subscription.
+  if (path === "/api/v1/push/key" || path === "/api/v1/push/subscriptions" || path === "/api/v1/push/unsubscribe") return path;
   const dm =
     /^\/api\/v1\/dms\/([0-9a-f-]{36})(?:\/(?:messages(?:\?(?:before|after|around)=[1-9][0-9]{0,17}|\/search)?|pins|typing|read|members|leave|rename))?$/i.exec(
       path,

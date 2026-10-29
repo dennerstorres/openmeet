@@ -50,7 +50,7 @@ import {
   type UnreadState,
 } from "@openmeet/shared";
 import desktopPackage from "../../package.json";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { holdMeetingLock } from "../shell/background";
 import { CardStage } from "./Cards";
 import { Face, ImagePicker } from "./images";
@@ -113,6 +113,8 @@ import {
   isTauri,
   listenInvite,
   browserNotifications,
+  takeOpenedChat,
+  webPush,
   listenOpenChat,
   listenShell,
   openGoogleLogin,
@@ -440,10 +442,19 @@ export function MeetingApp() {
   const [state, setState] = useState<ShellSnapshot>(model.snapshot());
 
   const shellActionRef = useRef<(action: string) => Promise<void>>(async () => undefined);
+  // ADR 0027 (F14-06): this browser's push follows the signed-in account and leaves before it signs out.
+  const pushApi = useMemo(
+    () => ({ key: () => model.pushKey(), save: model.savePush.bind(model), drop: (endpoint: string) => model.dropPush(endpoint) }),
+    [model],
+  );
+  const signOut = async () => {
+    await webPush.stop(pushApi);
+    await model.signOut();
+  };
   shellActionRef.current = async (action) => {
     // S-16: the tray "Sair da conta" is the same sign-out as the button on the screen.
     if (action === "sign-out") {
-      await model.signOut();
+      await signOut();
       return;
     }
     const kind = action === "toggle-microphone" ? "microphone" : action === "toggle-camera" ? "camera" : null;
@@ -725,6 +736,17 @@ export function MeetingApp() {
     if (serverId && serverId !== state.selectedServerId) void model.selectServer(serverId).then(() => setTextRoomId(chat.id));
     else setTextRoomId(chat.id);
   };
+  const signedIn = state.step === "rooms" || state.step === "meeting";
+  useEffect(() => {
+    if (signedIn && webNotify && state.userId !== null) void webPush.sync(pushApi);
+  }, [signedIn, webNotify, state.userId, pushApi]);
+  // A push clicked with no tab open opens one on that chat, once the unread list knows the rooms' servers.
+  const unreadLoaded = unread.state.chats.length > 0;
+  useEffect(() => {
+    if (!signedIn || !unreadLoaded) return;
+    const chat = takeOpenedChat();
+    if (chat) openNotified.current(chat);
+  }, [signedIn, unreadLoaded]);
   const dmBadge = directMessages.dms.reduce((total, dm) => total + (chatBadge(unread.state, { kind: "dm", id: dm.id }).unread ? 1 : 0), 0);
   const messageMember = (userId: string) =>
     void model.openDm([userId]).then((dm) => {
@@ -1344,7 +1366,7 @@ export function MeetingApp() {
                   </MenuItem>
                 )}
                 <MenuDivider />
-                <MenuItem icon={<SignOutRegular />} disabled={state.pending} onClick={() => void model.signOut()}>
+                <MenuItem icon={<SignOutRegular />} disabled={state.pending} onClick={() => void signOut()}>
                   Sair da conta
                 </MenuItem>
               </MenuList>
@@ -1599,10 +1621,14 @@ export function MeetingApp() {
                         if (data.checked !== true) {
                           browserNotifications.disable();
                           setWebNotify(false);
+                          void webPush.stop(pushApi);
                           return;
                         }
                         // The permission prompt only ever follows this click.
-                        void browserNotifications.enable().then(setWebNotify);
+                        void browserNotifications.enable().then((enabled) => {
+                          setWebNotify(enabled);
+                          if (enabled) void webPush.sync(pushApi);
+                        });
                       }}
                     />
                   </div>

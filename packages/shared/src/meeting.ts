@@ -834,6 +834,34 @@ export class MeetingModel {
     return body === null ? null : (parseUnreadState(body) ?? null);
   }
 
+  // ADR 0027 (F14-06): Web Push. Quiet on purpose: an instance without a VAPID pair answers 404 and the
+  // browser notifications simply stay tab-only, with no error on screen.
+  async pushKey(): Promise<string | null> {
+    const result = await this.quietCall("GET", "/api/v1/push/key", null);
+    const key =
+      result?.status === 200 && typeof result.body === "object" && result.body !== null ? (result.body as Record<string, unknown>).publicKey : undefined;
+    return typeof key === "string" ? key : null;
+  }
+
+  async savePush(subscription: { endpoint: string; keys: { p256dh: string; auth: string } }): Promise<boolean> {
+    return (await this.quietCall("POST", "/api/v1/push/subscriptions", subscription))?.status === 204;
+  }
+
+  async dropPush(endpoint: string): Promise<boolean> {
+    return (await this.quietCall("POST", "/api/v1/push/unsubscribe", { endpoint }))?.status === 204;
+  }
+
+  private async quietCall(method: "GET" | "POST", path: string, body: unknown): Promise<ApiResult | null> {
+    const origin = this.origin;
+    const accessToken = this.accessToken;
+    if (origin === null || accessToken === null) return null;
+    try {
+      return await this.api.request(origin, method, path, body, accessToken);
+    } catch {
+      return null;
+    }
+  }
+
   // ADR 0024: DMs. Each call answers the DM (or list) or null after showing the error.
   async listDms(): Promise<DmSummary[] | null> {
     const body = await this.memberCall("GET", "/api/v1/dms", null);
