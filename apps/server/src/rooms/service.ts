@@ -45,7 +45,9 @@ export type RoomErrorCode =
   | "emoji_too_large"
   | "emoji_limit"
   | "emoji_name_taken"
-  | "emoji_not_found";
+  | "emoji_not_found"
+  | "invalid_subscription"
+  | "push_unconfigured";
 
 export class RoomError extends Error {
   readonly code: RoomErrorCode;
