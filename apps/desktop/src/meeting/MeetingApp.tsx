@@ -1634,7 +1634,17 @@ export function MeetingApp() {
                   </div>
                 </>
               ) : null}
-              {state.role === "admin" ? <AccountsPanel model={model} selfId={state.userId} pending={state.pending} /> : null}
+              {state.role === "admin" && isTauri() ? (
+                <>
+                  <div>
+                    <h2>Usuários da instância</h2>
+                  </div>
+                  <div className="settings-group">
+                    <p className="hint">Por segurança, as contas da instância são gerenciadas pela versão web.</p>
+                  </div>
+                </>
+              ) : null}
+              {state.role === "admin" && !isTauri() ? <AccountsPanel model={model} selfId={state.userId} pending={state.pending} /> : null}
               <div>
                 <h2>Diagnóstico</h2>
                 <p className="hint">Versão e qualidade da conexão, para relatar um problema.</p>
