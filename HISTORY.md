@@ -1,5 +1,9 @@
 # HISTORY — registro cronológico
 
+### 2026-10-29 — F08-01, preparação open source — Claude
+Branch `task/F08-01-oss`. Licenças revisadas: 183 pacotes JS de produção e 571 crates Rust, sem GPL/AGPL/SSPL obrigatória; MPL-2.0 (`web-push` e crates CSS do Tauri) usada sem modificação. Relatório em `docs/THIRD_PARTY.md`. `SECURITY.md` ganhou canal (GitHub private vulnerability reporting), escopo e a seção de push; `CONTRIBUTING.md` reescrito (checks, regra de licença, seção 5 da Apache); README com cliente web/PWA e links. Varredura do histórico inteiro (`git log --all -p`) por chaves privadas, tokens AWS/GitHub/Google/OpenAI/Slack e chave de assinatura do Tauri: nada. Nenhum `.env`, `.pem`, `.pfx` ou dump versionado. Kit Teams/Figma fora do git.
+Pendente (humano): ativar *Private vulnerability reporting* nas configurações do repositório; revisão do Codex exigida pelo PLAN; decidir versão e tag do release candidate.
+
 ### 2026-10-29 — F02-06, GO de Tauri/WebView2 — Claude
 Decisão humana do usuário: uso contínuo nas reuniões da equipe, desktop e web juntos, com microfone, câmera e compartilhamento funcionando. Registrado no ADR 0004 (Accepted, GO). M01–M12 não rodados item a item; o GO se apoia no uso real. F02-06 DONE; F08-01 READY.
 

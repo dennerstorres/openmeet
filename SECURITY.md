@@ -1,6 +1,18 @@
 # Segurança
 
-Projeto em planejamento. Não há canal formal de reporte ainda. **Não publique vulnerabilidades exploráveis ou credenciais em issues públicas**. Antes do release, configurar GitHub private vulnerability reporting e contato de segurança. Não registrar mídia, tokens, senhas ou headers de autenticação em logs. Testes de segurança devem mirar apenas ambientes autorizados.
+## Como reportar
+
+Use **Report a vulnerability** na aba *Security* do repositório (<https://github.com/dennerstorres/openmeet/security/advisories/new>). O relato fica privado entre você e os mantenedores. **Não abra issue pública** com vulnerabilidade explorável, token, senha ou dado de alguém.
+
+Informe a versão (app e servidor), os passos para reproduzir e o impacto. A resposta inicial sai em até 7 dias. A correção e a divulgação são combinadas no próprio advisory.
+
+## Escopo
+
+Entram: a API (`apps/server`), o app desktop e o cliente web (`apps/desktop`), o pacote compartilhado e a stack de `infra/compose`. Não entram: instâncias de terceiros e o próprio LiveKit, PostgreSQL ou Caddy (reporte direto ao projeto de cada um). Teste só em instância sua ou autorizada.
+
+## Regras do projeto
+
+Mídia, tokens, senhas, cabeçalhos de autenticação e texto de mensagem não vão para log. Segredos de instância ficam no `.env`, fora do Git. O instalador não tem assinatura de código do Windows, mas as atualizações são assinadas (ADR 0018).
 
 ## Salas de texto e DM (ADR 0024)
 
@@ -12,3 +24,10 @@ Projeto em planejamento. Não há canal formal de reporte ainda. **Não publique
 - **Logs e URLs.** Texto de mensagem, busca e nome de anexo vão só no corpo de POST, nunca na URL nem no log. Na URL vão só ids e o cursor numérico.
 - **Notificações.** A notificação do Windows e a `Notification` da web mostram quem escreveu e o começo da mensagem, inclusive na tela bloqueada, conforme a configuração do sistema. O nível `none` por servidor, sala ou DM silencia.
 - **Limites de taxa** estão em `docs/DEPLOYMENT.md`. São por conta e em memória: reiniciar a API zera.
+
+## Push na web (ADR 0027)
+
+- O aviso vai pelo serviço de push do navegador (Google, Mozilla, Microsoft ou Apple). O conteúdo é criptografado de ponta a ponta até o navegador (RFC 8291): o serviço vê só o tamanho, a hora e o endereço da inscrição. O aviso leva o nome de quem escreveu, o nome da sala e até 120 caracteres da mensagem.
+- O servidor só envia para hosts desses serviços, em HTTPS e sem porta (anti-SSRF). Cada pessoa apaga só a própria inscrição. Sair da conta apaga a inscrição deste navegador.
+- A chave privada VAPID fica no `.env` e nunca vai para log nem para o cliente.
+

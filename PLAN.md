@@ -82,7 +82,7 @@ F09-08 — Presença dos membros do servidor: WAITING_VALIDATION. Implementada e
 | F02-04 | POC | Captura de monitor e janela | F02-02 | WAITING_VALIDATION | Grok | G2 |
 | F02-05 | POC | Redes distintas, TURN, reconexão, métricas | F02-03,F02-04 | WAITING_VALIDATION | Grok | G2 |
 | F02-06 | POC | Decisão GO/NO-GO de Tauri/WebView2 | F02-05 | DONE | Claude | G2 |
-| F08-01 | OSS | Segurança/licença/docs/release candidate | F07-02, F02-06 GO | READY | Claude+Codex review | G8 |
+| F08-01 | OSS | Segurança/licença/docs/release candidate | F07-02, F02-06 GO | WAITING_VALIDATION | Claude+Codex review | G8 |
 | F09-01 | Servidores | Schema, API, migração Geral e token LiveKit pelo id da sala | F03-03 | IMPLEMENTED | Claude | G9 |
 | F09-02 | Servidores | Convite do servidor por link openmeet:// | F09-01 | WAITING_VALIDATION | Claude | G9 |
 | F09-03 | Sala | Três colunas, cards, destaque, grade, fixar e tela cheia | F09-01 | IMPLEMENTED | Claude | G9 |
