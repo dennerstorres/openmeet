@@ -32,6 +32,7 @@ Cliente desktop Windows e cliente web, servido pela própria instância, para sa
 21. Biblioteca de sons por servidor, enviada pelos membros e tocada para a sala pela faixa do microfone. ADR 0021. Não implementado.
 22. Rádio: uma entrada de áudio do PC escolhida pelo participante, transmitida na sala como faixa própria. ADR 0022. Não implementado.
 23. Salas de texto no servidor, mensagem direta (1:1 e grupo de até 10), menções, reações, anexos, emoji próprio por servidor e notificação no app e na aba da web, entregues por SSE e guardadas para sempre. ADR 0024. Não implementado.
+24. Cliente web instalável como PWA, com cache que nunca prende versão velha e notificação push (Web Push/VAPID, sem serviço pago) para menção, DM e resposta. ADR 0027. Não implementado.
 
 ## Out of scope — MVP
 Federação, apps móveis, macOS/Linux, gravações, transcrição, E2EE, plugins, quadro branco, acesso remoto, múltiplos nós, bots, integrações além do login Google, captura nativa do áudio do Windows, juntar conta Google a uma conta de senha e link que entra direto numa sala.
