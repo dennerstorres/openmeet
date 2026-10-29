@@ -59,7 +59,7 @@ import { DESKTOP_DOWNLOAD_URL, isWindowsDesktop } from "../web/desktopApp";
 import {
   Badge,
   Button,
-  Checkbox,
+  Switch,
   Dialog,
   DialogBody,
   DialogContent,
@@ -1415,7 +1415,7 @@ export function MeetingApp() {
             ))}
           </ul>
           {state.serverPresence.allowInvisible ? (
-            <Checkbox
+            <Switch
               className="presence-option member-self-mode"
               label="Aparecer como invisível"
               checked={state.serverPresence.selfMode === "invisible"}
@@ -1555,7 +1555,7 @@ export function MeetingApp() {
                   disabled={inCall && (!controlsEnabled || controlPending)}
                   onChange={onDevice}
                 />
-                <Checkbox
+                <Switch
                   className="effect-toggle"
                   label="Desfocar fundo da câmera"
                   checked={media.backgroundBlur}
@@ -1613,7 +1613,7 @@ export function MeetingApp() {
                     <p className="hint">Avisos do navegador para menções e mensagens diretas quando esta aba não está na frente.</p>
                   </div>
                   <div className="settings-group">
-                    <Checkbox
+                    <Switch
                       className="effect-toggle"
                       label="Mostrar notificações do navegador"
                       checked={webNotify}
@@ -1652,7 +1652,7 @@ export function MeetingApp() {
                 ) : (
                   <p className="metrics">{inCall ? "Métricas ainda não disponíveis." : "As métricas aparecem durante uma chamada."}</p>
                 )}
-                <Checkbox
+                <Switch
                   className="export"
                   label="Autorizar exportação do diagnóstico"
                   checked={exportConsent}
@@ -1913,13 +1913,13 @@ export function MeetingApp() {
                         <h2>Privacidade de presença</h2>
                         <p className="hint">Defina se membros podem ficar invisíveis e quem pode identificá-los.</p>
                       </div>
-                      <Checkbox
+                      <Switch
                         className="presence-option"
                         label="Permitir modo invisível"
                         checked={state.serverPresence.allowInvisible}
                         onChange={(_, data) => void model.setPresencePolicy(data.checked === true, state.serverPresence?.managersSeeInvisible ?? false)}
                       />
-                      <Checkbox
+                      <Switch
                         className="presence-option"
                         label="Dono e moderadores podem identificar membros invisíveis"
                         checked={state.serverPresence.managersSeeInvisible}
@@ -2177,7 +2177,7 @@ export function MeetingApp() {
                         ))}
                       </Select>
                     </Field>
-                    <Checkbox
+                    <Switch
                       className="effect-toggle"
                       label="Ouvir minha voz"
                       checked={media.voiceMonitor}
