@@ -71,6 +71,7 @@ import {
   type MessageView,
 } from "./messages.js";
 import { markRead, readOwnMessage, setNotifyLevel, unreadState } from "./unread.js";
+import { deletePushSubscription, savePushSubscription, vapidPublicKey } from "./push.js";
 import { addDmMember, getDm, leaveDm, listBlocks, listDms, openDm, renameDm, setBlock, type DmView } from "./dms.js";
 import { deleteEmoji, listMyEmojis, listServerEmojis, readEmoji, renameEmoji, uploadEmoji } from "./emojis.js";
 import { deleteSound, importSound, listLibrary, listOwnSounds, readSound, removeFromLibrary, renameSound, uploadSound } from "./sounds.js";
@@ -127,6 +128,8 @@ const ROOM_STATUS: Record<RoomErrorCode, number> = {
   emoji_limit: 409,
   emoji_name_taken: 409,
   emoji_not_found: 404,
+  invalid_subscription: 400,
+  push_unconfigured: 404,
 };
 
 function configuredSecret(env: AppEnv): string | undefined {
@@ -1335,6 +1338,50 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
         .code(200)
         .header("cache-control", "no-store")
         .send(await unreadState(db, actor));
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  // ADR 0027 (F14-04): Web Push subscriptions. The key route answers 404 while the instance has no VAPID pair,
+  // and the web client then hides the option.
+  const pushWrites = createAttemptGate(10, 60_000);
+  app.get("/api/v1/push/key", async (request, reply) => {
+    try {
+      await caller(request);
+      const publicKey = vapidPublicKey(env);
+      if (!publicKey) throw new RoomError("push_unconfigured");
+      return reply.code(200).header("cache-control", "no-store").send({ publicKey });
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/push/subscriptions", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      if (!vapidPublicKey(env)) throw new RoomError("push_unconfigured");
+      if (!pushWrites.allow(actor.id, Date.now())) throw new AuthError("rate_limited");
+      const keys = bodyField(request.body, "keys");
+      await savePushSubscription(db, actor, {
+        endpoint: bodyField(request.body, "endpoint"),
+        p256dh: bodyField(keys, "p256dh"),
+        auth: bodyField(keys, "auth"),
+        userAgent: request.headers["user-agent"],
+      });
+      return reply.code(204).header("cache-control", "no-store").send();
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.delete("/api/v1/push/subscriptions", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      await deletePushSubscription(db, actor, bodyField(request.body, "endpoint"));
+      return reply.code(204).header("cache-control", "no-store").send();
     } catch (error) {
       return sendError(request, reply, error);
     }

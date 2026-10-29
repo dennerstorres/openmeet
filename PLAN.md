@@ -136,7 +136,7 @@ F09-08 — Presença dos membros do servidor: WAITING_VALIDATION. Implementada e
 | F14-01 | PWA | Aceite do ADR 0027 e SPEC | — | DONE | Humano | — |
 | F14-02 | PWA | Manifest, ícones e CSP (worker/manifest) | F14-01,F12-04 | READY | Grok | G12 |
 | F14-03 | PWA | Service worker com cache seguro e aviso de nova versão | F14-02 | PENDING | Grok | G12 |
-| F14-04 | PWA | Migração e rotas de inscrição push | F14-01 | READY | Grok | G4,G10 |
+| F14-04 | PWA | Migração e rotas de inscrição push | F14-01 | IMPLEMENTED | Grok | G4,G10 |
 | F14-05 | PWA | Envio de push em menção, DM e resposta | F14-04,F13-13 | PENDING | Grok | G4,G10 |
 | F14-06 | PWA | Ativar push na UI e clique abre a conversa | F14-03,F14-05 | PENDING | Grok | G12 |
 | F14-07 | PWA | Prova: atualização com app aberto e push em Chrome, Firefox e Android | F14-06 | PENDING | Humano | G12 |

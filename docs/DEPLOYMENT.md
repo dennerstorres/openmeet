@@ -79,6 +79,10 @@ Referências: https://docs.livekit.io/transport/self-hosting/ e https://docs.liv
 
 Sem as duas chaves o botão some e as rotas do Google respondem 404. A URI de retorno vem de `API_DOMAIN`, ou de `GOOGLE_REDIRECT_URI` quando definida; nunca do cabeçalho Host. Instância fechada: o Google só cria conta para quem entra a partir de um link de convite válido (não revogado, não expirado, com uso restante). Sem convite, conta Google desconhecida é recusada com `invite_required` e nada é criado; quem já tem conta entra normalmente. O primeiro administrador continua nascendo pelo token de instalação.
 
+## Notificação push no cliente web (ADR 0027)
+
+Opcional. Gere um par VAPID uma vez por instância, por exemplo com `npx web-push generate-vapid-keys`, e grave no `infra/compose/.env`, fora do Git: `VAPID_PUBLIC_KEY=...`, `VAPID_PRIVATE_KEY=...` e `VAPID_SUBJECT=mailto:admin@exemplo.com`. Recrie o serviço `api`. Sem o par, `GET /api/v1/push/key` responde 404 e o cliente web esconde a opção. Trocar o par invalida as inscrições existentes. A chave privada nunca vai para log nem para o repositório.
+
 ## Salas de texto, DM e emoji (ADR 0024)
 
 ### Migração 0011 e seguintes
@@ -121,7 +125,7 @@ O Coolify já tem o Traefik nas portas 80/443, então o Caddy desta stack sai. O
 
 1. Na máquina local, gere segredos e o YAML do LiveKit: `node infra/compose/host.mjs --api-domain api.exemplo.com --livekit-domain livekit.exemplo.com` (sem `--up`). Copie `infra/compose/generated/livekit.yaml` para o servidor, por exemplo `/data/openmeet/livekit.yaml`.
 2. No Coolify, crie um recurso **Docker Compose** apontando para este repositório, com o arquivo `infra/compose/docker-compose.yml`. Apague o serviço `caddy` e os volumes `caddy-*` da cópia do Coolify.
-3. Em **Environment Variables**, cole os valores do `.env` gerado: `POSTGRES_PASSWORD`, `AUTH_SECRET`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_URL` (`wss://livekit.exemplo.com`), `BOOTSTRAP_TOKEN`, `PROXY_AUTH`, `API_DOMAIN` e, se quiser, `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`.
+3. Em **Environment Variables**, cole os valores do `.env` gerado: `POSTGRES_PASSWORD`, `AUTH_SECRET`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_URL` (`wss://livekit.exemplo.com`), `BOOTSTRAP_TOKEN`, `PROXY_AUTH`, `API_DOMAIN` e, se quiser, `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` e `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`.
 4. No serviço `livekit`, troque o volume `./generated/livekit.yaml` pelo caminho absoluto do passo 1. Mantenha `7881:7881` e `7882:7882/udp` publicados: a mídia não passa pelo Traefik.
 5. Domínios: `api` → `https://api.exemplo.com:3000`; `livekit` → `https://livekit.exemplo.com:7880`. O Traefik emite o certificado.
 6. O serviço `api` precisa receber `X-OpenMeet-Proxy: <PROXY_AUTH>` em toda requisição, como o Caddy fazia (S-11). Sem ele a API não confia no IP do cliente e o rate limit fica por proxy. Adicione nas labels do `api`:

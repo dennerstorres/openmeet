@@ -597,6 +597,31 @@ export const notifyPrefs = pgTable(
   ],
 );
 
+// ADR 0027: one Web Push subscription per browser of the web client.
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references((): AnyPgColumn => users.id),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    userAgent: text("user_agent"),
+    createdAt: createdAt(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true, mode: "date" }),
+  },
+  (table) => [
+    uniqueIndex("push_subscriptions_endpoint").on(table.endpoint),
+    index("push_subscriptions_user").on(table.userId),
+    check("push_subscriptions_endpoint_length", sql`char_length(${table.endpoint}) between 1 and 2048`),
+    check("push_subscriptions_p256dh_length", sql`char_length(${table.p256dh}) between 1 and 128`),
+    check("push_subscriptions_auth_length", sql`char_length(${table.auth}) between 1 and 64`),
+    check("push_subscriptions_user_agent_length", sql`${table.userAgent} is null or char_length(${table.userAgent}) <= 256`),
+  ],
+);
+
 export const schemaMigrations = pgTable("schema_migrations", {
   name: text("name").primaryKey(),
   appliedAt: timestamp("applied_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
@@ -631,5 +656,6 @@ export const identityTables = [
   userBlocks,
   chatReads,
   notifyPrefs,
+  pushSubscriptions,
   schemaMigrations,
 ] as const;

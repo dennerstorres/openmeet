@@ -1,5 +1,9 @@
 # HISTORY — registro cronológico
 
+### 2026-10-29 — F14-04, inscrições de push — Claude
+Branch `task/F14-04-push-subscriptions`, a partir da `main` 0472c83. ADR 0027. Migração `0013_push_subscriptions.sql` (uma linha por navegador, endpoint único, até 20 por conta, as mais velhas caem). Rotas: `GET /api/v1/push/key` (chave pública VAPID; 404 sem o par), `POST` e `DELETE /api/v1/push/subscriptions` (204; apagar só a própria, a dos outros fica e a resposta é a mesma). Endpoint só de serviços de push dos navegadores (FCM, Mozilla, WNS, Apple), em HTTPS e sem porta ou credencial, para o envio da F14-05 não virar SSRF. Mesmo navegador entrando em outra conta move a inscrição. Limite de 10 escritas/min por conta. `VAPID_*` no compose e no `DEPLOYMENT.md`.
+Windows 11, 2026-10-29: `pnpm --filter ./apps/server test` (122/122, inclui `push.test.ts` com 6 casos de permissão e validação e `schema.test.ts` com a 0013), `tsc --noEmit`, `pnpm lint`. Sem teste em Postgres real nem navegador: a UI é F14-06.
+
 ### 2026-10-28 — release 0.2.7 — Claude
 Branch `main`, após merge da `fix/camera-mic-desfoque` (OverconstrainedError da câmera/mic, .wasm do desfoque no web, captura que termina depois de sair da sala é parada). Versão 0.2.6 → 0.2.7 nos quatro arquivos, por pedido do usuário. Push da `main` e tag `v0.2.7`. Bug do ícone de câmera na aba ainda não validado no fluxo real.
 Release 0.2.7: run 40691187103 concluída com sucesso; GitHub Release `v0.2.7` com `OpenMeet_0.2.7_x64-setup.exe`, `.sig`, `latest.json` e `SHA256SUMS`.
