@@ -55,3 +55,63 @@ self.addEventListener("fetch", (event) => {
     })(),
   );
 });
+
+// ADR 0027 (F14-06): pushes from the instance (F14-05). A tab in front already shows the message, so the
+// push is skipped then; otherwise one notification per chat, replaced by the next one from that chat.
+const CHAT_ID = /^[0-9a-f-]{36}$/i;
+
+function pushChat(data) {
+  const chat = data && data.chat;
+  if (!chat || (chat.kind !== "room" && chat.kind !== "dm") || typeof chat.id !== "string" || !CHAT_ID.test(chat.id)) return null;
+  return { kind: chat.kind, id: chat.id };
+}
+
+function text(value, max) {
+  return typeof value === "string" ? value.slice(0, max) : "";
+}
+
+self.addEventListener("push", (event) => {
+  event.waitUntil(
+    (async () => {
+      let data = null;
+      try {
+        data = event.data ? event.data.json() : null;
+      } catch {
+        return;
+      }
+      const chat = pushChat(data);
+      if (!chat) return;
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      if (windows.some((client) => client.focused && client.visibilityState === "visible")) return;
+      const author = text(data.authorName, 80) || "OpenMeet";
+      const room = text(data.roomName, 80);
+      const title = chat.kind === "room" && room ? `${author} em #${room}` : author;
+      const lead = data.type === "mention" ? "Mencionou você" : data.type === "reply" ? "Respondeu você" : "";
+      const excerpt = text(data.excerpt, 200);
+      await self.registration.showNotification(title, {
+        body: lead && excerpt ? `${lead}: ${excerpt}` : lead || excerpt,
+        tag: `${chat.kind}:${chat.id}`,
+        icon: "/pwa/icon-192.png",
+        badge: "/pwa/icon-192.png",
+        data: { chat },
+      });
+    })(),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const chat = pushChat(event.notification.data);
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const open = windows.find((client) => new URL(client.url).origin === self.location.origin);
+      if (open) {
+        await open.focus();
+        if (chat) open.postMessage({ type: "openmeet:open-chat", chat });
+        return;
+      }
+      await self.clients.openWindow(chat ? `/?chat=${chat.kind}:${chat.id}` : "/");
+    })(),
+  );
+});

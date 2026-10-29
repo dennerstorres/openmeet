@@ -145,8 +145,10 @@ test("only the owner removes a subscription; someone else's endpoint is left alo
   await w.subscribe(w.ana, { endpoint, keys: { p256dh, auth: authKey } });
   assert.equal((await w.unsubscribe(w.admin, endpoint)).statusCode, 204);
   assert.deepEqual(await w.rows(), [{ username: "ana", endpoint }]);
-  assert.equal((await w.unsubscribe(w.ana, endpoint)).statusCode, 204);
+  const viaPost = await w.app.inject({ method: "POST", url: "/api/v1/push/unsubscribe", headers: auth(w.ana), payload: { endpoint } });
+  assert.equal(viaPost.statusCode, 204);
   assert.deepEqual(await w.rows(), []);
+  assert.equal((await w.unsubscribe(w.ana, endpoint)).statusCode, 204);
   assert.equal((await w.app.inject({ method: "DELETE", url: "/api/v1/push/subscriptions", payload: { endpoint } })).statusCode, 401);
   await w.app.close();
 });

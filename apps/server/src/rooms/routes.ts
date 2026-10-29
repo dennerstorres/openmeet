@@ -1397,16 +1397,26 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
     }
   });
 
-  app.delete("/api/v1/push/subscriptions", async (request, reply) => {
-    try {
-      const actor = await caller(request);
-      if (!db) throw new AuthError("auth_unconfigured");
-      await deletePushSubscription(db, actor, bodyField(request.body, "endpoint"));
-      return reply.code(204).header("cache-control", "no-store").send();
-    } catch (error) {
-      return sendError(request, reply, error);
-    }
-  });
+  // The same removal as POST too: the .exe and the web client only speak GET and POST through instance_call.
+  for (const [method, url] of [
+    ["DELETE", "/api/v1/push/subscriptions"],
+    ["POST", "/api/v1/push/unsubscribe"],
+  ] as const) {
+    app.route({
+      method,
+      url,
+      handler: async (request, reply) => {
+        try {
+          const actor = await caller(request);
+          if (!db) throw new AuthError("auth_unconfigured");
+          await deletePushSubscription(db, actor, bodyField(request.body, "endpoint"));
+          return reply.code(204).header("cache-control", "no-store").send();
+        } catch (error) {
+          return sendError(request, reply, error);
+        }
+      },
+    });
+  }
 
   app.get("/api/v1/blocks", async (request, reply) => {
     try {

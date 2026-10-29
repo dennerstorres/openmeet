@@ -29,7 +29,11 @@ Data: 2026-10-29. Branch: `main` local (ee6d2a3), **sem push para o remoto**.
 - Payload JSON: `{type, authorName, chat:{kind,id}, serverId, roomName, excerpt, messageId}` — é o contrato do `sw.js` na F14-06.
 - Servidor 125/125, typecheck e lint ok.
 
+## F14-06 (WAITING_VALIDATION, 2026-10-29)
+- Push ligado à caixa "Mostrar notificações do navegador"; `webPush.sync/stop` em `apps/desktop/src/web/native.ts`, stub no `shell/native.ts`.
+- `sw.js` com `push` e `notificationclick`; aba nova abre em `/?chat=kind:id`.
+- Servidor ganhou `POST /api/v1/push/unsubscribe`. Testes ok; push real não testado.
+
 ## Próximos passos
-1. **F14-06**: no cliente web, opção "Ativar notificações" (permissão só por clique) usando `/api/v1/push/key`. `pushManager.subscribe` → POST; logout → DELETE antes de sair. No `sw.js`: handlers `push` (pula se houver cliente com foco) e `notificationclick` (abre ou foca na conversa, usando `chat` e `serverId` do payload).
-2. **F14-07** (humano): instalar no Chrome; testar atualização com chamada aberta e push em Chrome, Firefox e Android.
-3. Revisão independente de F14-02 a F14-05 e `git push` da main, quando o usuário autorizar.
+1. **F14-07** (humano): gerar VAPID no `.env`, instalar no Chrome, ligar notificações, mandar menção/DM de outra conta com a aba em segundo plano e clicar na notificação. Repetir no Firefox e no Android. Testar atualização com chamada aberta.
+2. Revisão independente de F14-02 a F14-06 e `git push` da main, quando o usuário autorizar.

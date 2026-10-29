@@ -185,6 +185,29 @@ export function listenOpenChat(handler: (chat: NotifiedChat) => void): Promise<U
   });
 }
 
+/** ADR 0027: what the web client's Web Push needs from the signed-in model. */
+export interface PushApi {
+  key(): Promise<string | null>;
+  save(subscription: { endpoint: string; keys: { p256dh: string; auth: string } }): Promise<boolean>;
+  drop(endpoint: string): Promise<boolean>;
+}
+
+/** Web Push lives only in the browser build; the app has native toasts while it runs in the tray. */
+export const webPush = {
+  sync: async (api: PushApi): Promise<boolean> => {
+    void api;
+    return false;
+  },
+  stop: async (api: PushApi): Promise<void> => {
+    void api;
+  },
+};
+
+/** A chat a push notification opened in a new tab, taken once. The app never has one. */
+export function takeOpenedChat(): NotifiedChat | null {
+  return null;
+}
+
 /** The browser's Notification is opt-in on the web; the app always has toasts. */
 export const browserNotifications = {
   supported: (): boolean => false,
