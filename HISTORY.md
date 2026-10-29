@@ -1,5 +1,8 @@
 # HISTORY — registro cronológico
 
+### 2026-10-29 — F02-06, GO de Tauri/WebView2 — Claude
+Decisão humana do usuário: uso contínuo nas reuniões da equipe, desktop e web juntos, com microfone, câmera e compartilhamento funcionando. Registrado no ADR 0004 (Accepted, GO). M01–M12 não rodados item a item; o GO se apoia no uso real. F02-06 DONE; F08-01 READY.
+
 ### 2026-10-29 — F14-06, push no cliente web — Claude
 Branch `task/F14-06-push-ui`, a partir da `main` 0f2d957. ADR 0027. A caixa "Mostrar notificações do navegador" (Configurações) agora também inscreve este navegador no push: permissão só no clique; ao entrar com a permissão já dada, sincroniza sem perguntar; desmarcar ou "Sair da conta" apaga no servidor e depois no navegador. Par VAPID trocado no servidor refaz a inscrição. Sem VAPID (404) fica só a notificação da aba, sem erro. `sw.js`: `push` pula se há aba com foco e visível, uma notificação por chat (`tag`); `notificationclick` foca a aba aberta e manda `openmeet:open-chat`, ou abre `/?chat=room:<id>`, lido uma vez e tirado da barra. Servidor: `POST /api/v1/push/unsubscribe` (o cliente só fala GET/POST), e as três rotas de push entraram no allowlist do `prepareInstanceRequest`.
 Windows 11, 2026-10-29: `test/sw.test.mjs` 7/7 (2 novos: push e clique, ids inválidos recusados), server 125/125, shared 78/78, desktop 42/43 (a mesma falha "atalhos globais" de antes), `pnpm typecheck`, `pnpm lint`, `vite build --mode web`. Sem push real: precisa de VAPID, rede até FCM/Mozilla e navegador real (F14-07).
