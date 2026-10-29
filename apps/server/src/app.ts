@@ -7,6 +7,7 @@ import { registerAuth } from "./auth/routes.js";
 import type { MigrationClient } from "./db/migrate.js";
 import { registerInstance } from "./instance.js";
 import { redactInviteUrl, registerInvitePage } from "./invite-page.js";
+import { registerLegalPages } from "./legal-pages.js";
 import { registerPocJoin, type AppEnv } from "./poc-join.js";
 import type { RoomMedia } from "./rooms/media.js";
 import { registerRooms } from "./rooms/routes.js";
@@ -65,5 +66,6 @@ export async function buildApp(options?: {
   registerRooms(app, env, options?.db, options?.media);
   registerPocJoin(app, env);
   registerInvitePage(app, registerWebClient(app, env, options?.webRoot));
+  registerLegalPages(app);
   return app;
 }

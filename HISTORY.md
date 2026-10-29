@@ -753,3 +753,7 @@ Próxima tarefa:
 ## ADR 0010 — Google só cria conta com convite (2026-10-29, branch `main`)
 - Conta Google desconhecida só nasce se o login começou com um convite de servidor válido. `POST /auth/google/start` aceita `invite`; o hash fica em `oauth_logins.invite_hash` (migration `0012_google_invite.sql`). Sem convite: `invite_required` na página e no poll, nenhum usuário criado. Conta existente entra sem convite. O cliente manda o convite pendente da mesma instância.
 - Validação (Windows 11): `pnpm typecheck` ok, eslint ok, server google/schema/invite 14 pass, shared 78 pass. Não testado contra o Google real. Estado: WAITING_VALIDATION.
+
+## ADR 0010 — páginas públicas de privacidade e termos (2026-10-29, branch `main`)
+- A API serve `/privacidade` e `/termos` (HTML estático, sem script, CSP `default-src 'none'`), links pedidos pela tela de consentimento do Google. Novo `apps/server/src/legal-pages.ts` e teste `legal-pages.test.ts`; DEPLOYMENT.md cita os links.
+- Validação (Windows 11): server tsc ok, eslint ok, teste 1 pass. Texto genérico para instância privada; operador deve revisar. Estado: WAITING_VALIDATION.
