@@ -18,10 +18,14 @@ O instalador NSIS, por usuário, fica na página de Releases do GitHub. Ele não
 
 Na primeira abertura, a pessoa cola o endereço HTTPS da API e entra com o usuário daquela instância.
 
+## Cliente web
+
+A mesma API serve o cliente web na própria origem. Ele pode ser instalado como app (PWA) e recebe push de menção, resposta e DM quando a pessoa liga as notificações. O push exige o par VAPID no `.env`, descrito em `docs/DEPLOYMENT.md`.
+
 ## Desenvolvimento
 
 Node.js LTS, pnpm, Rust e Docker. O contrato dos agentes está em `AGENTS.md`. Requisitos em `SPEC.md`, tarefas em `PLAN.md`.
 
 ## Licença
 
-Apache-2.0. Veja `LICENSE` e `NOTICE`.
+Apache-2.0. Veja `LICENSE` e `NOTICE`. Licenças das dependências em `docs/THIRD_PARTY.md`. Segurança em `SECURITY.md` e contribuição em `CONTRIBUTING.md`.
