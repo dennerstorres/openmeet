@@ -442,6 +442,28 @@ export class MeetingModel {
     });
   }
 
+  /** Owners and moderators rename a room. */
+  async renameRoom(roomId: string, name: string): Promise<boolean> {
+    const done = (await this.memberCall("POST", `/api/v1/rooms/${roomId}/rename`, { name })) !== null;
+    if (done) {
+      await this.loadRooms(this.generation);
+      this.publish();
+    }
+    return done;
+  }
+
+  /** Owners and moderators set the room order of the selected server. The list names every room once. */
+  async reorderRooms(roomIds: string[]): Promise<boolean> {
+    const server = this.selectedServerId;
+    if (server === null) return false;
+    const done = (await this.memberCall("POST", `/api/v1/servers/${server}/rooms/order`, { roomIds }, 204)) !== null;
+    if (done) {
+      await this.loadRooms(this.generation);
+      this.publish();
+    }
+    return done;
+  }
+
   /** ADR 0023. Only the owner removes a server; every room in it ends. */
   async deleteServer(serverId: string): Promise<void> {
     await this.run(async (generation) => {

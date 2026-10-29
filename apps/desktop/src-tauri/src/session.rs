@@ -208,6 +208,8 @@ fn allowed_call(method: &str, path: &str) -> bool {
         ("POST", ["", "api", "v1", "rooms", id, "join"]) => is_id(id),
         // ADR 0023: removing a room or a server.
         ("POST", ["", "api", "v1", "rooms" | "servers", id, "delete"]) => is_id(id),
+        ("POST", ["", "api", "v1", "rooms", id, "rename"]) => is_id(id),
+        ("POST", ["", "api", "v1", "servers", id, "rooms", "order"]) => is_id(id),
         ("POST", ["", "api", "v1", "rooms", id, "participants", user_id, "kick"]) => is_id(id) && is_id(user_id),
         ("GET" | "POST", ["", "api", "v1", "servers", id, "rooms"]) => is_id(id),
         ("POST", ["", "api", "v1", "servers", id, "invites"]) => is_id(id),
@@ -531,6 +533,8 @@ mod tests {
             ("POST", format!("/api/v1/sounds/{id}/rename")),
             ("POST", format!("/api/v1/sounds/{id}/delete")),
             ("POST", format!("/api/v1/rooms/{id}/delete")),
+            ("POST", format!("/api/v1/rooms/{id}/rename")),
+            ("POST", format!("/api/v1/servers/{id}/rooms/order")),
             ("POST", format!("/api/v1/servers/{id}/delete")),
             ("GET", format!("/api/v1/rooms/{id}/messages")),
             ("GET", format!("/api/v1/rooms/{id}/messages?before=42")),

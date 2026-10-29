@@ -426,7 +426,7 @@ export async function listServerRooms(db: MigrationClient, actor: PublicUser, id
   const access = await loadServerAccess(db, actor, serverId(id));
   if (!activeRole(access.membership)) throw new RoomError("server_not_found");
   const listed = await db.query(
-    "select id, server_id, name, slug, kind, channel, ended_at is not null as ended from rooms where server_id = $1 and deleted_at is null order by created_at, id",
+    "select id, server_id, name, slug, kind, channel, ended_at is not null as ended from rooms where server_id = $1 and deleted_at is null order by position, created_at, id",
     [access.server.id],
   );
   return listed.rows.map(readRoom).filter((room): room is RoomRecord => room !== undefined);
@@ -624,14 +624,12 @@ export async function createRoom(
       const access = await loadServerAccess(tx, actor, target);
       requireMember(access);
       if (!canManage(access.membership)) throw new RoomError("forbidden");
-      const inserted = await tx.query("insert into rooms (server_id, name, slug, kind, channel, created_by) values ($1, $2, $3, $4, $5, $6) returning id", [
-        access.server.id,
-        name,
-        input.slug,
-        input.kind,
-        channel,
-        actor.id,
-      ]);
+      const inserted = await tx.query(
+        `insert into rooms (server_id, name, slug, kind, channel, created_by, position)
+         values ($1, $2, $3, $4, $5, $6, (select coalesce(max(position) + 1, 0) from rooms where server_id = $1))
+         returning id`,
+        [access.server.id, name, input.slug, input.kind, channel, actor.id],
+      );
       const id = text(inserted.rows[0]?.id);
       if (!id) throw new RoomError("conflict");
       await audit(tx, actor.id, "room_create", "room", id);
@@ -669,7 +667,7 @@ export async function listRooms(db: MigrationClient, actor: PublicUser): Promise
      join servers s on s.id = r.server_id and s.deleted_at is null
      join server_members m on m.server_id = r.server_id and m.user_id = $1 and m.removed_at is null
      where r.deleted_at is null
-     order by r.created_at, r.id`,
+     order by r.position, r.created_at, r.id`,
     [actor.id],
   );
   return listed.rows.map(readRoom).filter((room): room is RoomRecord => room !== undefined);
@@ -706,6 +704,37 @@ export async function endRoom(db: MigrationClient, actor: PublicUser, id: string
   if (revokeAt === undefined) return;
   await disconnectMedia(() => media.closeRoom(room.id, revokeAt));
   await db.query("update rooms set media_closed_at = now() where id = $1 and media_closed_at is null", [room.id]);
+}
+
+export async function renameRoom(db: MigrationClient, actor: PublicUser, id: string, value: string): Promise<RoomRecord> {
+  const name = parseName(value);
+  const { room, access } = await loadRoomAccess(db, actor, roomId(id));
+  if (!activeRole(access.membership)) throw new RoomError("room_not_found");
+  if (!canManage(access.membership)) throw new RoomError("forbidden");
+  return db.transaction(async (tx) => {
+    const updated = await tx.query("update rooms set name = $1, updated_at = now() where id = $2 and deleted_at is null returning id", [name, room.id]);
+    if (updated.rows.length !== 1) throw new RoomError("room_not_found");
+    await audit(tx, actor.id, "room_rename", "room", room.id);
+    return { ...room, name };
+  });
+}
+
+// The list must name every live room of the server exactly once; its order becomes the room order.
+export async function reorderRooms(db: MigrationClient, actor: PublicUser, server: string, roomIds: unknown): Promise<void> {
+  const target = serverId(server);
+  if (!Array.isArray(roomIds) || roomIds.length > 500 || !roomIds.every((item) => typeof item === "string")) throw new RoomError("invalid_body");
+  const ids = roomIds.map((item: string) => roomId(item));
+  if (new Set(ids).size !== ids.length) throw new RoomError("invalid_body");
+  const access = await loadServerAccess(db, actor, target);
+  requireMember(access);
+  if (!canManage(access.membership)) throw new RoomError("forbidden");
+  await db.transaction(async (tx) => {
+    const live = await tx.query("select id from rooms where server_id = $1 and deleted_at is null order by id for update", [target]);
+    const known = new Set(live.rows.map((row) => text(row.id)));
+    if (known.size !== ids.length || !ids.every((id) => known.has(id))) throw new RoomError("invalid_body");
+    await tx.query("update rooms r set position = o.n - 1, updated_at = now() from unnest($1::uuid[]) with ordinality as o(id, n) where r.id = o.id", [ids]);
+    await audit(tx, actor.id, "room_reorder", "server", target);
+  });
 }
 
 // ADR 0023: removal ends the call and hides the room; the row stays for audit and invites.

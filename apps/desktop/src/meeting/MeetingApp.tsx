@@ -86,6 +86,7 @@ import {
   ChatRegular,
   ClockRegular,
   DeleteRegular,
+  EditRegular,
   DismissRegular,
   HeadphonesRegular,
   MicOffRegular,
@@ -400,6 +401,8 @@ export function MeetingApp() {
   const [blurRadius, setBlurRadius] = useState(storedBlurRadius);
   const [kickTarget, setKickTarget] = useState<{ roomId: string; userId: string; label: string } | null>(null);
   // ADR 0023: removing a room or a server always asks first.
+  const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
+  const [draggedRoom, setDraggedRoom] = useState<string | null>(null);
   const [removeTarget, setRemoveTarget] = useState<{ kind: "room" | "server"; id: string; label: string } | null>(null);
   const [levels, setLevels] = useState<Record<string, PlaybackLevel>>({});
   const [mediaError, setMediaError] = useState<string | null>(null);
@@ -1121,88 +1124,122 @@ export function MeetingApp() {
               </p>
             ) : null}
             <ul className="room-list">
-              {state.rooms.map((room) => (
-                <li key={room.id} className="room-row">
-                  <button
-                    type="button"
-                    className={`room-item${room.id === state.activeRoomId || room.id === textRoom?.id ? " active" : ""}${
-                      room.channel === "text" && chatBadge(unread.state, { kind: "room", id: room.id }).unread ? " unread" : ""
-                    }`}
-                    disabled={room.channel === "text" ? false : state.pending || room.ended || room.id === state.activeRoomId}
-                    aria-current={room.id === textRoom?.id ? "page" : undefined}
-                    onClick={() => {
-                      if (room.channel === "text") {
-                        setTextRoomId(room.id);
-                        setDmOpenId(null);
-                        setMobileRooms(false);
-                        return;
-                      }
-                      setTextRoomId(null);
-                      void model.enterRoom(room.id, "").then(() => {
-                        if (model.snapshot().activeRoomId === room.id) setMobileRooms(false);
-                      });
+              {[...state.rooms.filter((room) => room.channel !== "text"), ...state.rooms.filter((room) => room.channel === "text")].map(
+                (room, index, ordered) => (
+                  <li
+                    key={room.id}
+                    className={room.channel === "text" && index > 0 && ordered[index - 1]?.channel !== "text" ? "room-row room-group-start" : "room-row"}
+                    draggable={state.canCreate && !state.pending}
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = "move";
+                      setDraggedRoom(room.id);
+                    }}
+                    onDragEnd={() => setDraggedRoom(null)}
+                    onDragOver={(event) => {
+                      const dragged = ordered.find((item) => item.id === draggedRoom);
+                      if (dragged && dragged.id !== room.id && (dragged.channel === "text") === (room.channel === "text")) event.preventDefault();
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      const dragged = draggedRoom;
+                      setDraggedRoom(null);
+                      if (dragged === null || dragged === room.id) return;
+                      const ids = ordered.map((item) => item.id).filter((id) => id !== dragged);
+                      const from = ordered.findIndex((item) => item.id === dragged);
+                      ids.splice(ids.indexOf(room.id) + (from < index ? 1 : 0), 0, dragged);
+                      void model.reorderRooms(ids);
                     }}
                   >
-                    {room.channel === "text" ? (
-                      <NumberSymbolRegular fontSize={18} />
-                    ) : room.kind === "temporary" ? (
-                      <ClockRegular fontSize={18} />
-                    ) : (
-                      <Speaker2Regular fontSize={18} />
-                    )}
-                    <span className="room-name">{room.name}</span>
-                    <UnreadMark badge={chatBadge(unread.state, { kind: "room", id: room.id })} />
-                    {room.ended ? (
-                      <Badge appearance="tint" color="subtle" size="small">
-                        encerrada
-                      </Badge>
-                    ) : room.kind === "temporary" ? (
-                      <span className="sr">temporária</span>
-                    ) : null}
-                  </button>
-                  {state.canCreate ? (
-                    <IconAction
-                      className="room-remove"
-                      danger
-                      disabled={state.pending}
-                      label={`Remover a sala ${room.name}`}
-                      icon={<DeleteRegular />}
+                    <button
+                      type="button"
+                      className={`room-item${room.id === state.activeRoomId || room.id === textRoom?.id ? " active" : ""}${
+                        room.channel === "text" && chatBadge(unread.state, { kind: "room", id: room.id }).unread ? " unread" : ""
+                      }`}
+                      disabled={room.channel === "text" ? false : state.pending || room.ended || room.id === state.activeRoomId}
+                      aria-current={room.id === textRoom?.id ? "page" : undefined}
                       onClick={() => {
-                        setRemoveTarget({ kind: "room", id: room.id, label: room.name });
+                        if (room.channel === "text") {
+                          setTextRoomId(room.id);
+                          setDmOpenId(null);
+                          setMobileRooms(false);
+                          return;
+                        }
+                        setTextRoomId(null);
+                        void model.enterRoom(room.id, "").then(() => {
+                          if (model.snapshot().activeRoomId === room.id) setMobileRooms(false);
+                        });
                       }}
-                    />
-                  ) : null}
-                  {(state.presence?.[room.id] ?? []).length > 0 ? (
-                    <ul className="occupants" aria-label={`Na sala ${room.name}`}>
-                      {(state.presence?.[room.id] ?? []).map((person) => {
-                        const speaking = room.id === state.activeRoomId && media.speakers.includes(person.id);
-                        return (
-                          <li key={person.id} className={speaking ? "speaking" : undefined}>
-                            <span className="avatar tiny" aria-hidden="true">
-                              <span>
-                                <Face origin={state.origin} imageId={memberById.get(person.id)?.avatarId ?? null} label={person.label} />
+                    >
+                      {room.channel === "text" ? (
+                        <NumberSymbolRegular fontSize={18} />
+                      ) : room.kind === "temporary" ? (
+                        <ClockRegular fontSize={18} />
+                      ) : (
+                        <Speaker2Regular fontSize={18} />
+                      )}
+                      <span className="room-name">{room.name}</span>
+                      <UnreadMark badge={chatBadge(unread.state, { kind: "room", id: room.id })} />
+                      {room.ended ? (
+                        <Badge appearance="tint" color="subtle" size="small">
+                          encerrada
+                        </Badge>
+                      ) : room.kind === "temporary" ? (
+                        <span className="sr">temporária</span>
+                      ) : null}
+                    </button>
+                    {state.canCreate ? (
+                      <IconAction
+                        className="room-edit"
+                        disabled={state.pending}
+                        label={`Editar a sala ${room.name}`}
+                        icon={<EditRegular />}
+                        onClick={() => setRenameTarget({ id: room.id, name: room.name })}
+                      />
+                    ) : null}
+                    {state.canCreate ? (
+                      <IconAction
+                        className="room-remove"
+                        danger
+                        disabled={state.pending}
+                        label={`Remover a sala ${room.name}`}
+                        icon={<DeleteRegular />}
+                        onClick={() => {
+                          setRemoveTarget({ kind: "room", id: room.id, label: room.name });
+                        }}
+                      />
+                    ) : null}
+                    {(state.presence?.[room.id] ?? []).length > 0 ? (
+                      <ul className="occupants" aria-label={`Na sala ${room.name}`}>
+                        {(state.presence?.[room.id] ?? []).map((person) => {
+                          const speaking = room.id === state.activeRoomId && media.speakers.includes(person.id);
+                          return (
+                            <li key={person.id} className={speaking ? "speaking" : undefined}>
+                              <span className="avatar tiny" aria-hidden="true">
+                                <span>
+                                  <Face origin={state.origin} imageId={memberById.get(person.id)?.avatarId ?? null} label={person.label} />
+                                </span>
                               </span>
-                            </span>
-                            <span className="room-name">{person.label}</span>
-                            {(state.canCreate || state.role === "admin") && !media.participants.some((p) => p.local && p.identity === person.id) ? (
-                              <IconAction
-                                danger
-                                disabled={state.pending}
-                                label={`Desconectar ${person.label} da sala`}
-                                icon={<CallEndRegular />}
-                                onClick={() => {
-                                  setKickTarget({ roomId: room.id, userId: person.id, label: person.label });
-                                }}
-                              />
-                            ) : null}
-                            {speaking ? <span className="sr"> falando</span> : null}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : null}
-                </li>
-              ))}
+                              <span className="room-name">{person.label}</span>
+                              {(state.canCreate || state.role === "admin") && !media.participants.some((p) => p.local && p.identity === person.id) ? (
+                                <IconAction
+                                  danger
+                                  disabled={state.pending}
+                                  label={`Desconectar ${person.label} da sala`}
+                                  icon={<CallEndRegular />}
+                                  onClick={() => {
+                                    setKickTarget({ roomId: room.id, userId: person.id, label: person.label });
+                                  }}
+                                />
+                              ) : null}
+                              {speaking ? <span className="sr"> falando</span> : null}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : null}
+                  </li>
+                ),
+              )}
             </ul>
             {selectedServer && state.rooms.length === 0 ? <p className="hint">Nenhuma sala neste servidor.</p> : null}
             {state.canCreate ? (
@@ -1443,6 +1480,38 @@ export function MeetingApp() {
           }}
           onCancel={() => setKickTarget(null)}
         />
+        {renameTarget !== null ? (
+          <Dialog open onOpenChange={(_, data) => !data.open && setRenameTarget(null)}>
+            <DialogSurface aria-describedby={undefined}>
+              <DialogBody>
+                <DialogTitle action={<IconAction label="Fechar" icon={<DismissRegular />} onClick={() => setRenameTarget(null)} />}>Editar sala</DialogTitle>
+                <DialogContent>
+                  <form
+                    className="modal-section"
+                    onSubmit={(event: FormEvent) => {
+                      event.preventDefault();
+                      void model.renameRoom(renameTarget.id, renameTarget.name.trim()).then((done) => {
+                        if (done) setRenameTarget(null);
+                      });
+                    }}
+                  >
+                    <Field label="Nome da sala">
+                      <Input
+                        value={renameTarget.name}
+                        maxLength={80}
+                        autoFocus
+                        onChange={(_, data) => setRenameTarget({ ...renameTarget, name: data.value })}
+                      />
+                    </Field>
+                    <Button type="submit" appearance="primary" disabled={state.pending || renameTarget.name.trim().length === 0}>
+                      Salvar
+                    </Button>
+                  </form>
+                </DialogContent>
+              </DialogBody>
+            </DialogSurface>
+          </Dialog>
+        ) : null}
         <ConfirmDialog
           open={removeTarget !== null}
           title={removeTarget?.kind === "server" ? "Remover servidor" : "Remover sala"}

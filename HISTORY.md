@@ -791,3 +791,9 @@ Próxima tarefa:
 - Desktop esconde o painel de contas (rotas admin bloqueadas por S-06); usa `__WEB__` para não vazar código nativo no bundle web.
 - Testes (Windows 11): shared 79/79, server 125+/0 falhas, desktop 44/1 — a falha "atalhos globais" no bundle web é anterior (DesktopOffer, RF-27).
 - Pendente: verificação manual no navegador e no .exe; sessões antigas aparecem como "Cliente desconhecido" até o próximo refresh.
+
+## 2026-10-29 — Editar e reordenar salas
+- Migration `0015_room_position.sql` (`rooms.position`). Rotas `POST /api/v1/rooms/:id/rename` e `POST /api/v1/servers/:id/rooms/order` (dono/moderador; a ordem precisa listar todas as salas vivas uma vez). Liberadas no filtro do cliente e no `allowed_call` do Rust.
+- UI: lápis ao lado da lixeira abre "Editar sala"; arrastar reordena dentro do grupo (voz ou texto). Voz primeiro, texto depois, com divisória; ícones centralizados na linha.
+- Testes: shared 79/0, server 126/0 (novo teste de rename/ordem), cargo allowed 2/0, desktop 44/1 (falha antiga "atalhos globais").
+- Pendente: teste manual de arrastar no .exe e na web.

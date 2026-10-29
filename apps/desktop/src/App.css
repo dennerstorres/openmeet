@@ -472,6 +472,7 @@ a {
   align-items: center;
   gap: 6px;
   width: 100%;
+  min-height: 34px;
   padding: 6px 8px;
   background: transparent;
   color: var(--text-faint);
@@ -484,11 +485,44 @@ a {
   position: relative;
 }
 
+.room-row > .room-edit {
+  position: absolute;
+  top: 17px;
+  right: 36px;
+  opacity: 0;
+  transform: translateY(-50%);
+}
+
+.room-row.room-group-start > .room-edit {
+  top: 24px;
+}
+
+.room-row:hover > .room-edit,
+.room-row > .room-edit:focus-visible {
+  opacity: 1;
+}
+
+.room-row[draggable="true"] {
+  cursor: grab;
+}
+
 .room-row > .room-remove {
   position: absolute;
-  top: 0;
+  top: 17px;
   right: 4px;
   opacity: 0;
+  transform: translateY(-50%);
+}
+
+/* Voice rooms first, then text rooms, with a small gap between the groups. */
+.room-row.room-group-start {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.room-row.room-group-start > .room-remove {
+  top: 24px;
 }
 
 .room-row:hover > .room-remove,
@@ -497,6 +531,7 @@ a {
 }
 
 @media (hover: none) {
+  .room-row > .room-edit,
   .room-row > .room-remove {
     opacity: 1;
   }

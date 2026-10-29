@@ -161,6 +161,7 @@ export const rooms = pgTable(
     slug: text("slug").notNull(),
     kind: roomKind("kind").notNull(),
     channel: roomChannel("channel").notNull().default("voice"),
+    position: integer("position").notNull().default(0),
     createdBy: uuid("created_by")
       .notNull()
       .references(() => users.id),

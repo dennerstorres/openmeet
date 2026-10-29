@@ -13,6 +13,8 @@ import {
   disableAccount,
   enableAccount,
   listAccounts,
+  renameRoom,
+  reorderRooms,
   resetAccountPassword,
   createInvite,
   createRoom,
@@ -721,6 +723,29 @@ export function registerRooms(app: FastifyInstance, env: AppEnv, db: MigrationCl
         throw new RoomError("invalid_body");
       }
       await endRoom(db, actor, param(request, "id"), media);
+      return reply.code(204).header("cache-control", "no-store").send();
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/rooms/:id/rename", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const room = await renameRoom(db, actor, param(request, "id"), requiredText(request.body, "name"));
+      return reply.code(200).header("cache-control", "no-store").send(room);
+    } catch (error) {
+      return sendError(request, reply, error);
+    }
+  });
+
+  app.post("/api/v1/servers/:id/rooms/order", async (request, reply) => {
+    try {
+      const actor = await caller(request);
+      if (!db) throw new AuthError("auth_unconfigured");
+      const body = typeof request.body === "object" && request.body !== null ? (request.body as Record<string, unknown>) : {};
+      await reorderRooms(db, actor, param(request, "id"), body.roomIds);
       return reply.code(204).header("cache-control", "no-store").send();
     } catch (error) {
       return sendError(request, reply, error);

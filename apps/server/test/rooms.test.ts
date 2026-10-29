@@ -542,3 +542,90 @@ test("servers hold rooms, hide themselves from non-members, and gate the room to
     await pg.close();
   }
 });
+
+test("managers rename rooms and set their order; members cannot", async () => {
+  const pg = new PGlite();
+  const db = pgliteClient(pg);
+  await applyMigrations(db);
+  const media: RoomMedia = { disconnect: async () => undefined, closeRoom: async () => undefined };
+  const app = await buildApp({
+    logger: false,
+    env: {
+      AUTH_SECRET: authSecret,
+      BOOTSTRAP_TOKEN: bootstrapToken,
+      LIVEKIT_URL: "ws://127.0.0.1:7880",
+      LIVEKIT_API_KEY: apiKey,
+      LIVEKIT_API_SECRET: apiSecret,
+    },
+    db,
+    media,
+  });
+  try {
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/bootstrap",
+      payload: { token: bootstrapToken, username: "admin", password: adminPassword, displayName: "Admin" },
+    });
+    const adminToken = (created.json() as { accessToken: string }).accessToken;
+    const server = (await app.inject({ method: "POST", url: "/api/v1/servers", headers: auth(adminToken), payload: { name: "Mesa" } })).json() as {
+      id: string;
+    };
+    const rooms: string[] = [];
+    for (const slug of ["a", "b", "c"]) {
+      const room = await app.inject({
+        method: "POST",
+        url: "/api/v1/rooms",
+        headers: auth(adminToken),
+        payload: { serverId: server.id, name: slug.toUpperCase(), slug, kind: "persistent" },
+      });
+      assert.equal(room.statusCode, 201);
+      rooms.push((room.json() as { id: string }).id);
+    }
+    const [a, b, c] = rooms as [string, string, string];
+    const names = async (): Promise<string[]> =>
+      ((await app.inject({ method: "GET", url: `/api/v1/servers/${server.id}/rooms`, headers: auth(adminToken) })).json() as { name: string }[]).map(
+        (room) => room.name,
+      );
+    assert.deepEqual(await names(), ["A", "B", "C"]);
+
+    const renamed = await app.inject({ method: "POST", url: `/api/v1/rooms/${b}/rename`, headers: auth(adminToken), payload: { name: "Taverna" } });
+    assert.equal(renamed.statusCode, 200);
+    const order = await app.inject({
+      method: "POST",
+      url: `/api/v1/servers/${server.id}/rooms/order`,
+      headers: auth(adminToken),
+      payload: { roomIds: [c, a, b] },
+    });
+    assert.equal(order.statusCode, 204);
+    assert.deepEqual(await names(), ["C", "A", "Taverna"]);
+
+    const partial = await app.inject({
+      method: "POST",
+      url: `/api/v1/servers/${server.id}/rooms/order`,
+      headers: auth(adminToken),
+      payload: { roomIds: [a, b] },
+    });
+    assert.equal(partial.statusCode, 400);
+    const repeated = await app.inject({
+      method: "POST",
+      url: `/api/v1/servers/${server.id}/rooms/order`,
+      headers: auth(adminToken),
+      payload: { roomIds: [a, a, b] },
+    });
+    assert.equal(repeated.statusCode, 400);
+
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/users",
+      headers: auth(adminToken),
+      payload: { username: "member", password: memberPassword, displayName: "Member", role: "participant" },
+    });
+    const memberToken = await login(app, "member", memberPassword);
+    const outsider = await app.inject({ method: "POST", url: `/api/v1/rooms/${a}/rename`, headers: auth(memberToken), payload: { name: "X" } });
+    assert.notEqual(outsider.statusCode, 200);
+    assert.deepEqual(await names(), ["C", "A", "Taverna"]);
+  } finally {
+    await app.close();
+    await pg.close();
+  }
+});

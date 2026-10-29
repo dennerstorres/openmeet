@@ -66,6 +66,7 @@ test("identity migration matches the schema and rejects a second admin, duplicat
       "0012_google_invite.sql",
       "0013_push_subscriptions.sql",
       "0014_session_client.sql",
+      "0015_room_position.sql",
     ]);
     assert.deepEqual(await applyMigrations(client), []);
 
@@ -167,6 +168,7 @@ test("identity migration matches the schema and rejects a second admin, duplicat
         "0012_google_invite.sql",
         "0013_push_subscriptions.sql",
         "0014_session_client.sql",
+        "0015_room_position.sql",
       ],
     );
   } finally {
@@ -211,6 +213,7 @@ test("the servers migration moves existing rooms into Geral and revokes room inv
       "0012_google_invite.sql",
       "0013_push_subscriptions.sql",
       "0014_session_client.sql",
+      "0015_room_position.sql",
     ]);
 
     const servers = await client.query("select id, name, created_by from servers");
@@ -282,6 +285,7 @@ test("the session family migration names every chain by its root", async () => {
       "0012_google_invite.sql",
       "0013_push_subscriptions.sql",
       "0014_session_client.sql",
+      "0015_room_position.sql",
     ]);
     const rows = await client.query("select id, family_id from refresh_sessions");
     const family = new Map(rows.rows.map((row) => [row.id, row.family_id]));
