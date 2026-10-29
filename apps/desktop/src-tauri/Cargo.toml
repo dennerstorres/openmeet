@@ -1,6 +1,6 @@
 [package]
 name = "openmeet-desktop"
-version = "0.2.14"
+version = "0.2.15"
 description = "OpenMeet desktop shell"
 authors = ["OpenMeet"]
 license = "Apache-2.0"
