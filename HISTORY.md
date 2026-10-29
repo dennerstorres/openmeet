@@ -1,5 +1,9 @@
 # HISTORY — registro cronológico
 
+### 2026-10-29 — F14-05, envio de push — Claude
+Branch `task/F14-05-push-send`, a partir da `main` 2073b52. ADR 0027. Lib `web-push` 3.6.7 (fixada no lockfile). `pushMessage` em `rooms/push.ts`, chamado depois da resposta nas duas rotas de envio (sala e DM), sem atrasar a mensagem; o `onClose` espera os envios. Destinatários: nunca o autor, nunca quem bloqueou o autor, nunca chat em "none"; sala só menção (inclui @everyone) ou resposta à própria mensagem; DM também qualquer mensagem no nível "all" (padrão de DM). Payload: tipo, nome do autor, chat, servidor, sala, trecho de até 120 caracteres (`<@id>` vira `@`) e id. 404/410 apaga a inscrição; 2xx atualiza `last_used_at`. Erro vai ao log só com código. Sender injetável (`buildApp({ pushSender })`).
+Windows 11, 2026-10-29: `pnpm --filter ./apps/server test` (125/125; `push.test.ts` 9/9 com 3 casos novos), `pnpm typecheck`, `pnpm lint`. Sem envio real a FCM/Mozilla: depende da F14-06 e da F14-07.
+
 ### 2026-10-29 — F14-04, inscrições de push — Claude
 Branch `task/F14-04-push-subscriptions`, a partir da `main` 0472c83. ADR 0027. Migração `0013_push_subscriptions.sql` (uma linha por navegador, endpoint único, até 20 por conta, as mais velhas caem). Rotas: `GET /api/v1/push/key` (chave pública VAPID; 404 sem o par), `POST` e `DELETE /api/v1/push/subscriptions` (204; apagar só a própria, a dos outros fica e a resposta é a mesma). Endpoint só de serviços de push dos navegadores (FCM, Mozilla, WNS, Apple), em HTTPS e sem porta ou credencial, para o envio da F14-05 não virar SSRF. Mesmo navegador entrando em outra conta move a inscrição. Limite de 10 escritas/min por conta. `VAPID_*` no compose e no `DEPLOYMENT.md`.
 Windows 11, 2026-10-29: `pnpm --filter ./apps/server test` (122/122, inclui `push.test.ts` com 6 casos de permissão e validação e `schema.test.ts` com a 0013), `tsc --noEmit`, `pnpm lint`. Sem teste em Postgres real nem navegador: a UI é F14-06.

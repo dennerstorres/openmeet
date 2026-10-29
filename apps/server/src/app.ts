@@ -1,3 +1,4 @@
+import type { PushSender } from "./rooms/push.js";
 import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { GoogleTokens } from "./auth/google.js";
@@ -22,6 +23,8 @@ export async function buildApp(options?: {
   media?: RoomMedia;
   attempts?: AttemptOptions;
   googleTokens?: GoogleTokens;
+  /** ADR 0027: tests send pushes through this instead of the network. */
+  pushSender?: PushSender;
   /** ADR 0014: the built web client (`dist-web`). Absent, the instance serves only the API. */
   webRoot?: string;
   /** Tests read the production log lines through this stream. */
@@ -63,7 +66,7 @@ export async function buildApp(options?: {
   registerInstance(app, env, options?.db);
   registerAuth(app, env, options?.db, attempts, options?.media);
   registerGoogle(app, env, options?.db, attempts, options?.googleTokens);
-  registerRooms(app, env, options?.db, options?.media);
+  registerRooms(app, env, options?.db, options?.media, options?.pushSender);
   registerPocJoin(app, env);
   registerInvitePage(app, registerWebClient(app, env, options?.webRoot));
   registerLegalPages(app);
