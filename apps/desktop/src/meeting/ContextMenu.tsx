@@ -6,6 +6,8 @@ export interface MenuItem {
   onSelect: () => void;
   danger?: boolean;
   disabled?: boolean;
+  /** Turns the row into a 0–100% slider that stays open while it is dragged. */
+  volume?: { value: number; onChange: (value: number) => void };
 }
 
 const LONG_PRESS_MS = 500;
@@ -81,21 +83,25 @@ function ContextMenu(props: { x: number; y: number; items: readonly MenuItem[]; 
 
   return createPortal(
     <div ref={ref} className="context-menu" role="menu" style={position} onContextMenu={(event) => event.preventDefault()}>
-      {props.items.map((item) => (
-        <button
-          key={item.label}
-          type="button"
-          role="menuitem"
-          className={item.danger ? "danger" : undefined}
-          disabled={item.disabled}
-          onClick={() => {
-            props.onClose();
-            item.onSelect();
-          }}
-        >
-          {item.label}
-        </button>
-      ))}
+      {props.items.map((item) =>
+        item.volume ? (
+          <VolumeRow key={item.label} label={item.label} initial={item.volume.value} onChange={item.volume.onChange} />
+        ) : (
+          <button
+            key={item.label}
+            type="button"
+            role="menuitem"
+            className={item.danger ? "danger" : undefined}
+            disabled={item.disabled}
+            onClick={() => {
+              props.onClose();
+              item.onSelect();
+            }}
+          >
+            {item.label}
+          </button>
+        ),
+      )}
     </div>,
     document.body,
   );
@@ -109,5 +115,29 @@ export function MenuRow(props: { items: () => readonly MenuItem[]; className?: s
       {props.children}
       {context.menu}
     </li>
+  );
+}
+
+function VolumeRow(props: { label: string; initial: number; onChange: (value: number) => void }) {
+  const [value, setValue] = useState(Math.round(props.initial * 100));
+  return (
+    <label className="context-volume">
+      <span>
+        {props.label} <output>{value}%</output>
+      </span>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={1}
+        value={value}
+        aria-label={props.label}
+        onChange={(event) => {
+          const next = Number(event.currentTarget.value);
+          setValue(next);
+          props.onChange(next / 100);
+        }}
+      />
+    </label>
   );
 }

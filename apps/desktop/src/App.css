@@ -3170,3 +3170,15 @@ button.message-reply:hover span:where(:not([class*="fui-"])) {
   -webkit-touch-callout: none;
   user-select: none;
 }
+
+.context-volume {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+}
+
+.context-volume span {
+  display: flex;
+  justify-content: space-between;
+}

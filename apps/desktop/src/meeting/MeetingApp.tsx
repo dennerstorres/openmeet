@@ -869,7 +869,11 @@ export function MeetingApp() {
       if (!self) {
         const heard = levelFor(cardId).heard;
         items.push({ label: heard ? "Silenciar para mim" : "Voltar a ouvir", onSelect: () => changeLevel(cardId, { heard: !heard }) });
-        items.push({ label: "Volume normal", onSelect: () => changeLevel(cardId, { volume: 1 }) });
+        items.push({
+          label: "Volume",
+          onSelect: () => undefined,
+          volume: { value: levelFor(cardId).volume, onChange: (volume) => changeLevel(cardId, { volume }) },
+        });
       }
     }
     if ((state.canCreate || state.role === "admin") && !self) {
@@ -886,6 +890,11 @@ export function MeetingApp() {
     if (!card.local && card.audioIds.length > 0) {
       const heard = levelFor(card.id).heard;
       items.push({ label: heard ? "Silenciar para mim" : "Voltar a ouvir", onSelect: () => changeLevel(card.id, { heard: !heard }) });
+      items.push({
+        label: "Volume",
+        onSelect: () => undefined,
+        volume: { value: levelFor(card.id).volume, onChange: (volume) => changeLevel(card.id, { volume }) },
+      });
     }
     return items;
   }
