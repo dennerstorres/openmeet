@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@fluentui/react-components";
 import { Face } from "./images";
 import {
@@ -30,6 +30,54 @@ export interface CardStageProps {
   levelFor: (cardId: string) => PlaybackLevel;
   onLevel: (cardId: string, patch: Partial<PlaybackLevel>) => void;
   onPin: (cardId: string | null) => void;
+  /** Grid mode: "auto" fits every card, a number fixes the cards per screen. */
+  gridCapacity: GridCapacity;
+}
+
+export type GridCapacity = "auto" | 4 | 9 | 16;
+
+const GRID_GAP = 12;
+const ASPECT = 16 / 9;
+
+/** Picks the column count that gives the largest 16:9 card for `count` cards in a w×h box. */
+export function gridShape(count: number, capacity: GridCapacity, width: number, height: number) {
+  const fit = (cols: number, rows: number) =>
+    Math.max(0, Math.min((width - GRID_GAP * (cols - 1)) / cols, ((height - GRID_GAP * (rows - 1)) / rows) * ASPECT));
+  if (capacity !== "auto") {
+    const side = Math.sqrt(capacity);
+    return { cols: side, cardWidth: fit(side, side) };
+  }
+  const n = Math.max(1, count);
+  let best = { cols: 1, cardWidth: 0 };
+  for (let cols = 1; cols <= n; cols += 1) {
+    const cardWidth = fit(cols, Math.ceil(n / cols));
+    if (cardWidth > best.cardWidth) best = { cols, cardWidth };
+  }
+  return best;
+}
+
+function CardGrid(props: { count: number; capacity: GridCapacity; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState({ width: 0, height: 0 });
+  useEffect(() => {
+    const node = ref.current;
+    if (node === null) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setBox({ width: entry.contentRect.width, height: entry.contentRect.height });
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  const { cols, cardWidth } = gridShape(props.count, props.capacity, box.width, box.height);
+  const style =
+    cardWidth > 0
+      ? { gridTemplateColumns: `repeat(${cols}, ${Math.floor(cardWidth)}px)`, gridAutoRows: `${Math.floor(cardWidth / ASPECT)}px` }
+      : undefined;
+  return (
+    <div ref={ref} className="card-grid" style={style}>
+      {props.children}
+    </div>
+  );
 }
 
 export function CardStage(props: CardStageProps) {
@@ -64,7 +112,9 @@ export function CardStage(props: CardStageProps) {
           {!props.fullscreen && others.length > 0 ? <div className="strip">{others.map((card) => render(card, "strip"))}</div> : null}
         </>
       ) : (
-        <div className="card-grid">{others.map((card) => render(card, "grid"))}</div>
+        <CardGrid count={others.length} capacity={props.gridCapacity}>
+          {others.map((card) => render(card, "grid"))}
+        </CardGrid>
       )}
       {props.cards.flatMap((card) =>
         card.audioIds.flatMap((id) => {

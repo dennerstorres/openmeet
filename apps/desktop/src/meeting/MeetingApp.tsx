@@ -52,7 +52,7 @@ import {
 import desktopPackage from "../../package.json";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { holdMeetingLock } from "../shell/background";
-import { CardStage } from "./Cards";
+import { CardStage, type GridCapacity } from "./Cards";
 import { Face, ImagePicker } from "./images";
 import { ConfirmDialog, IconAction } from "./fluent";
 import { DESKTOP_DOWNLOAD_URL, isWindowsDesktop } from "../web/desktopApp";
@@ -389,6 +389,7 @@ export function MeetingApp() {
   const [copied, setCopied] = useState(false);
   const [creating, setCreating] = useState<"server" | "room" | null>(null);
   const [layout, setLayout] = useState<CardLayout>("spotlight");
+  const [gridCapacity, setGridCapacity] = useState<GridCapacity>("auto");
   const [mobileRooms, setMobileRooms] = useState(true);
   const [pinnedId, setPinnedId] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
@@ -2068,6 +2069,15 @@ export function MeetingApp() {
                   Grade
                 </button>
               </div>
+              {layout === "grid" ? (
+                <div className="segmented" role="group" aria-label="Cards por tela">
+                  {(["auto", 4, 9, 16] as const).map((option) => (
+                    <button key={option} type="button" aria-pressed={gridCapacity === option} onClick={() => setGridCapacity(option)}>
+                      {option === "auto" ? "Auto" : option}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               {layout === "spotlight" ? (
                 <Button appearance="subtle" size="small" onClick={() => setFullscreen(true)} disabled={placement.featuredId === null}>
                   Tela cheia
@@ -2096,6 +2106,7 @@ export function MeetingApp() {
               accountFor={(identity) => callMembers.get(identity)?.globalName ?? null}
               tiles={media.tiles}
               layout={layout}
+              gridCapacity={gridCapacity}
               featuredId={placement.featuredId}
               others={placement.others}
               pinnedId={pin}
