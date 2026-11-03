@@ -23,6 +23,7 @@ import {
   screenCaption,
   screenShareAction,
   type CardLayout,
+  type MeetingCard,
   type DeviceKind,
   type DeviceOption,
   type PlaybackLevel,
@@ -53,6 +54,7 @@ import desktopPackage from "../../package.json";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { holdMeetingLock } from "../shell/background";
 import { CardStage, type GridCapacity } from "./Cards";
+import { MenuRow, type MenuItem as ActionItem } from "./ContextMenu";
 import { Face, ImagePicker } from "./images";
 import { ConfirmDialog, IconAction } from "./fluent";
 import { DESKTOP_DOWNLOAD_URL, isWindowsDesktop } from "../web/desktopApp";
@@ -856,6 +858,38 @@ export function MeetingApp() {
     setLevels((current) => ({ ...current, [id]: nextPlayback(current[id] ?? DEFAULT_PLAYBACK, patch) }));
   }
 
+  /** ADR 0013: actions on a person, shared by the card menu and the room list. */
+  function personMenu(identity: string, label: string, roomId: string): ActionItem[] {
+    const items: ActionItem[] = [];
+    const self = media.participants.some((p) => p.local && p.identity === identity);
+    const inCallHere = roomId === state.activeRoomId && cards.some((card) => card.identity === identity);
+    if (inCallHere) {
+      const cardId = `person:${identity}`;
+      items.push({ label: pin === cardId ? "Soltar destaque" : "Fixar em destaque", onSelect: () => setPinnedId(pin === cardId ? null : cardId) });
+      if (!self) {
+        const heard = levelFor(cardId).heard;
+        items.push({ label: heard ? "Silenciar para mim" : "Voltar a ouvir", onSelect: () => changeLevel(cardId, { heard: !heard }) });
+        items.push({ label: "Volume normal", onSelect: () => changeLevel(cardId, { volume: 1 }) });
+      }
+    }
+    if ((state.canCreate || state.role === "admin") && !self) {
+      items.push({ label: "Desconectar da sala", danger: true, disabled: state.pending, onSelect: () => setKickTarget({ roomId, userId: identity, label }) });
+    }
+    return items;
+  }
+
+  function cardMenu(card: MeetingCard): ActionItem[] {
+    if (card.kind === "person" && state.activeRoomId) return personMenu(card.identity, card.label, state.activeRoomId);
+    const items: ActionItem[] = [
+      { label: pin === card.id ? "Soltar destaque" : "Fixar em destaque", onSelect: () => setPinnedId(pin === card.id ? null : card.id) },
+    ];
+    if (!card.local && card.audioIds.length > 0) {
+      const heard = levelFor(card.id).heard;
+      items.push({ label: heard ? "Silenciar para mim" : "Voltar a ouvir", onSelect: () => changeLevel(card.id, { heard: !heard }) });
+    }
+    return items;
+  }
+
   function onDevice(kind: DeviceKind, deviceId: string): void {
     storeDevice(kind, deviceId);
     if (!inCall) {
@@ -1214,7 +1248,7 @@ export function MeetingApp() {
                         {(state.presence?.[room.id] ?? []).map((person) => {
                           const speaking = room.id === state.activeRoomId && media.speakers.includes(person.id);
                           return (
-                            <li key={person.id} className={speaking ? "speaking" : undefined}>
+                            <MenuRow key={person.id} className={speaking ? "speaking" : undefined} items={() => personMenu(person.id, person.label, room.id)}>
                               <span className="avatar tiny" aria-hidden="true">
                                 <span>
                                   <Face origin={state.origin} imageId={memberById.get(person.id)?.avatarId ?? null} label={person.label} />
@@ -1233,7 +1267,7 @@ export function MeetingApp() {
                                 />
                               ) : null}
                               {speaking ? <span className="sr"> falando</span> : null}
-                            </li>
+                            </MenuRow>
                           );
                         })}
                       </ul>
@@ -2116,6 +2150,7 @@ export function MeetingApp() {
               levelFor={levelFor}
               onLevel={changeLevel}
               onPin={setPinnedId}
+              menuFor={cardMenu}
             />
             <div className={`dock${isFullscreen ? " thin" : ""}`}>
               {media.audioPlayback ? null : (

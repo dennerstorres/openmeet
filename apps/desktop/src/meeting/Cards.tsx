@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@fluentui/react-components";
 import { Face } from "./images";
+import { useContextMenu, type MenuItem } from "./ContextMenu";
 import {
   applyPlayback,
   effectivePlayback,
@@ -32,6 +33,8 @@ export interface CardStageProps {
   onPin: (cardId: string | null) => void;
   /** Grid mode: "auto" fits every card, a number fixes the cards per screen. */
   gridCapacity: GridCapacity;
+  /** Actions for the right-click / long-press menu of a card. */
+  menuFor: (card: MeetingCard) => readonly MenuItem[];
 }
 
 export type GridCapacity = "auto" | 4 | 9 | 16;
@@ -41,8 +44,7 @@ const ASPECT = 16 / 9;
 
 /** Picks the column count that gives the largest 16:9 card for `count` cards in a w×h box. */
 export function gridShape(count: number, capacity: GridCapacity, width: number, height: number) {
-  const fit = (cols: number, rows: number) =>
-    Math.max(0, Math.min((width - GRID_GAP * (cols - 1)) / cols, ((height - GRID_GAP * (rows - 1)) / rows) * ASPECT));
+  const fit = (cols: number, rows: number) => Math.max(0, Math.min((width - GRID_GAP * (cols - 1)) / cols, ((height - GRID_GAP * (rows - 1)) / rows) * ASPECT));
   if (capacity !== "auto") {
     const side = Math.sqrt(capacity);
     return { cols: side, cardWidth: fit(side, side) };
@@ -70,9 +72,7 @@ function CardGrid(props: { count: number; capacity: GridCapacity; children: Reac
   }, []);
   const { cols, cardWidth } = gridShape(props.count, props.capacity, box.width, box.height);
   const style =
-    cardWidth > 0
-      ? { gridTemplateColumns: `repeat(${cols}, ${Math.floor(cardWidth)}px)`, gridAutoRows: `${Math.floor(cardWidth / ASPECT)}px` }
-      : undefined;
+    cardWidth > 0 ? { gridTemplateColumns: `repeat(${cols}, ${Math.floor(cardWidth)}px)`, gridAutoRows: `${Math.floor(cardWidth / ASPECT)}px` } : undefined;
   return (
     <div ref={ref} className="card-grid" style={style}>
       {props.children}
@@ -102,6 +102,7 @@ export function CardStage(props: CardStageProps) {
       playback={props.levelFor(card.id)}
       onLevel={(patch) => props.onLevel(card.id, patch)}
       onPin={() => props.onPin(props.pinnedId === card.id ? null : card.id)}
+      menu={() => props.menuFor(card)}
     />
   );
   return (
@@ -140,8 +141,10 @@ function CardView(props: {
   playback: PlaybackLevel;
   onLevel: (patch: Partial<PlaybackLevel>) => void;
   onPin: () => void;
+  menu: () => readonly MenuItem[];
 }) {
   const { card } = props;
+  const context = useContextMenu(props.menu);
   const live = props.video !== undefined && shouldShowLiveVideo(props.video);
   const hearable = (card.kind === "person" || card.kind === "radio") && !card.local && card.audioIds.length > 0;
   const name =
@@ -156,6 +159,7 @@ function CardView(props: {
           : card.label;
   return (
     <article
+      {...context.handlers}
       className={`card ${props.size}${props.pinned ? " pinned" : ""}${props.speaking ? " speaking" : ""}${card.kind === "share" ? " share" : ""}${card.kind === "radio" ? " radio" : ""}`}
     >
       {live && props.video ? (
@@ -196,6 +200,7 @@ function CardView(props: {
           </label>
         </div>
       ) : null}
+      {context.menu}
     </article>
   );
 }

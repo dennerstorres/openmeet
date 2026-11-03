@@ -3125,3 +3125,48 @@ button.message-reply:hover span:where(:not([class*="fui-"])) {
 .fui-Checkbox {
   margin-inline-start: -8px;
 }
+
+.context-menu {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  padding: 4px;
+  border: 1px solid var(--colorNeutralStroke1, #333);
+  border-radius: 8px;
+  background: var(--colorNeutralBackground1, #1f2120);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 40%);
+}
+
+.context-menu button {
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.context-menu button:hover:not(:disabled),
+.context-menu button:focus-visible {
+  background: var(--colorNeutralBackground1Hover, #2a2d2b);
+  outline: none;
+}
+
+.context-menu button.danger {
+  color: var(--colorPaletteRedForeground1, #f1707b);
+}
+
+.context-menu button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.card,
+.occupants li {
+  -webkit-touch-callout: none;
+  user-select: none;
+}
