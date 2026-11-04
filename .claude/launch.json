@@ -4,11 +4,7 @@
     {
       "name": "desktop-web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "--filter",
-        "@openmeet/desktop",
-        "dev"
-      ],
+      "runtimeArgs": ["--filter", "@openmeet/desktop", "dev"],
       "port": 1420
     },
     {
@@ -24,14 +20,7 @@
     {
       "name": "web-client",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "--filter",
-        "@openmeet/desktop",
-        "exec",
-        "vite",
-        "--mode",
-        "web"
-      ],
+      "runtimeArgs": ["--filter", "@openmeet/desktop", "exec", "vite", "--mode", "web"],
       "port": 1420,
       "env": {
         "OPENMEET_API": "http://127.0.0.1:3002"
@@ -70,17 +59,7 @@
     {
       "name": "delete-web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "--filter",
-        "@openmeet/desktop",
-        "exec",
-        "vite",
-        "--mode",
-        "web",
-        "--port",
-        "1430",
-        "--strictPort"
-      ],
+      "runtimeArgs": ["--filter", "@openmeet/desktop", "exec", "vite", "--mode", "web", "--port", "1430", "--strictPort"],
       "port": 1430,
       "env": {
         "OPENMEET_API": "http://127.0.0.1:3012"
@@ -89,18 +68,7 @@
     {
       "name": "fluent-poc",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "--filter",
-        "@openmeet/desktop",
-        "exec",
-        "vite",
-        "preview",
-        "--port",
-        "4173",
-        "--strictPort",
-        "--outDir",
-        "dist-poc"
-      ],
+      "runtimeArgs": ["--filter", "@openmeet/desktop", "exec", "vite", "preview", "--port", "4173", "--strictPort", "--outDir", "dist-poc"],
       "port": 4173,
       "env": {
         "FLUENT_POC": "1"
@@ -109,17 +77,7 @@
     {
       "name": "fluent-web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "--filter",
-        "@openmeet/desktop",
-        "exec",
-        "vite",
-        "--mode",
-        "web",
-        "--port",
-        "1440",
-        "--strictPort"
-      ],
+      "runtimeArgs": ["--filter", "@openmeet/desktop", "exec", "vite", "--mode", "web", "--port", "1440", "--strictPort"],
       "port": 1440,
       "env": {
         "OPENMEET_API": "http://127.0.0.1:3000"
@@ -156,17 +114,7 @@
     {
       "name": "fluent-web-2",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "--filter",
-        "@openmeet/desktop",
-        "exec",
-        "vite",
-        "--mode",
-        "web",
-        "--port",
-        "1460",
-        "--strictPort"
-      ],
+      "runtimeArgs": ["--filter", "@openmeet/desktop", "exec", "vite", "--mode", "web", "--port", "1460", "--strictPort"],
       "port": 1460,
       "env": {
         "OPENMEET_API": "http://127.0.0.1:3020"
