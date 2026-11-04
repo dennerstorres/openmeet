@@ -1,5 +1,11 @@
 # Fase 07 — distribution
 
+## F07-13 — Release 0.2.19
+
+READY → IN_PROGRESS em 2026-11-04, por pedido explícito do usuário. Escopo: correção visual F04-05 no rodapé lateral e nos pares ícone/chevron do dock, registros, quatro manifests em `0.2.19`, commit e push na `main`, tag `v0.2.19` e publicação do instalador pelo workflow. Gates locais: testes do desktop, scripts de release, typecheck, lint, formatação e build. Instalação e atualização reais ficam `WAITING_VALIDATION`.
+
+Gates locais PASS em Windows 11: desktop 45/45, scripts de release 6/6, typecheck, ESLint, Prettier e build. O aviso de chunk acima de 500 kB permanece o preexistente. CI, publicação e conferência dos artefatos ainda pendentes.
+
 ## F07-12 — Release 0.2.18
 
 READY → IN_PROGRESS em 2026-11-04. Retomar versão deixada pelo Claude sobre 093699b, por pedido do usuário. Branch `codex/F07-12-release-0.2.18`. Arquivos: quatro manifests de versão do desktop, teste de anexos, PLAN.md, este plano e HISTORY.md. Validar testes de release, anexos/permissões, CI e artefatos publicados. CI do merge falhou porque attachments.test.ts ainda esperava 409 para upload em sala de voz, agora permitido pelo ADR 0031. Instalação e atualização em máquina real ficam WAITING_VALIDATION.

@@ -2669,7 +2669,7 @@ function DeviceMenu({
   return (
     <Popover positioning="above-end" withArrow onOpenChange={(_, data) => onOpen(data.open)}>
       <PopoverTrigger disableButtonEnhancement>
-        <Button appearance="subtle" size="small" className="device-arrow" aria-label={label} title={label} icon={<ChevronDownRegular />} />
+        <Button appearance="subtle" size="small" className="device-arrow" aria-label={label} title={label} icon={<ChevronDownRegular />} disabled={disabled} />
       </PopoverTrigger>
       <PopoverSurface className="device-menu">
         {kinds.map((item) => (

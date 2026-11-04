@@ -1,5 +1,7 @@
 # PLAN — roadmap executável (fonte de verdade)
 
+F07-13 — Release 0.2.19: IN_PROGRESS em 2026-11-04, por pedido explícito do usuário. Inclui somente a correção visual F04-05 do rodapé lateral e dos controles segmentados do dock, mais registros e quatro manifests de versão. Gates locais PASS: desktop 45/45, release 6/6, typecheck, lint, formatação e build. Faltam CI/publicação da tag; instalação e atualização reais permanecem `WAITING_VALIDATION`.
+
 F07-12 — Release 0.2.18: WAITING_VALIDATION em 2026-11-04, retomada explicitamente solicitada pelo usuário após interrupção. Merge 093699b preservado; expectativa antiga de anexo em sala de voz corrigida conforme ADR 0031. CI completo 41898690823 e CI da tag 41899548742 PASS; testes locais 20/20 e release 6/6. Main e tag v0.2.18 enviadas no commit 6734f70; publicação 41899548934 PASS. Instalador, assinatura, latest.json e SHA256SUMS publicados e baixados para conferir hash e referências. Gate G7: instalação e atualização reais permanecem pendentes.
 
 Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, `VERIFIED`, `DONE`, `BLOCKED`.
@@ -39,6 +41,7 @@ F07-03 — Entrega 0.2.0: WAITING_VALIDATION. GitHub Release `v0.2.0`, instalado
 F12-08 — Responsividade mínima da web: WAITING_VALIDATION. Selecionada READY em 2026-10-23 por solicitação explícita; depende de F12-03/F12-06 implementadas. Branch `codex/F12-08-web-mobile`. Layout verificado em Edge emulado, falta aparelho físico e revisão independente. Escopo/testes em plans/phase-12-web.md. Alterações locais anteriores de F04-05 preservadas, sem escrita concorrente.
 
 F04-05 — Ajustes, kick da sala e volume de entrada: WAITING_VALIDATION. Selecionada READY em 2026-10-23 pelo pedido do usuário, dependências F04-02/F09-01 implementadas. Branch `codex/F04-05-controles-sala`; gates G3/G4/G9. Falta revisão independente, inspeção visual e prova real de áudio/kick. Escopo e validação em `plans/phase-04-meeting-ui.md`.
+Correção visual de 2026-11-04 na `main`: o rodapé lateral reserva uma linha inteira para avatar/nome e uma segunda para mic, saída e configurações; no dock, ícone e seta formam controles segmentados, com divisor e alvo de clique coerentes. Typecheck, lint, 45/45 testes e builds desktop/web passaram. A fixture Playwright não carregou pelo Vite de desenvolvimento; inspeção na sala real continua pendente e o estado permanece `WAITING_VALIDATION`.
 
 F04-06 — Blur de fundo da câmera: WAITING_VALIDATION. Selecionada READY em 2026-10-23 por pedido explícito, depende de F04-02. Pipeline local com `@livekit/track-processors`, assets MediaPipe no bundle, fallback visível e CSP limitada a `wasm-unsafe-eval`, autorizada pelo usuário. Faltam câmera real no WebView2/web, qualidade do recorte e desempenho em celular. Escopo e validação em `plans/phase-04-meeting-ui.md` e ADR 0016.
 

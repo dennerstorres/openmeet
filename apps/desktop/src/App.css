@@ -912,12 +912,13 @@ a {
 
 .account {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   min-height: 56px;
   margin: auto -8px 0;
-  padding: 0 8px;
+  padding: 6px 8px;
   background: var(--bg-panel);
 }
 
@@ -927,8 +928,9 @@ a {
 
 .you {
   display: flex;
-  flex: 1;
+  grid-column: 1 / -1;
   align-items: center;
+  width: 100%;
   min-width: 0;
   padding: 4px;
   border-radius: 6px;
@@ -967,12 +969,21 @@ a {
 .device-pair {
   display: inline-flex;
   align-items: center;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--bg-main);
 }
 
 .device-arrow.fui-Button {
-  min-width: 16px;
-  max-width: 16px;
+  min-width: 24px;
+  max-width: 24px;
   padding: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0 6px 6px 0;
+}
+
+.account > .fui-Button:last-child {
+  justify-self: end;
 }
 
 .device-menu {
@@ -1622,6 +1633,31 @@ video {
   border-radius: 8px;
   background: var(--bg-rail);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+}
+
+.dock .ctl-pair {
+  overflow: hidden;
+  border-radius: 24px;
+  background: var(--bg-control);
+}
+
+.dock .ctl-pair > .ctl {
+  border-radius: 24px 0 0 24px;
+}
+
+.dock .device-arrow.fui-Button {
+  width: 28px;
+  min-width: 28px;
+  max-width: 28px;
+  height: 48px;
+  border-left-color: var(--bg-active);
+  border-radius: 0 24px 24px 0;
+  color: var(--text-muted);
+}
+
+.dock .device-arrow.fui-Button:hover:not(:disabled) {
+  background: var(--bg-active);
+  color: var(--text);
 }
 
 .ctl {

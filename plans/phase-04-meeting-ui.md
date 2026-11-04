@@ -5,6 +5,8 @@ Objetivo: UI de reunião e controles.
 ## F04-05 — controles solicitados em 2026-10-23
 READY → IN_PROGRESS → WAITING_VALIDATION. Alterados Icons.tsx, MeetingApp.tsx, session.ts de mídia, processor novo, MeetingModel, allowlists web/nativa, serviço/rota de salas e testes. Sol substituído por ajustes; kick só da sala (ADR 0015); ganho de entrada 0–200%. Testes cobrem RBAC negativo, membership preservado, erro do SFU, contrato nativo, processor/restart/cleanup. Comandos e resultados em HISTORY.md. Prova de áudio e desconexão real em dois PCs e revisão independente exigidas antes de DONE.
 
+Ajuste visual de 2026-11-04: `footer.account` separa identidade e ações em duas linhas para o nome não ser espremido; os pares do dock agora agrupam botão e chevron como um único controle segmentado. A seta herda o estado desabilitado da ação. Automatizados e builds passaram; falta abrir a sala no `.exe` e na web para aprovar espaçamento e alvos com mouse/teclado.
+
 Ajuste de 2026-10-23: consentimento de atalhos saiu da tela principal e passou para Configurações no menu da conta. Menus de conta e de dispositivos fecham ao clicar fora. O bundle web continua sem shell nem texto de atalhos nativos.
 
 ## F04-06 — blur de fundo da câmera
