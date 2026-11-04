@@ -29,6 +29,8 @@ import {
   type PlaybackLevel,
   type PocSnapshot,
   type VoiceEffect,
+  DEFAULT_SCREEN_MODE,
+  type ScreenMode,
 } from "@openmeet/media";
 import {
   inviteFromFragment,
@@ -243,6 +245,18 @@ function storedShareAudio(): boolean {
   }
 }
 
+const SCREEN_MODE_KEY = "openmeet.screenMode";
+
+// ADR 0029: the share profile stays on this PC and is picked before sharing.
+function storedScreenMode(): ScreenMode {
+  try {
+    const value = localStorage.getItem(SCREEN_MODE_KEY);
+    return value === "motion" || value === "detail" ? value : DEFAULT_SCREEN_MODE;
+  } catch {
+    return DEFAULT_SCREEN_MODE;
+  }
+}
+
 const BLUR_RADIUS_KEY = "openmeet.blurRadius";
 
 // ADR 0016: only the strength is kept on this PC; the effect itself still starts off.
@@ -398,6 +412,7 @@ export function MeetingApp() {
   // ADR 0013: only this PC, only during the call, never saved.
   const [deafened, setDeafened] = useState(false);
   const [shareAudio, setShareAudio] = useState(storedShareAudio);
+  const [screenMode, setScreenMode] = useState(storedScreenMode);
   const [microphoneVolume, setMicrophoneVolume] = useState(100);
   // ADR 0022: the input picked for the radio before turning it on.
   const [radioInput, setRadioInput] = useState("");
@@ -767,7 +782,7 @@ export function MeetingApp() {
   const activeServer = state.servers.find((server) => server.id === state.activeServerId);
   const toggleMicrophone = () => void runControl("microphone", () => session().setMicrophone(!media.microphone));
   const toggleCamera = () => void runControl("camera", () => session().setCamera(!media.camera));
-  const toggleScreen = () => void runControl("screen", () => session().setScreenShare(screenShareAction(media.screen) === "start", shareAudio));
+  const toggleScreen = () => void runControl("screen", () => session().setScreenShare(screenShareAction(media.screen) === "start", shareAudio, screenMode));
   const toggleDeafen = () => setDeafened((current) => !current);
   const leaveCall = () => {
     setMobileRooms(true);
@@ -2234,6 +2249,25 @@ export function MeetingApp() {
                   Incluir áudio do PC
                 </label>
               ) : null}
+              <label className="share-audio" title="Como a tela vai para os outros. Muda na próxima vez que compartilhar.">
+                <select
+                  value={screenMode}
+                  disabled={media.screen}
+                  aria-label="Qualidade da tela"
+                  onChange={(event) => {
+                    const next: ScreenMode = event.currentTarget.value === "motion" ? "motion" : "detail";
+                    setScreenMode(next);
+                    try {
+                      localStorage.setItem(SCREEN_MODE_KEY, next);
+                    } catch {
+                      // The choice still holds for this window.
+                    }
+                  }}
+                >
+                  <option value="detail">Texto nítido</option>
+                  <option value="motion">Movimento fluido</option>
+                </select>
+              </label>
               {!isFullscreen ? (
                 <SoundPanel
                   model={model}

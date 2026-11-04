@@ -801,3 +801,7 @@ Próxima tarefa:
 ## 2026-11-04 — F15-01 perfis de compartilhamento de tela
 
 Branch `task/F15-01-qualidade-tela`. ADR 0029 (proposto), com base na análise do cliente público do salinha.live. Novo `screen-quality.ts` e `setScreenShare(enabled, audio, mode)`. Comandos: `pnpm --filter @openmeet/media typecheck` e `test`, 80/80 passando, no Windows 11. Testes antigos de opções de captura passaram a usar `screenCapture`. Riscos: banda e CPU maiores, VP9 não provado no SFU real. Próximo passo: chamada real nos dois perfis, depois F15-02 (UI).
+
+## 2026-11-04 — F15-02 seletor de perfil da tela
+
+ADR 0029 aceito. Seletor na barra da chamada, salvo por aparelho. Typecheck, lint ok; teste desktop com 1 falha preexistente (web.test.mjs, atalhos globais). Falta inspeção visual e chamada real.

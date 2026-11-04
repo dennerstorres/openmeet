@@ -1,6 +1,6 @@
 # ADR 0029 — ajuste fino da mídia (tela, sala e áudio)
 
-Data: 2026-11-04. Estado: proposto, aberto por pedido do usuário em 2026-11-04. Falta o aceite.
+Data: 2026-11-04. Estado: aceito pelo usuário em 2026-11-04.
 
 ## Contexto
 
