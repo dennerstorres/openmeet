@@ -835,3 +835,11 @@ ADR 0030 aceito pelo usuário em 2026-11-04.
 ## 2026-11-04 — web.test.mjs volta a passar
 
 O bundle web levava "atalhos globais" (texto do DesktopOffer, desde f3042ba) e "openmeet.instance" (funções de instância sem guarda `__WEB__`). O texto do convite mudou para "atalhos de teclado" e as funções retornam cedo no web. Desktop 45/45, typecheck e lint ok.
+## 2026-11-04 — F07-12 retomada da release 0.2.18
+
+- Pedido explícito do usuário para concluir commit, tag e push interrompidos após o merge 093699b. Branch `codex/F07-12-release-0.2.18`; quatro mudanças de versão preservadas.
+- Revisão Codex: CI 41895806817 falhou no teste de anexos, que ainda exigia rejeição em sala de voz. Expectativa alinhada ao ADR 0031 aceito; acrescentada recusa de upload por não membro. Nenhuma mudança no código de produção ou nas permissões.
+- Windows, 2026-11-04: `node --test scripts/installer-checksum.test.mjs scripts/updater-manifest.test.mjs` PASS (6/6); `pnpm exec prettier --check apps/server/test/attachments.test.ts apps/desktop/package.json apps/desktop/src-tauri/tauri.conf.json` PASS; `git diff --check` PASS. Versão 0.2.18 consistente nos manifests JSON e diff Cargo revisado.
+- Testes `pnpm --filter @openmeet/server exec node --import tsx --test test/attachments.test.ts test/messages.test.ts test/events.test.ts` em execução; resultado final e publicação serão registrados no acompanhamento.
+- Gate G7 permanece WAITING_VALIDATION para instalação e atualização real. Assinatura do updater não equivale a Authenticode Windows. Causa da interrupção do agente anterior não verificada.
+

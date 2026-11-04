@@ -1,5 +1,7 @@
 # PLAN — roadmap executável (fonte de verdade)
 
+F07-12 — Release 0.2.18: READY → IN_PROGRESS em 2026-11-04, retomada explicitamente solicitada pelo usuário após interrupção. Dependência: merge 093699b na main. Escopo: validar versão, corrigir expectativa antiga de anexo em sala de voz (ADR 0031), commit, tag e publicação. Gate G7; instalação e atualização reais permanecem pendentes.
+
 Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, `VERIFIED`, `DONE`, `BLOCKED`.
 
 

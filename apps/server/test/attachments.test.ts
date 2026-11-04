@@ -193,7 +193,9 @@ test("a picture goes up first, rides on a message and comes back only as a downl
     assert.equal((await download(w, w.outsider, file.id)).statusCode, 404);
     assert.equal((await download(w, w.member, "not-an-id")).statusCode, 404);
     assert.equal((await upload(w, w.outsider, "x.png", base64(png()))).statusCode, 404);
-    assert.equal((await upload(w, w.member, "x.png", base64(png()), w.voiceId)).statusCode, 409);
+    // ADR 0031: members can attach files in voice rooms without joining the call.
+    assert.equal((await upload(w, w.member, "x.png", base64(png()), w.voiceId)).statusCode, 201);
+    assert.equal((await upload(w, w.outsider, "x.png", base64(png()), w.voiceId)).statusCode, 404);
 
     // Removing the message takes the bytes with it.
     const removed = await w.app.inject({ method: "POST", url: `/api/v1/messages/${message.id}/delete`, headers: auth(w.member), payload: {} });

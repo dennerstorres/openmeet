@@ -1,5 +1,9 @@
 # Fase 07 — distribution
 
+## F07-12 — Release 0.2.18
+
+READY → IN_PROGRESS em 2026-11-04. Retomar versão deixada pelo Claude sobre 093699b, por pedido do usuário. Branch `codex/F07-12-release-0.2.18`. Arquivos: quatro manifests de versão do desktop, teste de anexos, PLAN.md, este plano e HISTORY.md. Validar testes de release, anexos/permissões, CI e artefatos publicados. CI do merge falhou porque attachments.test.ts ainda esperava 409 para upload em sala de voz, agora permitido pelo ADR 0031. Instalação e atualização em máquina real ficam WAITING_VALIDATION.
+
 Objetivo: Infra Docker + instalador.
 
 ## F07-06 — 0.2.2
