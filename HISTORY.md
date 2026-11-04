@@ -805,3 +805,7 @@ Branch `task/F15-01-qualidade-tela`. ADR 0029 (proposto), com base na análise d
 ## 2026-11-04 — F15-02 seletor de perfil da tela
 
 ADR 0029 aceito. Seletor na barra da chamada, salvo por aparelho. Typecheck, lint ok; teste desktop com 1 falha preexistente (web.test.mjs, atalhos globais). Falta inspeção visual e chamada real.
+
+## 2026-11-04 — F15-03 adaptiveStream e dynacast
+
+Room criado com `roomOptions()`. Mídia 81/81, typecheck e lint ok. Risco: vídeo pausado em card escondido demorar a voltar. Falta chamada real com 3+ pessoas.

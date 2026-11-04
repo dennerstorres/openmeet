@@ -4,7 +4,7 @@
 |---|---|---|---|
 | F15-01 | Perfis de compartilhamento de tela (`detail`/`motion`), VP9 + reserva, prioridade alta, áudio do PC estéreo | IMPLEMENTED | ADR 0029 (aceito) |
 | F15-02 | Escolha do perfil na UI ao compartilhar | WAITING_VALIDATION | F15-01 |
-| F15-03 | `adaptiveStream` + `dynacast` no Room | PENDING | ADR 0029 |
+| F15-03 | `adaptiveStream` + `dynacast` no Room | IMPLEMENTED | ADR 0029 |
 | F15-04 | Jitter buffer baixo no vídeo da tela, com medição | PENDING | F15-01 |
 | F15-05 | RNNoise local no microfone | PENDING | ADR próprio |
 
@@ -19,3 +19,7 @@ Falta validar numa chamada real com o SFU: codec negociado (VP9 ou reserva) em `
 ## F15-02
 
 Seletor "Texto nítido" / "Movimento fluido" ao lado de "Incluir áudio do PC" (`MeetingApp.tsx`), salvo em `openmeet.screenMode` neste aparelho e travado enquanto compartilha. Typecheck e lint ok. `apps/desktop` test: 44 passando, 1 falha que já existia (`web.test.mjs`, "atalhos globais"), também sem esta mudança. Falta ver na tela e numa chamada real.
+
+## F15-03
+
+`packages/media/src/room-options.ts`: `new Room({ adaptiveStream: true, dynacast: true })`. Os cards já usam `track.attach`, então o SDK vê o tamanho e a visibilidade de cada vídeo. Teste da mídia 81/81, typecheck e lint ok (2026-11-04, Windows 11). Falta uma chamada real com 3 ou mais pessoas para medir a banda (`getStats`) e confirmar que card escondido ou em tela cheia não congela o vídeo ao voltar.

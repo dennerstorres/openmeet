@@ -17,6 +17,7 @@ import { describeMediaError, mediaActionError, sanitizeDiagnostic, type Diagnost
 import { HANDS_FREE_HINT, isHandsFree, playbackOutput, type AudioDevice } from "./bluetooth-output.js";
 import { InputGain } from "./input-gain.js";
 import { isRadio, radioCapture, radioPublish } from "./radio.js";
+import { roomOptions } from "./room-options.js";
 import { DEFAULT_SCREEN_MODE, screenCapture, screenPublish, type ScreenMode } from "./screen-quality.js";
 import { readAudioWorkletSupport, voiceEffectsFor, type VoiceEffect } from "./voice-effects.js";
 import { VideoBackground, type VideoBackgroundOptions } from "./video-background.js";
@@ -185,7 +186,7 @@ export class LiveKitPocSession {
     audioWorklet?: boolean;
     createRadioTrack?: (options: ReturnType<typeof radioCapture>) => Promise<LocalTrack>;
   }) {
-    this.room = options?.room ?? new Room();
+    this.room = options?.room ?? new Room(roomOptions());
     this.videoBackground = new VideoBackground(options?.videoBackground);
     this.appVersion = options?.appVersion ?? null;
     this.client = options?.client ?? null;
