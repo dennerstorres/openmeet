@@ -42,3 +42,27 @@ export function screenPublish(mode: ScreenMode): TrackPublishOptions {
     red: false,
   };
 }
+
+interface LatencyReceiver {
+  jitterBufferTarget?: number | null;
+  playoutDelayHint?: number;
+}
+
+/**
+ * ADR 0029 (F15-04): a shared screen plays as soon as frames arrive. Audio keeps the browser's adaptive buffer,
+ * because cutting it there gives clicks. Returns whether a hint was set.
+ */
+export function lowerScreenLatency(track: { kind: string; source: string; receiver?: unknown }): boolean {
+  if (track.kind !== "video" || track.source !== "screen_share") return false;
+  const receiver = track.receiver as LatencyReceiver | undefined;
+  if (!receiver) return false;
+  if ("jitterBufferTarget" in receiver) {
+    receiver.jitterBufferTarget = 0;
+    return true;
+  }
+  if ("playoutDelayHint" in receiver) {
+    receiver.playoutDelayHint = 0;
+    return true;
+  }
+  return false;
+}

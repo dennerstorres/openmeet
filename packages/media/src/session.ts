@@ -18,7 +18,7 @@ import { HANDS_FREE_HINT, isHandsFree, playbackOutput, type AudioDevice } from "
 import { InputGain } from "./input-gain.js";
 import { isRadio, radioCapture, radioPublish } from "./radio.js";
 import { roomOptions } from "./room-options.js";
-import { DEFAULT_SCREEN_MODE, screenCapture, screenPublish, type ScreenMode } from "./screen-quality.js";
+import { DEFAULT_SCREEN_MODE, lowerScreenLatency, screenCapture, screenPublish, type ScreenMode } from "./screen-quality.js";
 import { readAudioWorkletSupport, voiceEffectsFor, type VoiceEffect } from "./voice-effects.js";
 import { VideoBackground, type VideoBackgroundOptions } from "./video-background.js";
 import { browserLabel, readBrowserMedia, type BrowserMedia } from "./browser.js";
@@ -239,6 +239,7 @@ export class LiveKitPocSession {
       this.note("error", describeMediaError(error));
     });
     this.room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
+      lowerScreenLatency(track);
       this.rememberTrack(
         track,
         publication.trackSid,

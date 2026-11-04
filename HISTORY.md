@@ -809,3 +809,7 @@ ADR 0029 aceito. Seletor na barra da chamada, salvo por aparelho. Typecheck, lin
 ## 2026-11-04 — F15-03 adaptiveStream e dynacast
 
 Room criado com `roomOptions()`. Mídia 81/81, typecheck e lint ok. Risco: vídeo pausado em card escondido demorar a voltar. Falta chamada real com 3+ pessoas.
+
+## 2026-11-04 — F15-04 buffer baixo no vídeo da tela
+
+`jitterBufferTarget = 0` só no vídeo de tela recebido. Mídia 82/82. Riscos: travadas com rede ruim e dessincronia com o áudio do PC. Falta medição real.

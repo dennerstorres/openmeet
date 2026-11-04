@@ -34,3 +34,18 @@ test("VP9 with a backup codec and PC audio as stereo music", () => {
     assert.equal(p.red, false);
   }
 });
+
+test("only remote screen video loses the playout buffer", async () => {
+  const { lowerScreenLatency } = await import("../src/screen-quality.js");
+  const modern = { jitterBufferTarget: null as number | null };
+  assert.equal(lowerScreenLatency({ kind: "video", source: "screen_share", receiver: modern }), true);
+  assert.equal(modern.jitterBufferTarget, 0);
+  const old = { playoutDelayHint: 1 };
+  assert.equal(lowerScreenLatency({ kind: "video", source: "screen_share", receiver: old }), true);
+  assert.equal(old.playoutDelayHint, 0);
+  const camera = { jitterBufferTarget: null as number | null };
+  assert.equal(lowerScreenLatency({ kind: "video", source: "camera", receiver: camera }), false);
+  assert.equal(camera.jitterBufferTarget, null);
+  assert.equal(lowerScreenLatency({ kind: "audio", source: "screen_share_audio", receiver: {} }), false);
+  assert.equal(lowerScreenLatency({ kind: "video", source: "screen_share" }), false);
+});

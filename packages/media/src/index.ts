@@ -33,4 +33,4 @@ export type { DiagnosticEvent } from "./diagnostics.js";
 export type { ConnectionPhase } from "./phase.js";
 export type { DeviceKind, DeviceOption, PocSnapshot, TrackTile } from "./session.js";
 export type { RtcSnapshot } from "./stats.js";
-export { DEFAULT_SCREEN_MODE, screenCapture, screenPublish, type ScreenMode } from "./screen-quality.js";
+export { DEFAULT_SCREEN_MODE, lowerScreenLatency, screenCapture, screenPublish, type ScreenMode } from "./screen-quality.js";
