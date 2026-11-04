@@ -1,6 +1,6 @@
 # ADR 0030 — redução de ruído do microfone com RNNoise local
 
-Data: 2026-11-04. Estado: proposto. O usuário pediu para seguir com a F15 inteira; falta o aceite explícito deste ADR.
+Data: 2026-11-04. Estado: aceito pelo usuário em 2026-11-04.
 
 ## Contexto
 
