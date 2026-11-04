@@ -41,7 +41,7 @@ export function DesktopOffer() {
             <Caption1>
               {downloaded
                 ? "Depois de instalar, abra o app por aqui para ele já entrar nesta instância."
-                : "O app tem melhor desempenho, áudio do PC, bandeja e atalhos globais."}
+                : "O app tem melhor desempenho, áudio do PC, bandeja e atalhos de teclado."}
             </Caption1>
           }
         />

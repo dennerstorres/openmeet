@@ -339,6 +339,8 @@ function chatTransport(origin: string, broker: SessionBroker | undefined): { tra
 }
 
 function rememberedInstance(): string | null {
+  // The web client is its own instance (ADR 0014); the key stays out of that bundle.
+  if (__WEB__) return null;
   try {
     return localStorage.getItem("openmeet.instance");
   } catch {
@@ -348,6 +350,7 @@ function rememberedInstance(): string | null {
 
 // Leaving the instance is the only thing that makes the desktop app ask for an address again.
 function forgetInstance(): void {
+  if (__WEB__) return;
   try {
     localStorage.removeItem("openmeet.instance");
   } catch {
@@ -356,6 +359,7 @@ function forgetInstance(): void {
 }
 
 function storedAddress(): string {
+  if (__WEB__) return "";
   try {
     return localStorage.getItem("openmeet.instance") ?? "http://127.0.0.1:3000";
   } catch {
@@ -699,7 +703,7 @@ export function MeetingApp() {
     };
   }, [state.step, media.phase]);
   useEffect(() => {
-    if (state.origin === null || __WEB__) return;
+    if (__WEB__ || state.origin === null) return;
     try {
       localStorage.setItem("openmeet.instance", state.origin);
     } catch {
