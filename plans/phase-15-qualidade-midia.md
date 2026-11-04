@@ -6,7 +6,7 @@
 | F15-02 | Escolha do perfil na UI ao compartilhar | WAITING_VALIDATION | F15-01 |
 | F15-03 | `adaptiveStream` + `dynacast` no Room | IMPLEMENTED | ADR 0029 |
 | F15-04 | Jitter buffer baixo no vídeo da tela, com medição | IMPLEMENTED | F15-01 |
-| F15-05 | RNNoise local no microfone | PENDING | ADR próprio |
+| F15-05 | RNNoise local no microfone | IMPLEMENTED | ADR 0030 (proposto) |
 
 ## F15-01
 
@@ -27,3 +27,7 @@ Seletor "Texto nítido" / "Movimento fluido" ao lado de "Incluir áudio do PC" (
 ## F15-04
 
 `lowerScreenLatency` em `screen-quality.ts`: no `TrackSubscribed`, o vídeo de tela remoto recebe `jitterBufferTarget = 0`, ou `playoutDelayHint = 0` em navegador antigo. Câmera e áudio não mudam. Mídia 82/82 (2026-11-04). Falta medir na chamada real o atraso e as travadas com rede ruim, e ver se o áudio do PC continua sincronizado com a imagem. Se piorar, a chamada sai sem mexer no resto.
+
+## F15-05
+
+ADR 0030. `InputGain.setDenoise` e `session.setNoiseSuppression`, com o switch "Reduzir ruído do microfone" nos ajustes (`openmeet.noiseSuppression`). Os assets ficam em `public/media/rnnoise/` e os avisos de licença em `THIRD_PARTY_NOTICES.txt`. A biblioteca é importada sob demanda. Mídia 83/83 e lint ok. Desktop 44 passando, 1 falha preexistente. Falta ouvir numa chamada real, medir a CPU e testar com fone Bluetooth. Falta também o aceite do ADR 0030.

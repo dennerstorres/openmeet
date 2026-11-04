@@ -33,6 +33,7 @@ const idleSnapshot: PocSnapshot = {
   backgroundBlurRadius: 10,
   voiceEffects: ["off"],
   voiceEffect: "off",
+  noiseSuppression: false,
   voiceMonitor: false,
   radio: false,
   radioDevice: null,

@@ -3,7 +3,7 @@
 Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, `VERIFIED`, `DONE`, `BLOCKED`.
 
 
-F15 — Qualidade da mídia: ADR 0029 aceito em 2026-11-04. F15-01 IMPLEMENTED na branch `task/F15-01-qualidade-tela`: perfis de tela detail/motion, VP9 com reserva, prioridade alta. F15-02 WAITING_VALIDATION (seletor na UI). F15-03 IMPLEMENTED (adaptiveStream + dynacast). F15-04 IMPLEMENTED (buffer baixo no vídeo da tela). Falta chamada real e revisão. Ver plans/phase-15-qualidade-midia.md.
+F15 — Qualidade da mídia: ADR 0029 aceito em 2026-11-04. F15-01 IMPLEMENTED na branch `task/F15-01-qualidade-tela`: perfis de tela detail/motion, VP9 com reserva, prioridade alta. F15-02 WAITING_VALIDATION (seletor na UI). F15-03 IMPLEMENTED (adaptiveStream + dynacast). F15-04 IMPLEMENTED (buffer baixo no vídeo da tela). F15-05 IMPLEMENTED (RNNoise, ADR 0030 proposto). Falta chamada real e revisão. Ver plans/phase-15-qualidade-midia.md.
 F14 — PWA e push no cliente web: ADR 0027 aceito em 2026-10-29, SPEC item 24. Na `main`: F14-02 e F14-03 WAITING_VALIDATION (falta instalar no Chrome real, teste com chamada aberta, deploy real e revisão); F14-04 IMPLEMENTED (migração 0013 e rotas); F14-05 IMPLEMENTED (envio com `web-push` 3.6.7); F14-06 WAITING_VALIDATION (opção na UI e handlers no `sw.js`, falta push real no navegador). F14-07 READY (humano).
 
 F13 — Salas de texto, DM e emoji próprio: ADR 0024 aceito em 2026-10-27, SPEC item 23. F13-02 a F13-13 na `main`; F13-14 (docs e revisão da fase) na `task/F13-14-docs`, sem merge. F13-02 a F13-05 e F13-11 IMPLEMENTED; F13-06 a F13-10 e F13-12 a F13-14 WAITING_VALIDATION. Falta o teste do usuário no `.exe`, na web e atrás do proxy real; roteiro em `HANDOFF.md`. Escopo em `plans/phase-13-salas-de-texto.md`.

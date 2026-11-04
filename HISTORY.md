@@ -813,3 +813,7 @@ Room criado com `roomOptions()`. Mídia 81/81, typecheck e lint ok. Risco: víde
 ## 2026-11-04 — F15-04 buffer baixo no vídeo da tela
 
 `jitterBufferTarget = 0` só no vídeo de tela recebido. Mídia 82/82. Riscos: travadas com rede ruim e dessincronia com o áudio do PC. Falta medição real.
+
+## 2026-11-04 — F15-05 RNNoise no microfone
+
+ADR 0030 proposto. Dependência @sapphi-red/web-noise-suppressor 0.4.1 (MIT) + RNNoise (BSD-3), assets em public/media/rnnoise, switch nos ajustes. Mídia 83/83, lint ok, desktop com 1 falha preexistente. Riscos: CPU e contexto a 44,1 kHz. Falta chamada real.

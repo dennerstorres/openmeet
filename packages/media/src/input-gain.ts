@@ -1,9 +1,16 @@
+import type { RnnoiseWorkletNode } from "@sapphi-red/web-noise-suppressor";
 import type { AudioProcessorOptions, Track, TrackProcessor } from "livekit-client";
 import { buildVoiceEffect, isVoiceEffect, needsWorklet, type EffectChain, type VoiceEffect } from "./voice-effects.js";
 
 export interface InputGainOptions {
   /** URL of the pitch worklet module; defaults to the bundle's `media/` folder. */
   workletUrl?: () => string;
+  /** Base URL of the RNNoise worklet and wasm (ADR 0030); defaults to the bundle's `media/rnnoise/` folder. */
+  denoiseUrl?: () => string;
+}
+
+function defaultDenoiseUrl(): string {
+  return new URL("media/rnnoise/", document.baseURI).href;
 }
 
 function defaultWorkletUrl(): string {
@@ -12,7 +19,7 @@ function defaultWorkletUrl(): string {
 
 /**
  * Changes outgoing microphone audio, never local playback or screen audio.
- * Graph: source → voice effect (ADR 0020) → gain → voice gate → published track, plus an optional local monitor.
+ * Graph: source → noise suppression (ADR 0030, optional) → voice effect (ADR 0020) → gain → voice gate → published track, plus an optional local monitor.
  * Library sounds (ADR 0021) enter after the gate, so they skip the effect and the microphone volume, and also
  * play on this device.
  */
@@ -35,9 +42,32 @@ export class InputGain implements TrackProcessor<Track.Kind.Audio, AudioProcesso
   private monitoring = false;
   private readonly loaded = new WeakSet<BaseAudioContext>();
   private readonly workletUrl: () => string;
+  private readonly denoiseUrl: () => string;
+  private denoising = false;
+  private denoiseNode: RnnoiseWorkletNode | undefined;
+  private denoiseBinary: ArrayBuffer | undefined;
+  private readonly denoiseLoaded = new WeakSet<BaseAudioContext>();
 
   constructor(options?: InputGainOptions) {
     this.workletUrl = options?.workletUrl ?? defaultWorkletUrl;
+    this.denoiseUrl = options?.denoiseUrl ?? defaultDenoiseUrl;
+  }
+
+  get denoise(): boolean {
+    return this.denoising;
+  }
+
+  /** ADR 0030: RNNoise on this device, before the effect. On failure the voice goes out without it. */
+  async setDenoise(enabled: boolean): Promise<void> {
+    this.denoising = enabled;
+    if (!this.context || !this.source || !this.gain) return;
+    try {
+      await this.wire(this.context);
+    } catch (error) {
+      this.denoising = false;
+      await this.wire(this.context);
+      throw error;
+    }
   }
 
   get effect(): VoiceEffect {
@@ -175,6 +205,7 @@ export class InputGain implements TrackProcessor<Track.Kind.Audio, AudioProcesso
   async destroy(): Promise<void> {
     this.stopSound();
     this.source?.disconnect();
+    this.releaseDenoise();
     this.chain?.dispose();
     this.gain?.disconnect();
     this.destination?.disconnect();
@@ -199,17 +230,49 @@ export class InputGain implements TrackProcessor<Track.Kind.Audio, AudioProcesso
       await context.audioWorklet.addModule(this.workletUrl());
       this.loaded.add(context);
     }
-    if (!this.source || !this.gain || effect !== this.currentEffect) return;
+    const denoise = this.denoising ? await this.buildDenoise(context) : undefined;
+    if (!this.source || !this.gain || effect !== this.currentEffect || this.denoising !== (denoise !== undefined)) {
+      denoise?.destroy();
+      return;
+    }
     const next = buildVoiceEffect(context, effect);
     this.source.disconnect();
+    this.releaseDenoise();
     this.chain?.dispose();
     this.chain = next;
+    let head: AudioNode = this.source;
+    if (denoise) {
+      this.denoiseNode = denoise;
+      head.connect(denoise);
+      head = denoise;
+    }
     if (next) {
-      this.source.connect(next.input);
+      head.connect(next.input);
       next.output.connect(this.gain);
     } else {
-      this.source.connect(this.gain);
+      head.connect(this.gain);
     }
+  }
+
+  private async buildDenoise(context: AudioContext): Promise<RnnoiseWorkletNode> {
+    // RNNoise is trained at 48 kHz; another rate would distort the voice instead of cleaning it.
+    if (context.sampleRate !== 48_000) throw new Error(`Noise suppression needs 48 kHz, got ${context.sampleRate}`);
+    // Loaded on demand: the library extends AudioWorkletNode at import time, which Node and old WebViews lack.
+    const { RnnoiseWorkletNode, loadRnnoise } = await import("@sapphi-red/web-noise-suppressor");
+    const base = this.denoiseUrl();
+    this.denoiseBinary ??= await loadRnnoise({ url: new URL("rnnoise.wasm", base).href, simdUrl: new URL("rnnoise_simd.wasm", base).href });
+    if (!this.denoiseLoaded.has(context)) {
+      await context.audioWorklet.addModule(new URL("rnnoiseWorklet.js", base).href);
+      this.denoiseLoaded.add(context);
+    }
+    return new RnnoiseWorkletNode(context, { maxChannels: 1, wasmBinary: this.denoiseBinary });
+  }
+
+  private releaseDenoise(): void {
+    if (!this.denoiseNode) return;
+    this.denoiseNode.disconnect();
+    this.denoiseNode.destroy();
+    this.denoiseNode = undefined;
   }
 
   private connectMonitor(): void {

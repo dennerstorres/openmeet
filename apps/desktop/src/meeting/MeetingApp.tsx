@@ -160,6 +160,7 @@ const idleSnapshot: PocSnapshot = {
   backgroundBlurRadius: BLUR_RADIUS_DEFAULT,
   voiceEffects: ["off"],
   voiceEffect: "off",
+  noiseSuppression: false,
   voiceMonitor: false,
   radio: false,
   radioDevice: null,
@@ -254,6 +255,17 @@ function storedScreenMode(): ScreenMode {
     return value === "motion" || value === "detail" ? value : DEFAULT_SCREEN_MODE;
   } catch {
     return DEFAULT_SCREEN_MODE;
+  }
+}
+
+const NOISE_KEY = "openmeet.noiseSuppression";
+
+// ADR 0030: the choice stays on this PC; it starts off.
+function storedNoiseSuppression(): boolean {
+  try {
+    return localStorage.getItem(NOISE_KEY) === "1";
+  } catch {
+    return false;
   }
 }
 
@@ -450,6 +462,8 @@ export function MeetingApp() {
         videoBackground: { blurRadius: storedBlurRadius() },
       });
       sessionRef.current.setSoundVolume(storedSoundVolume());
+      // Before the microphone exists this only keeps the choice; it is wired when the microphone starts.
+      if (storedNoiseSuppression()) void sessionRef.current.setNoiseSuppression(true).catch(() => undefined);
     }
     return sessionRef.current;
   }
@@ -2326,6 +2340,23 @@ export function MeetingApp() {
                       />
                     </Field>
                     <p className="hint">100% mantém o nível original. Acima disso, o som pode distorcer. 0% corta sua voz.</p>
+                    <Switch
+                      className="effect-toggle"
+                      label="Reduzir ruído do microfone"
+                      checked={media.noiseSuppression}
+                      onChange={(_, data) => {
+                        const next = data.checked === true;
+                        try {
+                          localStorage.setItem(NOISE_KEY, next ? "1" : "0");
+                        } catch {
+                          // The choice still holds for this window.
+                        }
+                        session()
+                          .setNoiseSuppression(next)
+                          .catch(() => setMediaError("Não foi possível ligar a redução de ruído. Sua voz segue sem ela."));
+                      }}
+                    />
+                    <p className="hint">Tira teclado, ventilador e barulho de fundo, aqui no PC. Usa um pouco mais de processador.</p>
                     <Field label="Efeito de voz">
                       <Select
                         value={media.voiceEffect}

@@ -13,6 +13,7 @@
   "dependencies": {
     "@livekit/track-processors": "0.8.2",
     "@openmeet/shared": "workspace:*",
+    "@sapphi-red/web-noise-suppressor": "0.4.1",
     "livekit-client": "^2.23.0"
   },
   "scripts": {

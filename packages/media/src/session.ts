@@ -108,6 +108,8 @@ export interface PocSnapshot {
   /** ADR 0020: effects this client can run, the one in use and the local monitor. */
   voiceEffects: VoiceEffect[];
   voiceEffect: VoiceEffect;
+  /** ADR 0030: RNNoise on the outgoing microphone. */
+  noiseSuppression: boolean;
   voiceMonitor: boolean;
   /** ADR 0021: id of the library sound playing now, and the panel volume (0–1). */
   soundPlaying: string | null;
@@ -332,6 +334,7 @@ export class LiveKitPocSession {
       backgroundBlurRadius: this.videoBackground.blurRadius,
       voiceEffects: voiceEffectsFor(this.audioWorklet),
       voiceEffect: this.inputGain.effect,
+      noiseSuppression: this.inputGain.denoise,
       voiceMonitor: this.inputGain.monitor,
       soundPlaying: this.soundId,
       soundVolume: this.inputGain.soundVolume,
@@ -427,6 +430,18 @@ export class LiveKitPocSession {
 
   setMicrophoneVolume(value: number): void {
     this.inputGain.setVolume(value);
+  }
+
+  /** ADR 0030: RNNoise in the live graph without republishing; on failure the voice goes out without it. */
+  async setNoiseSuppression(enabled: boolean): Promise<void> {
+    try {
+      await this.inputGain.setDenoise(enabled);
+    } catch (error) {
+      this.note("error", `noise suppression unavailable: ${describeMediaError(error)}`);
+      throw error;
+    } finally {
+      this.emit();
+    }
   }
 
   /** Switches the effect in the live graph without republishing; on failure the voice goes out plain. */
