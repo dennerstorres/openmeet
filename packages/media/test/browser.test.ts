@@ -1,3 +1,4 @@
+import { screenCapture } from "../src/screen-quality.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Room } from "livekit-client";
@@ -42,7 +43,7 @@ test("a browser without screen audio never asks for it, even when the mark is on
   const firefox = detectBrowserMedia({ userAgent: FIREFOX, setSinkId: false, getDisplayMedia: true });
   const session = new LiveKitPocSession({ room, browser: firefox, client: "web" });
   await session.setScreenShare(true, true);
-  assert.deepEqual(asked, [{ audio: false }]);
+  assert.deepEqual(asked, [screenCapture("detail", false)]);
   assert.equal(session.snapshot().screenAudio, "off");
   assert.equal(
     session.snapshot().diagnostics.some((event) => event.message.includes("screen audio missing")),

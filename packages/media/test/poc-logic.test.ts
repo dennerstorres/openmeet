@@ -1,3 +1,4 @@
+import { screenCapture } from "../src/screen-quality.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { DisconnectReason, Room, RoomEvent, Track } from "livekit-client";
@@ -312,11 +313,11 @@ test("PC audio is asked only when marked, and a share without it is reported as 
   const session = new LiveKitPocSession({ room, browser: { name: "edge", version: "141", outputSelection: true, screenAudio: true } });
 
   await session.setScreenShare(true);
-  assert.deepEqual(asked.at(-1), { audio: false });
+  assert.deepEqual(asked.at(-1), screenCapture("detail", false));
   assert.equal(session.snapshot().screenAudio, "off");
 
   await session.setScreenShare(true, true);
-  assert.deepEqual(asked.at(-1), { audio: true, systemAudio: "include" });
+  assert.deepEqual(asked.at(-1), screenCapture("detail", true));
   assert.equal(session.snapshot().screenAudio, "missing");
   assert.equal(
     session.snapshot().diagnostics.some((event) => event.message.includes("screen audio missing")),
@@ -328,6 +329,6 @@ test("PC audio is asked only when marked, and a share without it is reported as 
   assert.equal(session.snapshot().screenAudio, "on");
 
   await session.setScreenShare(false, true);
-  assert.deepEqual(asked.at(-1), { audio: false });
+  assert.deepEqual(asked.at(-1), screenCapture("detail", false));
   assert.equal(session.snapshot().screenAudio, "off");
 });

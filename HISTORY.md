@@ -797,3 +797,29 @@ Próxima tarefa:
 - UI: lápis ao lado da lixeira abre "Editar sala"; arrastar reordena dentro do grupo (voz ou texto). Voz primeiro, texto depois, com divisória; ícones centralizados na linha.
 - Testes: shared 79/0, server 126/0 (novo teste de rename/ordem), cargo allowed 2/0, desktop 44/1 (falha antiga "atalhos globais").
 - Pendente: teste manual de arrastar no .exe e na web.
+
+## 2026-11-04 — F15-01 perfis de compartilhamento de tela
+
+Branch `task/F15-01-qualidade-tela`. ADR 0029 (proposto), com base na análise do cliente público do salinha.live. Novo `screen-quality.ts` e `setScreenShare(enabled, audio, mode)`. Comandos: `pnpm --filter @openmeet/media typecheck` e `test`, 80/80 passando, no Windows 11. Testes antigos de opções de captura passaram a usar `screenCapture`. Riscos: banda e CPU maiores, VP9 não provado no SFU real. Próximo passo: chamada real nos dois perfis, depois F15-02 (UI).
+
+## 2026-11-04 — F15-02 seletor de perfil da tela
+
+ADR 0029 aceito. Seletor na barra da chamada, salvo por aparelho. Typecheck, lint ok; teste desktop com 1 falha preexistente (web.test.mjs, atalhos globais). Falta inspeção visual e chamada real.
+
+## 2026-11-04 — F15-03 adaptiveStream e dynacast
+
+Room criado com `roomOptions()`. Mídia 81/81, typecheck e lint ok. Risco: vídeo pausado em card escondido demorar a voltar. Falta chamada real com 3+ pessoas.
+
+## 2026-11-04 — F15-04 buffer baixo no vídeo da tela
+
+`jitterBufferTarget = 0` só no vídeo de tela recebido. Mídia 82/82. Riscos: travadas com rede ruim e dessincronia com o áudio do PC. Falta medição real.
+
+## 2026-11-04 — F15-05 RNNoise no microfone
+
+ADR 0030 proposto. Dependência @sapphi-red/web-noise-suppressor 0.4.1 (MIT) + RNNoise (BSD-3), assets em public/media/rnnoise, switch nos ajustes. Mídia 83/83, lint ok, desktop com 1 falha preexistente. Riscos: CPU e contexto a 44,1 kHz. Falta chamada real.
+
+ADR 0030 aceito pelo usuário em 2026-11-04.
+
+## 2026-11-04 — web.test.mjs volta a passar
+
+O bundle web levava "atalhos globais" (texto do DesktopOffer, desde f3042ba) e "openmeet.instance" (funções de instância sem guarda `__WEB__`). O texto do convite mudou para "atalhos de teclado" e as funções retornam cedo no web. Desktop 45/45, typecheck e lint ok.

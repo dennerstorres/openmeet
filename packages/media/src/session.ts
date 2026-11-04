@@ -17,6 +17,8 @@ import { describeMediaError, mediaActionError, sanitizeDiagnostic, type Diagnost
 import { HANDS_FREE_HINT, isHandsFree, playbackOutput, type AudioDevice } from "./bluetooth-output.js";
 import { InputGain } from "./input-gain.js";
 import { isRadio, radioCapture, radioPublish } from "./radio.js";
+import { roomOptions } from "./room-options.js";
+import { DEFAULT_SCREEN_MODE, lowerScreenLatency, screenCapture, screenPublish, type ScreenMode } from "./screen-quality.js";
 import { readAudioWorkletSupport, voiceEffectsFor, type VoiceEffect } from "./voice-effects.js";
 import { VideoBackground, type VideoBackgroundOptions } from "./video-background.js";
 import { browserLabel, readBrowserMedia, type BrowserMedia } from "./browser.js";
@@ -106,6 +108,8 @@ export interface PocSnapshot {
   /** ADR 0020: effects this client can run, the one in use and the local monitor. */
   voiceEffects: VoiceEffect[];
   voiceEffect: VoiceEffect;
+  /** ADR 0030: RNNoise on the outgoing microphone. */
+  noiseSuppression: boolean;
   voiceMonitor: boolean;
   /** ADR 0021: id of the library sound playing now, and the panel volume (0–1). */
   soundPlaying: string | null;
@@ -184,7 +188,7 @@ export class LiveKitPocSession {
     audioWorklet?: boolean;
     createRadioTrack?: (options: ReturnType<typeof radioCapture>) => Promise<LocalTrack>;
   }) {
-    this.room = options?.room ?? new Room();
+    this.room = options?.room ?? new Room(roomOptions());
     this.videoBackground = new VideoBackground(options?.videoBackground);
     this.appVersion = options?.appVersion ?? null;
     this.client = options?.client ?? null;
@@ -237,6 +241,7 @@ export class LiveKitPocSession {
       this.note("error", describeMediaError(error));
     });
     this.room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
+      lowerScreenLatency(track);
       this.rememberTrack(
         track,
         publication.trackSid,
@@ -329,6 +334,7 @@ export class LiveKitPocSession {
       backgroundBlurRadius: this.videoBackground.blurRadius,
       voiceEffects: voiceEffectsFor(this.audioWorklet),
       voiceEffect: this.inputGain.effect,
+      noiseSuppression: this.inputGain.denoise,
       voiceMonitor: this.inputGain.monitor,
       soundPlaying: this.soundId,
       soundVolume: this.inputGain.soundVolume,
@@ -424,6 +430,18 @@ export class LiveKitPocSession {
 
   setMicrophoneVolume(value: number): void {
     this.inputGain.setVolume(value);
+  }
+
+  /** ADR 0030: RNNoise in the live graph without republishing; on failure the voice goes out without it. */
+  async setNoiseSuppression(enabled: boolean): Promise<void> {
+    try {
+      await this.inputGain.setDenoise(enabled);
+    } catch (error) {
+      this.note("error", `noise suppression unavailable: ${describeMediaError(error)}`);
+      throw error;
+    } finally {
+      this.emit();
+    }
   }
 
   /** Switches the effect in the live graph without republishing; on failure the voice goes out plain. */
@@ -562,18 +580,18 @@ export class LiveKitPocSession {
   }
 
   /** The image and, only when asked, the PC audio in the same picker. Stopping ends both. */
-  async setScreenShare(enabled: boolean, requestAudio = false): Promise<void> {
+  async setScreenShare(enabled: boolean, requestAudio = false, mode: ScreenMode = DEFAULT_SCREEN_MODE): Promise<void> {
     // A browser without screen audio is never asked for it (ADR 0014).
     const withAudio = requestAudio && this.browser.screenAudio;
     this.screenAudioRequested = enabled && withAudio;
-    const options = enabled && withAudio ? { audio: true, systemAudio: "include" as const } : { audio: false };
+    const capture = screenCapture(mode, enabled && withAudio);
     // ADR 0022: the radio and the PC audio of a share are never on together.
     const radio = this.radioDevice;
     if (enabled && withAudio && radio !== null) {
       await this.setRadio(null);
       this.note("info", "radio off: screen audio on");
     }
-    await this.toggle(() => this.room.localParticipant.setScreenShareEnabled(enabled, options), "screen");
+    await this.toggle(() => this.room.localParticipant.setScreenShareEnabled(enabled, capture, screenPublish(mode)), "screen");
     if (enabled && withAudio && this.screenAudioPublication() === undefined) {
       this.note("error", "screen audio missing: the source gave no PC audio");
     }
