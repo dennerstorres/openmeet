@@ -111,11 +111,10 @@ function cursor(value: string | undefined): string | undefined {
   return value;
 }
 
-// A voice room has no messages; a missing room and a room in someone else's server look the same.
-async function textRoom(db: MigrationClient, actor: PublicUser, id: string): Promise<Chat> {
+// ADR 0031: text and voice rooms both carry messages; a missing room and a room in someone else's server look the same.
+async function roomChat(db: MigrationClient, actor: PublicUser, id: string): Promise<Chat> {
   const { room, access } = await loadRoomAccess(db, actor, roomId(id));
   requireMember(access);
-  if (room.channel !== "text") throw new RoomError("voice_room");
   const moderator = canManage(access.membership);
   return { column: "room_id", target: room.id, room, moderator, canPin: moderator, closed: room.ended ? "room_ended" : undefined };
 }
@@ -125,8 +124,15 @@ async function dmChat(db: MigrationClient, actor: PublicUser, id: string): Promi
   return { column: "dm_id", target: dm.id, room: null, moderator: false, canPin: true, closed: dm.readOnly ? "blocked" : undefined };
 }
 
+/** ADR 0031: a temporary room's chat goes with the room, bodies and attachments included. */
+export async function purgeRoomMessages(db: MigrationClient, room: string): Promise<void> {
+  // Reactions, mentions and attachments cascade; replies inside the room are cut first.
+  await db.query("update messages set reply_to_id = null where reply_to_id in (select id from messages where room_id = $1)", [room]);
+  await db.query("delete from messages where room_id = $1", [room]);
+}
+
 export function loadChat(db: MigrationClient, actor: PublicUser, id: string, kind: ChatKind): Promise<Chat> {
-  return kind === "dm" ? dmChat(db, actor, id) : textRoom(db, actor, id);
+  return kind === "dm" ? dmChat(db, actor, id) : roomChat(db, actor, id);
 }
 
 function requireOpen(chat: Chat): void {
@@ -433,7 +439,7 @@ async function messageChat(db: MigrationClient, actor: PublicUser, id: string): 
   if (!row || (!room && !dm)) throw new RoomError("message_not_found");
   let chat: Chat;
   try {
-    chat = room ? await textRoom(db, actor, room) : await dmChat(db, actor, dm ?? "");
+    chat = room ? await roomChat(db, actor, room) : await dmChat(db, actor, dm ?? "");
   } catch (error) {
     if (error instanceof RoomError) throw new RoomError("message_not_found");
     throw error;

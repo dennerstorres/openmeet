@@ -159,7 +159,7 @@ async function act(w: World, token: string, id: string, action: string, payload:
   return w.app.inject({ method: "POST", url: `/api/v1/messages/${id}/${action}`, headers: auth(token), payload });
 }
 
-test("members of the server talk in a text room; outsiders and voice rooms stay closed", async () => {
+test("members of the server talk in a text room; outsiders stay closed", async () => {
   const w = await world();
   try {
     const sent = await send(w, w.member, "olá\r\npessoal");
@@ -179,7 +179,6 @@ test("members of the server talk in a text room; outsiders and voice rooms stay 
     assert.equal((await act(w, w.outsider, message.id, "delete")).statusCode, 404);
     assert.equal((await w.app.inject({ method: "GET", url: `/api/v1/rooms/${w.roomId}/messages` })).statusCode, 401);
 
-    assert.equal((await send(w, w.member, "aqui não", undefined, w.voiceId)).statusCode, 409);
     const join = await w.app.inject({ method: "POST", url: `/api/v1/rooms/${w.roomId}/join`, headers: auth(w.member), payload: {} });
     assert.equal(join.statusCode, 409);
     const temporary = await w.app.inject({
@@ -196,6 +195,49 @@ test("members of the server talk in a text room; outsiders and voice rooms stay 
     await w.db.query("update server_members set removed_at = now() where user_id = $1", [w.memberId]);
     assert.equal((await page(w, w.member)).status, 404);
     assert.equal((await send(w, w.member, "voltei")).statusCode, 404);
+  } finally {
+    await w.app.close();
+  }
+});
+
+test("ADR 0031: a voice room has its own chat for every member, in the call or not", async () => {
+  const w = await world();
+  try {
+    assert.equal((await send(w, w.member, "na voz", undefined, w.voiceId)).statusCode, 201);
+    const seen = await page(w, w.owner, "", w.voiceId);
+    assert.equal(seen.status, 200);
+    assert.deepEqual(
+      seen.page.messages.map((message) => message.body),
+      ["na voz"],
+    );
+    assert.equal((await page(w, w.outsider, "", w.voiceId)).status, 404);
+    assert.equal((await send(w, w.outsider, "intruso", undefined, w.voiceId)).statusCode, 404);
+  } finally {
+    await w.app.close();
+  }
+});
+
+test("ADR 0031: ending a temporary voice room erases its chat; a persistent one keeps it", async () => {
+  const w = await world();
+  try {
+    const created = await w.app.inject({
+      method: "POST",
+      url: `/api/v1/servers/${w.serverId}/rooms`,
+      headers: auth(w.owner),
+      payload: { name: "Rápida", slug: "rapida", kind: "temporary" },
+    });
+    assert.equal(created.statusCode, 201);
+    const temporary = (created.json() as { id: string }).id;
+    const first = (await send(w, w.member, "some", undefined, temporary)).json() as Message;
+    assert.equal((await send(w, w.member, "resposta", first.id, temporary)).statusCode, 201);
+    assert.equal((await send(w, w.member, "fica", undefined, w.voiceId)).statusCode, 201);
+
+    const ended = await w.app.inject({ method: "PATCH", url: `/api/v1/rooms/${temporary}`, headers: auth(w.owner), payload: { ended: true } });
+    assert.equal(ended.statusCode, 204);
+    const left = await w.db.query("select count(*)::int as n from messages where room_id = $1", [temporary]);
+    assert.equal(left.rows[0]?.n, 0);
+    const kept = await w.db.query("select count(*)::int as n from messages where room_id = $1", [w.voiceId]);
+    assert.equal(kept.rows[0]?.n, 1);
   } finally {
     await w.app.close();
   }

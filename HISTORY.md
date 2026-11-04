@@ -1,5 +1,17 @@
 # HISTORY — registro cronológico
 
+### 2026-11-04 — ADR 0031, chat na sala de voz — Claude
+Mesma branch. ADR aceito pelo usuário. Servidor: `roomChat` aceita sala de voz (sai o 409 `voice_room` nas mensagens); `unreadState` conta salas de voz; `endRoom`/`deleteRoom` de sala temporária chamam `purgeRoomMessages` na mesma transação (respostas cortadas, anexos/reações/menções em cascata). SSE e push já seguiam membros do servidor, sem filtro de canal. Cliente: balão ao lado do canal de voz na lista (hover) abre o chat; na chamada, balão no `call-strip` abre o chat ao lado dos cards (`call-body`/`call-chat`), com aviso em sala temporária.
+Windows 11, 2026-11-04: server `messages/unread/events/rooms/delete/push` 33/33 (2 casos novos: voz para membros e 404 para fora; temporária apaga, persistente mantém), typecheck desktop e server, eslint, prettier, desktop 17/17. Sem teste manual; sem caso novo de SSE específico de voz.
+
+### 2026-11-04 — Paridade com o Discord, itens 5 e 7 — Claude
+Mesma branch. Dock da chamada: [mic ˅ · ensurdecer · câmera ˅ · tela ˅] | [sons · ⋯] | [sair]. A seta da tela leva "Incluir áudio do PC" e a qualidade, que saíram da barra. O botão de engrenagem do dock virou "⋯ Mais opções", com Destaque/Grade e cards por tela no topo (saíram do cabeçalho). Item 6 (chat na sala de voz) BLOCKED: fora do escopo pelo ADR 0024, pede ADR.
+Windows 11, 2026-11-04: typecheck, eslint, prettier; `node --test` scaffold/markdown/dm/chat-events. Sem teste manual.
+
+### 2026-11-04 — Paridade de posição com o Discord, itens 1–4 — Claude
+Branch `task/discord-paridade-1-4`, a partir da `main` 2c4bedc. Análise em `docs/UX_DISCORD_PARIDADE.md` (Discord observado dentro de sala de voz). Mudanças em `MeetingApp.tsx`, `sounds.tsx`, `App.css`: (1) botão Sons no painel "Voz conectada", ao lado de Câmera e Tela, popup abre para cima a partir da lateral; o do dock continua. (2) Mic e fone aparecem fora da chamada: mic fora da chamada decide se a próxima chamada abre com microfone (`openmeet.micOnJoin`, padrão desligado, como antes); ensurdecer antes de entrar vale para a chamada e zera ao sair (ADR 0013, nada salvo). (3) Engrenagem abre Configurações direto; o menu Conta (Perfil, Atualizar, instância, sair) foi para o clique no avatar/nome. (4) Setinha ao lado do mic (entrada) e do fone (saída, só onde o navegador deixa escolher), com atalho para Configurações.
+Windows 11, 2026-11-04: `pnpm -F @openmeet/desktop typecheck`, eslint e prettier nos arquivos alterados, `node --test` scaffold/markdown/dm/chat-events 17/17. Não rodados: bundle/web (build lento). WAITING_VALIDATION: sem teste manual no app (não havia API de dev pronta nesta sessão).
+
 ### 2026-10-29 — F08-01, preparação open source — Claude
 Branch `task/F08-01-oss`. Licenças revisadas: 183 pacotes JS de produção e 571 crates Rust, sem GPL/AGPL/SSPL obrigatória; MPL-2.0 (`web-push` e crates CSS do Tauri) usada sem modificação. Relatório em `docs/THIRD_PARTY.md`. `SECURITY.md` ganhou canal (GitHub private vulnerability reporting), escopo e a seção de push; `CONTRIBUTING.md` reescrito (checks, regra de licença, seção 5 da Apache); README com cliente web/PWA e links. Varredura do histórico inteiro (`git log --all -p`) por chaves privadas, tokens AWS/GitHub/Google/OpenAI/Slack e chave de assinatura do Tauri: nada. Nenhum `.env`, `.pem`, `.pfx` ou dump versionado. Kit Teams/Figma fora do git.
 Pendente (humano): ativar *Private vulnerability reporting* nas configurações do repositório; revisão do Codex exigida pelo PLAN; decidir versão e tag do release candidate.

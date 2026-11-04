@@ -77,6 +77,9 @@ import {
   MenuList,
   MenuPopover,
   MenuTrigger,
+  Popover,
+  PopoverSurface,
+  PopoverTrigger,
   Select,
   Slider,
   ToggleButton,
@@ -88,12 +91,14 @@ import {
   ArrowSyncRegular,
   CallEndRegular,
   ChatRegular,
+  ChevronDownRegular,
   ClockRegular,
   DeleteRegular,
   EditRegular,
   DismissRegular,
   HeadphonesRegular,
   MicOffRegular,
+  MoreHorizontalRegular,
   MicRegular,
   NumberSymbolRegular,
   PeopleRegular,
@@ -233,6 +238,25 @@ const AWAY_MS = 5 * 60_000;
 function errorText(code: string | null): string | null {
   if (code === null) return null;
   return ERROR_TEXT[code] ?? "A instância recusou o pedido.";
+}
+
+const MIC_ON_JOIN_KEY = "openmeet.micOnJoin";
+
+// Like Discord, the mic button works outside a call: it decides whether the next call starts with the mic open.
+function storedMicOnJoin(): boolean {
+  try {
+    return localStorage.getItem(MIC_ON_JOIN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function keepMicOnJoin(value: boolean): void {
+  try {
+    localStorage.setItem(MIC_ON_JOIN_KEY, value ? "1" : "0");
+  } catch {
+    // The choice still holds for this window.
+  }
 }
 
 const SHARE_AUDIO_KEY = "openmeet.shareAudio";
@@ -427,6 +451,8 @@ export function MeetingApp() {
   const [fullscreen, setFullscreen] = useState(false);
   // ADR 0013: only this PC, only during the call, never saved.
   const [deafened, setDeafened] = useState(false);
+  const [callChat, setCallChat] = useState(false);
+  const [micOnJoin, setMicOnJoin] = useState(storedMicOnJoin);
   const [shareAudio, setShareAudio] = useState(storedShareAudio);
   const [screenMode, setScreenMode] = useState(storedScreenMode);
   const [microphoneVolume, setMicrophoneVolume] = useState(100);
@@ -729,7 +755,8 @@ export function MeetingApp() {
   // server keeps the LiveKit name and the initial.
   const selfMember = state.serverPresence?.members.find((member) => member.self);
   const memberById = new Map((state.serverPresence?.members ?? []).map((member) => [member.id, member]));
-  const textRoom = state.rooms.find((room) => room.id === textRoomId && room.channel === "text");
+  // ADR 0031: a voice room opened from its chat button reads like a text room.
+  const textRoom = state.rooms.find((room) => room.id === textRoomId);
   const chatPerson = (id: string): ChatPerson => {
     const member = memberById.get(id);
     return member ? { label: member.label, avatarId: member.avatarId } : { label: "Ex-membro", avatarId: null };
@@ -798,7 +825,12 @@ export function MeetingApp() {
   const caption = screenCaption(localScreenSurface(media.tiles), media.screen);
   const isFullscreen = inCall && fullscreen && layout === "spotlight";
   const activeServer = state.servers.find((server) => server.id === state.activeServerId);
-  const toggleMicrophone = () => void runControl("microphone", () => session().setMicrophone(!media.microphone));
+  const toggleMicrophone = () => {
+    const next = inCall ? !media.microphone : !micOnJoin;
+    setMicOnJoin(next);
+    keepMicOnJoin(next);
+    if (inCall) void runControl("microphone", () => session().setMicrophone(next));
+  };
   const toggleCamera = () => void runControl("camera", () => session().setCamera(!media.camera));
   const toggleScreen = () => void runControl("screen", () => session().setScreenShare(screenShareAction(media.screen) === "start", shareAudio, screenMode));
   const toggleDeafen = () => setDeafened((current) => !current);
@@ -811,8 +843,20 @@ export function MeetingApp() {
   useEffect(() => {
     if (pinnedId !== null && pin === null) setPinnedId(null);
   }, [pinnedId, pin]);
+  // Opens the mic once per call when the button was left on before joining.
+  const micApplied = useRef(false);
   useEffect(() => {
-    if (!settingsOpen || inCall) return;
+    if (!inCall) {
+      micApplied.current = false;
+      return;
+    }
+    if (!controlsEnabled || micApplied.current) return;
+    micApplied.current = true;
+    if (micOnJoin && !media.microphone) void runControl("microphone", () => session().setMicrophone(true));
+  }, [inCall, controlsEnabled]);
+  const [deviceMenu, setDeviceMenu] = useState(false);
+  useEffect(() => {
+    if ((!settingsOpen && !deviceMenu) || inCall) return;
     let live = true;
     listIdleDevices()
       .then((options) => live && setIdleDevices(options))
@@ -820,7 +864,7 @@ export function MeetingApp() {
     return () => {
       live = false;
     };
-  }, [settingsOpen, inCall]);
+  }, [settingsOpen, deviceMenu, inCall]);
   useEffect(() => {
     // F04-12: once per call, switch to the devices saved in Settings that this PC still has.
     if (!inCall) {
@@ -847,6 +891,7 @@ export function MeetingApp() {
       setFullscreen(false);
       setPinnedId(null);
       setDeafened(false);
+      setCallChat(false);
     }
   }, [inCall]);
   useEffect(() => {
@@ -1230,7 +1275,7 @@ export function MeetingApp() {
                     <button
                       type="button"
                       className={`room-item${room.id === state.activeRoomId || room.id === textRoom?.id ? " active" : ""}${
-                        room.channel === "text" && chatBadge(unread.state, { kind: "room", id: room.id }).unread ? " unread" : ""
+                        chatBadge(unread.state, { kind: "room", id: room.id }).unread ? " unread" : ""
                       }`}
                       disabled={room.channel === "text" ? false : state.pending || room.ended || room.id === state.activeRoomId}
                       aria-current={room.id === textRoom?.id ? "page" : undefined}
@@ -1264,6 +1309,23 @@ export function MeetingApp() {
                         <span className="sr">temporária</span>
                       ) : null}
                     </button>
+                    {room.channel === "voice" ? (
+                      <IconAction
+                        className={`room-chat${state.canCreate ? "" : " solo"}`}
+                        label={`Abrir o chat de ${room.name}`}
+                        icon={<ChatRegular />}
+                        onClick={() => {
+                          if (inCall && room.id === state.activeRoomId) {
+                            setTextRoomId(null);
+                            setCallChat(true);
+                          } else {
+                            setTextRoomId(room.id);
+                            setDmOpenId(null);
+                          }
+                          setMobileRooms(false);
+                        }}
+                      />
+                    ) : null}
                     {state.canCreate ? (
                       <IconAction
                         className="room-edit"
@@ -1393,49 +1455,34 @@ export function MeetingApp() {
               <ToggleButton checked={media.screen} icon={<ShareScreenStartRegular />} disabled={!controlsEnabled || controlPending} onClick={toggleScreen}>
                 Tela
               </ToggleButton>
+              <SoundPanel
+                variant="panel"
+                model={model}
+                session={session}
+                origin={state.origin}
+                serverId={state.activeServerId}
+                servers={state.servers}
+                playing={media.soundPlaying}
+                volume={media.soundVolume}
+                onError={setMediaError}
+              />
             </div>
           </section>
         ) : null}
         <footer className="account">
-          <span className="avatar small" aria-hidden="true">
-            <span>
-              <Face origin={state.origin} imageId={selfMember?.avatarId ?? null} label={selfMember?.label ?? state.userLabel ?? "?"} />
-            </span>
-          </span>
-          <div className="you-name">
-            <strong>{selfMember?.label ?? state.userLabel}</strong>
-            <p className="origin">{inCall ? `Em ${state.activeRoomName ?? "reunião"}` : state.origin}</p>
-          </div>
-          {inCall ? (
-            <>
-              <IconAction
-                label={media.microphone ? "Desligar microfone" : "Ligar microfone"}
-                danger={!media.microphone}
-                disabled={!controlsEnabled || controlPending}
-                icon={media.microphone ? <MicRegular /> : <MicOffRegular />}
-                onClick={toggleMicrophone}
-              />
-              <Tooltip
-                content={deafened ? "Voltar a ouvir as pessoas neste PC" : "Cortar o som de todos neste PC. O microfone não muda."}
-                relationship="description"
-                withArrow
-              >
-                <ToggleButton
-                  appearance="subtle"
-                  size="small"
-                  aria-label="Ensurdecer"
-                  checked={deafened}
-                  icon={deafened ? <SpeakerMuteRegular /> : <HeadphonesRegular />}
-                  onClick={toggleDeafen}
-                />
-              </Tooltip>
-            </>
-          ) : null}
-          <Menu positioning="above-end">
+          <Menu positioning="above-start">
             <MenuTrigger disableButtonEnhancement>
-              <Tooltip content="Conta" relationship="label" withArrow>
-                <Button appearance="subtle" size="small" icon={<SettingsRegular />} />
-              </Tooltip>
+              <button type="button" className="you" aria-label="Conta" title="Conta">
+                <span className="avatar small" aria-hidden="true">
+                  <span>
+                    <Face origin={state.origin} imageId={selfMember?.avatarId ?? null} label={selfMember?.label ?? state.userLabel ?? "?"} />
+                  </span>
+                </span>
+                <span className="you-name">
+                  <strong>{selfMember?.label ?? state.userLabel}</strong>
+                  <span className="origin">{inCall ? `Em ${state.activeRoomName ?? "reunião"}` : state.origin}</span>
+                </span>
+              </button>
             </MenuTrigger>
             <MenuPopover>
               <MenuList>
@@ -1452,15 +1499,6 @@ export function MeetingApp() {
                 ) : null}
                 <MenuItem icon={<ArrowSyncRegular />} disabled={state.pending} onClick={() => void model.reloadRooms()}>
                   Atualizar
-                </MenuItem>
-                <MenuItem
-                  icon={<SettingsRegular />}
-                  onClick={() => {
-                    setSettingsOpen(true);
-                    setMobileRooms(false);
-                  }}
-                >
-                  Configurações
                 </MenuItem>
                 {__WEB__ ? (
                   isWindowsDesktop() ? (
@@ -1486,6 +1524,65 @@ export function MeetingApp() {
               </MenuList>
             </MenuPopover>
           </Menu>
+          <span className="device-pair">
+            <IconAction
+              label={(inCall ? media.microphone : micOnJoin) ? "Desligar microfone" : "Ligar microfone"}
+              danger={!(inCall ? media.microphone : micOnJoin)}
+              disabled={inCall && (!controlsEnabled || controlPending)}
+              icon={(inCall ? media.microphone : micOnJoin) ? <MicRegular /> : <MicOffRegular />}
+              onClick={toggleMicrophone}
+            />
+            <DeviceMenu
+              label="Opções de entrada"
+              kinds={[{ kind: "audioinput", label: "Dispositivo de entrada" }]}
+              devices={inCall ? media.devices : idleDevices}
+              disabled={inCall && (!controlsEnabled || controlPending)}
+              onOpen={setDeviceMenu}
+              onChange={onDevice}
+              onSettings={() => {
+                setSettingsOpen(true);
+                setMobileRooms(false);
+              }}
+            />
+          </span>
+          <span className="device-pair">
+            <Tooltip
+              content={deafened ? "Voltar a ouvir as pessoas neste PC" : "Cortar o som de todos neste PC. O microfone não muda."}
+              relationship="description"
+              withArrow
+            >
+              <ToggleButton
+                appearance="subtle"
+                size="small"
+                aria-label="Ensurdecer"
+                checked={deafened}
+                icon={deafened ? <SpeakerMuteRegular /> : <HeadphonesRegular />}
+                onClick={toggleDeafen}
+              />
+            </Tooltip>
+            {session().browser.outputSelection ? (
+              <DeviceMenu
+                label="Opções de saída"
+                kinds={[{ kind: "audiooutput", label: "Dispositivo de saída" }]}
+                devices={inCall ? media.devices : idleDevices}
+                disabled={inCall && (!controlsEnabled || controlPending)}
+                onOpen={setDeviceMenu}
+                onChange={onDevice}
+                onSettings={() => {
+                  setSettingsOpen(true);
+                  setMobileRooms(false);
+                }}
+              />
+            ) : null}
+          </span>
+          <IconAction
+            label="Configurações"
+            icon={<SettingsRegular />}
+            onClick={() => {
+              setSettingsOpen(true);
+              setMobileRooms(false);
+            }}
+          />
         </footer>
       </aside>
 
@@ -2130,30 +2227,12 @@ export function MeetingApp() {
                 {reconnectText ? ` · ${reconnectText}` : ""}
                 {media.disconnectReason ? ` · ${media.disconnectReason}` : ""}
               </p>
-              <div className="segmented" role="group" aria-label="Layout">
-                <button type="button" aria-pressed={layout === "spotlight"} onClick={() => setLayout("spotlight")}>
-                  Destaque
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={layout === "grid"}
-                  onClick={() => {
-                    setLayout("grid");
-                    setFullscreen(false);
-                  }}
-                >
-                  Grade
-                </button>
-              </div>
-              {layout === "grid" ? (
-                <div className="segmented" role="group" aria-label="Cards por tela">
-                  {(["auto", 4, 9, 16] as const).map((option) => (
-                    <button key={option} type="button" aria-pressed={gridCapacity === option} onClick={() => setGridCapacity(option)}>
-                      {option === "auto" ? "Auto" : option}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+              <IconAction
+                className={`call-chat-toggle${callChat ? " on" : ""}`}
+                label={callChat ? "Fechar o chat da sala" : "Abrir o chat da sala"}
+                icon={<ChatRegular />}
+                onClick={() => setCallChat((open) => !open)}
+              />
               {layout === "spotlight" ? (
                 <Button appearance="subtle" size="small" onClick={() => setFullscreen(true)} disabled={placement.featuredId === null}>
                   Tela cheia
@@ -2172,28 +2251,56 @@ export function MeetingApp() {
                 de áudio marcada no seletor.
               </p>
             ) : null}
-            <CardStage
-              cards={cards.map((card) => {
-                const member = callMembers.get(card.identity);
-                return member ? { ...card, label: member.label } : card;
-              })}
-              origin={state.origin}
-              avatarFor={(identity) => callMembers.get(identity)?.avatarId ?? null}
-              accountFor={(identity) => callMembers.get(identity)?.globalName ?? null}
-              tiles={media.tiles}
-              layout={layout}
-              gridCapacity={gridCapacity}
-              featuredId={placement.featuredId}
-              others={placement.others}
-              pinnedId={pin}
-              speakers={media.speakers}
-              deafened={deafened}
-              fullscreen={isFullscreen}
-              levelFor={levelFor}
-              onLevel={changeLevel}
-              onPin={setPinnedId}
-              menuFor={cardMenu}
-            />
+            <div className={`call-body${callChat && !isFullscreen ? " with-chat" : ""}`}>
+              <CardStage
+                cards={cards.map((card) => {
+                  const member = callMembers.get(card.identity);
+                  return member ? { ...card, label: member.label } : card;
+                })}
+                origin={state.origin}
+                avatarFor={(identity) => callMembers.get(identity)?.avatarId ?? null}
+                accountFor={(identity) => callMembers.get(identity)?.globalName ?? null}
+                tiles={media.tiles}
+                layout={layout}
+                gridCapacity={gridCapacity}
+                featuredId={placement.featuredId}
+                others={placement.others}
+                pinnedId={pin}
+                speakers={media.speakers}
+                deafened={deafened}
+                fullscreen={isFullscreen}
+                levelFor={levelFor}
+                onLevel={changeLevel}
+                onPin={setPinnedId}
+                menuFor={cardMenu}
+              />
+              {callChat && !isFullscreen && state.activeRoomId !== null ? (
+                <aside className="call-chat" aria-label="Chat da sala">
+                  <TextRoom
+                    model={model}
+                    chat={{
+                      kind: "room",
+                      id: state.activeRoomId,
+                      name: state.activeRoomName ?? "sala",
+                      closed: null,
+                      canPin: activeServer?.role === "owner" || activeServer?.role === "moderator",
+                    }}
+                    origin={state.origin}
+                    userId={state.userId}
+                    manager={activeServer?.role === "owner" || activeServer?.role === "moderator"}
+                    person={chatPerson}
+                    members={state.serverPresence?.members ?? []}
+                    subscribe={chatHub.subscribe}
+                    banner={
+                      state.rooms.find((room) => room.id === state.activeRoomId)?.kind === "temporary" ? (
+                        <p className="hint">Sala temporária: o chat é apagado quando ela for encerrada.</p>
+                      ) : undefined
+                    }
+                    onClose={() => setCallChat(false)}
+                  />
+                </aside>
+              ) : null}
+            </div>
             <div className={`dock${isFullscreen ? " thin" : ""}`}>
               {media.audioPlayback ? null : (
                 <Button
@@ -2207,37 +2314,30 @@ export function MeetingApp() {
                   Ativar som
                 </Button>
               )}
-              <button
-                type="button"
-                className={`ctl${media.microphone ? "" : " off"}`}
-                aria-label={media.microphone ? "Desligar microfone" : "Ligar microfone"}
-                title={media.microphone ? "Microfone ligado" : "Microfone desligado"}
-                disabled={!controlsEnabled || controlPending}
-                onClick={toggleMicrophone}
-              >
-                {media.microphone ? <MicRegular fontSize={22} /> : <MicOffRegular fontSize={22} />}
-              </button>
-              <button
-                type="button"
-                className={`ctl${media.camera ? " on" : ""}`}
-                aria-label={media.camera ? "Desligar câmera" : "Ligar câmera"}
-                title={media.camera ? "Câmera ligada" : "Câmera desligada"}
-                disabled={!controlsEnabled || controlPending}
-                onClick={toggleCamera}
-              >
-                {media.camera ? <VideoRegular fontSize={22} /> : <VideoOffRegular fontSize={22} />}
-              </button>
-              <button
-                type="button"
-                className={`ctl${media.screen ? " on" : ""}`}
-                aria-label={media.screen ? "Parar compartilhamento" : "Compartilhar tela"}
-                title={media.screen ? "Parar compartilhamento" : "Compartilhar tela"}
-                aria-pressed={media.screen}
-                disabled={!controlsEnabled || controlPending}
-                onClick={toggleScreen}
-              >
-                <ShareScreenStartRegular fontSize={22} />
-              </button>
+              <span className="ctl-pair">
+                <button
+                  type="button"
+                  className={`ctl${media.microphone ? "" : " off"}`}
+                  aria-label={media.microphone ? "Desligar microfone" : "Ligar microfone"}
+                  title={media.microphone ? "Microfone ligado" : "Microfone desligado"}
+                  disabled={!controlsEnabled || controlPending}
+                  onClick={toggleMicrophone}
+                >
+                  {media.microphone ? <MicRegular fontSize={22} /> : <MicOffRegular fontSize={22} />}
+                </button>
+                <DeviceMenu
+                  label="Opções de entrada"
+                  kinds={[{ kind: "audioinput", label: "Dispositivo de entrada" }]}
+                  devices={media.devices}
+                  disabled={!controlsEnabled || controlPending}
+                  onOpen={setDeviceMenu}
+                  onChange={onDevice}
+                  onSettings={() => {
+                    setSettingsOpen(true);
+                    setMobileRooms(false);
+                  }}
+                />
+              </span>
               <button
                 type="button"
                 className={`ctl${deafened ? " off" : ""}`}
@@ -2248,44 +2348,96 @@ export function MeetingApp() {
               >
                 {deafened ? <SpeakerMuteRegular fontSize={22} /> : <HeadphonesRegular fontSize={22} />}
               </button>
-              {session().browser.screenAudio ? (
-                <label className="share-audio" title="Pede o som do PC junto com a imagem. Muda na próxima vez que compartilhar.">
-                  <input
-                    type="checkbox"
-                    checked={shareAudio}
-                    disabled={media.screen}
-                    onChange={(event) => {
-                      const next = event.currentTarget.checked;
-                      setShareAudio(next);
-                      try {
-                        localStorage.setItem(SHARE_AUDIO_KEY, next ? "1" : "0");
-                      } catch {
-                        // The choice still holds for this window.
-                      }
-                    }}
-                  />
-                  Incluir áudio do PC
-                </label>
-              ) : null}
-              <label className="share-audio" title="Como a tela vai para os outros. Muda na próxima vez que compartilhar.">
-                <select
-                  value={screenMode}
-                  disabled={media.screen}
-                  aria-label="Qualidade da tela"
-                  onChange={(event) => {
-                    const next: ScreenMode = event.currentTarget.value === "motion" ? "motion" : "detail";
-                    setScreenMode(next);
-                    try {
-                      localStorage.setItem(SCREEN_MODE_KEY, next);
-                    } catch {
-                      // The choice still holds for this window.
-                    }
-                  }}
+              <span className="ctl-pair">
+                <button
+                  type="button"
+                  className={`ctl${media.camera ? " on" : ""}`}
+                  aria-label={media.camera ? "Desligar câmera" : "Ligar câmera"}
+                  title={media.camera ? "Câmera ligada" : "Câmera desligada"}
+                  disabled={!controlsEnabled || controlPending}
+                  onClick={toggleCamera}
                 >
-                  <option value="detail">Texto nítido</option>
-                  <option value="motion">Movimento fluido</option>
-                </select>
-              </label>
+                  {media.camera ? <VideoRegular fontSize={22} /> : <VideoOffRegular fontSize={22} />}
+                </button>
+                <DeviceMenu
+                  label="Opções de câmera"
+                  kinds={[{ kind: "videoinput", label: "Câmera" }]}
+                  devices={media.devices}
+                  disabled={!controlsEnabled || controlPending}
+                  onOpen={setDeviceMenu}
+                  onChange={onDevice}
+                  onSettings={() => {
+                    setSettingsOpen(true);
+                    setMobileRooms(false);
+                  }}
+                />
+              </span>
+              <span className="ctl-pair">
+                <button
+                  type="button"
+                  className={`ctl${media.screen ? " on" : ""}`}
+                  aria-label={media.screen ? "Parar compartilhamento" : "Compartilhar tela"}
+                  title={media.screen ? "Parar compartilhamento" : "Compartilhar tela"}
+                  aria-pressed={media.screen}
+                  disabled={!controlsEnabled || controlPending}
+                  onClick={toggleScreen}
+                >
+                  <ShareScreenStartRegular fontSize={22} />
+                </button>
+                <Popover positioning="above" withArrow>
+                  <PopoverTrigger disableButtonEnhancement>
+                    <Button
+                      appearance="subtle"
+                      size="small"
+                      className="device-arrow"
+                      aria-label="Opções de compartilhamento"
+                      title="Opções de compartilhamento"
+                      icon={<ChevronDownRegular />}
+                    />
+                  </PopoverTrigger>
+                  <PopoverSurface className="device-menu">
+                    {session().browser.screenAudio ? (
+                      <label className="share-audio" title="Pede o som do PC junto com a imagem. Muda na próxima vez que compartilhar.">
+                        <input
+                          type="checkbox"
+                          checked={shareAudio}
+                          disabled={media.screen}
+                          onChange={(event) => {
+                            const next = event.currentTarget.checked;
+                            setShareAudio(next);
+                            try {
+                              localStorage.setItem(SHARE_AUDIO_KEY, next ? "1" : "0");
+                            } catch {
+                              // The choice still holds for this window.
+                            }
+                          }}
+                        />
+                        Incluir áudio do PC
+                      </label>
+                    ) : null}
+                    <label className="share-audio" title="Como a tela vai para os outros. Muda na próxima vez que compartilhar.">
+                      <select
+                        value={screenMode}
+                        disabled={media.screen}
+                        aria-label="Qualidade da tela"
+                        onChange={(event) => {
+                          const next: ScreenMode = event.currentTarget.value === "motion" ? "motion" : "detail";
+                          setScreenMode(next);
+                          try {
+                            localStorage.setItem(SCREEN_MODE_KEY, next);
+                          } catch {
+                            // The choice still holds for this window.
+                          }
+                        }}
+                      >
+                        <option value="detail">Texto nítido</option>
+                        <option value="motion">Movimento fluido</option>
+                      </select>
+                    </label>
+                  </PopoverSurface>
+                </Popover>
+              </span>
+              <span className="dock-sep" aria-hidden="true" />
               {!isFullscreen ? (
                 <SoundPanel
                   model={model}
@@ -2310,8 +2462,8 @@ export function MeetingApp() {
                     if (!event.currentTarget.open && media.voiceMonitor) session().setVoiceMonitor(false);
                   }}
                 >
-                  <summary className="ctl" aria-label="Dispositivos e diagnóstico" title="Dispositivos e diagnóstico">
-                    <SettingsRegular fontSize={22} />
+                  <summary className="ctl" aria-label="Mais opções" title="Mais opções">
+                    <MoreHorizontalRegular fontSize={22} />
                   </summary>
                   <div className="more-body">
                     <button
@@ -2327,6 +2479,33 @@ export function MeetingApp() {
                     >
                       Fechar ajustes
                     </button>
+                    <fieldset className="view-controls">
+                      <legend>Exibição</legend>
+                      <div className="segmented" role="group" aria-label="Layout">
+                        <button type="button" aria-pressed={layout === "spotlight"} onClick={() => setLayout("spotlight")}>
+                          Destaque
+                        </button>
+                        <button
+                          type="button"
+                          aria-pressed={layout === "grid"}
+                          onClick={() => {
+                            setLayout("grid");
+                            setFullscreen(false);
+                          }}
+                        >
+                          Grade
+                        </button>
+                      </div>
+                      {layout === "grid" ? (
+                        <div className="segmented" role="group" aria-label="Cards por tela">
+                          {(["auto", 4, 9, 16] as const).map((option) => (
+                            <button key={option} type="button" aria-pressed={gridCapacity === option} onClick={() => setGridCapacity(option)}>
+                              {option === "auto" ? "Auto" : option}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </fieldset>
                     <DeviceSelect label="Entrada" kind="audioinput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
                     <Field label={`Volume de entrada do microfone: ${microphoneVolume}%`}>
                       <Slider
@@ -2467,6 +2646,41 @@ function presenceLabel(status: "online" | "away" | "offline" | "invisible", acti
   if (status === "away") return "ausente";
   if (status === "invisible") return activity === "away" ? "invisível · ausente" : "invisível";
   return "desconectado";
+}
+
+// The small arrow next to mic and headphones, as in Discord: pick the device without opening the call settings.
+function DeviceMenu({
+  label,
+  kinds,
+  devices,
+  disabled,
+  onOpen,
+  onChange,
+  onSettings,
+}: {
+  label: string;
+  kinds: { kind: DeviceKind; label: string }[];
+  devices: DeviceOption[];
+  disabled: boolean;
+  onOpen: (open: boolean) => void;
+  onChange: (kind: DeviceKind, deviceId: string) => void;
+  onSettings: () => void;
+}) {
+  return (
+    <Popover positioning="above-end" withArrow onOpenChange={(_, data) => onOpen(data.open)}>
+      <PopoverTrigger disableButtonEnhancement>
+        <Button appearance="subtle" size="small" className="device-arrow" aria-label={label} title={label} icon={<ChevronDownRegular />} />
+      </PopoverTrigger>
+      <PopoverSurface className="device-menu">
+        {kinds.map((item) => (
+          <DeviceSelect key={item.kind} label={item.label} kind={item.kind} devices={devices} disabled={disabled} onChange={onChange} />
+        ))}
+        <Button appearance="subtle" icon={<SettingsRegular />} onClick={onSettings}>
+          Configurações de voz
+        </Button>
+      </PopoverSurface>
+    </Popover>
+  );
 }
 
 function DeviceSelect({

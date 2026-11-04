@@ -10,6 +10,7 @@ import { heldRooms, releaseHold, revokeAfter } from "../auth/media-hold.js";
 import { roomGrant } from "./grant.js";
 import type { RoomMedia } from "./media.js";
 import { PlatformPresence, type ActivityState } from "./platform-presence.js";
+import { purgeRoomMessages } from "./messages.js";
 
 export type RoomErrorCode =
   | "invalid_body"
@@ -695,6 +696,7 @@ export async function endRoom(db: MigrationClient, actor: PublicUser, id: string
     if (!row) throw new RoomError("room_not_found");
     if (!isTrue(row.ended)) {
       await tx.query("update rooms set ended_at = now(), updated_at = now() where id = $1", [room.id]);
+      if (room.kind === "temporary") await purgeRoomMessages(tx, room.id);
       await audit(tx, actor.id, "room_end", "room", room.id);
     } else if (isTrue(row.closed)) {
       return undefined;
@@ -750,13 +752,14 @@ export async function deleteRoom(db: MigrationClient, actor: PublicUser, id: str
   if (!canManage(access.membership)) throw new RoomError("forbidden");
   const revokeAt = await db.transaction(async (tx) => {
     const locked = await tx.query(
-      "select deleted_at is not null as deleted, media_closed_at is not null as closed, last_join_nbf from rooms where id = $1 for update",
+      "select deleted_at is not null as deleted, media_closed_at is not null as closed, last_join_nbf, kind::text as kind from rooms where id = $1 for update",
       [target],
     );
     const row = locked.rows[0];
     if (!row) throw new RoomError("room_not_found");
     if (!isTrue(row.deleted)) {
       await tx.query("update rooms set deleted_at = now(), ended_at = coalesce(ended_at, now()), updated_at = now() where id = $1", [target]);
+      if (text(row.kind) === "temporary") await purgeRoomMessages(tx, target);
       await tx.query("update invites set revoked_at = now() where room_id = $1 and revoked_at is null", [target]);
       await audit(tx, actor.id, "room_delete", "room", target);
     } else if (isTrue(row.closed)) {

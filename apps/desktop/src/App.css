@@ -493,6 +493,23 @@ a {
   transform: translateY(-50%);
 }
 
+.room-row > .room-chat {
+  position: absolute;
+  top: 17px;
+  right: 68px;
+  opacity: 0;
+  transform: translateY(-50%);
+}
+
+.room-row > .room-chat.solo {
+  right: 4px;
+}
+
+.room-row:hover > .room-chat,
+.room-row > .room-chat:focus-visible {
+  opacity: 1;
+}
+
 .room-row.room-group-start > .room-edit {
   top: 24px;
 }
@@ -870,7 +887,7 @@ a {
 
 .voice-actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -908,10 +925,87 @@ a {
   margin-top: 0;
 }
 
+.you {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  padding: 4px;
+  border-radius: 6px;
+  color: inherit;
+  text-align: left;
+}
+
+.you:hover {
+  background: var(--bg-active);
+}
+
 .you-name {
   flex: 1;
   min-width: 0;
   padding-left: 4px;
+}
+
+.you-name .origin {
+  display: block;
+}
+
+.ctl-pair {
+  display: inline-flex;
+  align-items: center;
+}
+
+.view-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.device-pair {
+  display: inline-flex;
+  align-items: center;
+}
+
+.device-arrow.fui-Button {
+  min-width: 16px;
+  max-width: 16px;
+  padding: 0;
+}
+
+.device-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 260px;
+}
+
+/* Discord keeps the soundboard in the "voice connected" panel; the popup opens upward from the sidebar. */
+.voice-actions .sounds summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  background: var(--bg-main);
+  cursor: pointer;
+  list-style: none;
+}
+
+.voice-actions .sounds summary::-webkit-details-marker {
+  display: none;
+}
+
+.voice-actions .sounds summary:hover {
+  background: var(--bg-active);
+}
+
+.voice-actions .sounds .more-body {
+  left: 0;
+  transform: none;
+  width: min(420px, 80vw);
 }
 
 .you-name strong {
@@ -1298,6 +1392,29 @@ a {
   flex: 1;
   place-items: center;
   color: var(--text-faint);
+}
+
+/* ADR 0031: the room's chat sits beside the cards, which shrink instead of being covered. */
+.call-body {
+  display: flex;
+  flex: 1;
+  gap: 12px;
+  min-height: 0;
+}
+
+.call-chat {
+  display: flex;
+  flex: 0 0 min(380px, 40%);
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--bg-panel);
+}
+
+.call-chat-toggle.on {
+  color: var(--glow);
 }
 
 .cards {
