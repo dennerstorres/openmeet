@@ -4,6 +4,8 @@
 
 READY → IN_PROGRESS em 2026-11-04. Retomar versão deixada pelo Claude sobre 093699b, por pedido do usuário. Branch `codex/F07-12-release-0.2.18`. Arquivos: quatro manifests de versão do desktop, teste de anexos, PLAN.md, este plano e HISTORY.md. Validar testes de release, anexos/permissões, CI e artefatos publicados. CI do merge falhou porque attachments.test.ts ainda esperava 409 para upload em sala de voz, agora permitido pelo ADR 0031. Instalação e atualização em máquina real ficam WAITING_VALIDATION.
 
+WAITING_VALIDATION: testes locais 20/20 e scripts de release 6/6 PASS; CI 41898690823 e CI da tag 41899548742 completos PASS. Main e tag `v0.2.18` enviadas em 6734f70. Publicação PASS: https://github.com/dennerstorres/openmeet/actions/runs/41899548934. Release https://github.com/dennerstorres/openmeet/releases/tag/v0.2.18 com quatro assets; download verificado contra SHA256SUMS, versão/URL/assinatura referenciada no manifest consistentes. Falta instalar e validar atualização 0.2.17 → 0.2.18 em Windows real.
+
 Objetivo: Infra Docker + instalador.
 
 ## F07-06 — 0.2.2
