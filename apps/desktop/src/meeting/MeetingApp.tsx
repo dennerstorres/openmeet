@@ -98,6 +98,7 @@ import {
   DismissRegular,
   HeadphonesRegular,
   MicOffRegular,
+  MoreHorizontalRegular,
   MicRegular,
   NumberSymbolRegular,
   PeopleRegular,
@@ -2206,30 +2207,6 @@ export function MeetingApp() {
                 {reconnectText ? ` · ${reconnectText}` : ""}
                 {media.disconnectReason ? ` · ${media.disconnectReason}` : ""}
               </p>
-              <div className="segmented" role="group" aria-label="Layout">
-                <button type="button" aria-pressed={layout === "spotlight"} onClick={() => setLayout("spotlight")}>
-                  Destaque
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={layout === "grid"}
-                  onClick={() => {
-                    setLayout("grid");
-                    setFullscreen(false);
-                  }}
-                >
-                  Grade
-                </button>
-              </div>
-              {layout === "grid" ? (
-                <div className="segmented" role="group" aria-label="Cards por tela">
-                  {(["auto", 4, 9, 16] as const).map((option) => (
-                    <button key={option} type="button" aria-pressed={gridCapacity === option} onClick={() => setGridCapacity(option)}>
-                      {option === "auto" ? "Auto" : option}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
               {layout === "spotlight" ? (
                 <Button appearance="subtle" size="small" onClick={() => setFullscreen(true)} disabled={placement.featuredId === null}>
                   Tela cheia
@@ -2283,37 +2260,30 @@ export function MeetingApp() {
                   Ativar som
                 </Button>
               )}
-              <button
-                type="button"
-                className={`ctl${media.microphone ? "" : " off"}`}
-                aria-label={media.microphone ? "Desligar microfone" : "Ligar microfone"}
-                title={media.microphone ? "Microfone ligado" : "Microfone desligado"}
-                disabled={!controlsEnabled || controlPending}
-                onClick={toggleMicrophone}
-              >
-                {media.microphone ? <MicRegular fontSize={22} /> : <MicOffRegular fontSize={22} />}
-              </button>
-              <button
-                type="button"
-                className={`ctl${media.camera ? " on" : ""}`}
-                aria-label={media.camera ? "Desligar câmera" : "Ligar câmera"}
-                title={media.camera ? "Câmera ligada" : "Câmera desligada"}
-                disabled={!controlsEnabled || controlPending}
-                onClick={toggleCamera}
-              >
-                {media.camera ? <VideoRegular fontSize={22} /> : <VideoOffRegular fontSize={22} />}
-              </button>
-              <button
-                type="button"
-                className={`ctl${media.screen ? " on" : ""}`}
-                aria-label={media.screen ? "Parar compartilhamento" : "Compartilhar tela"}
-                title={media.screen ? "Parar compartilhamento" : "Compartilhar tela"}
-                aria-pressed={media.screen}
-                disabled={!controlsEnabled || controlPending}
-                onClick={toggleScreen}
-              >
-                <ShareScreenStartRegular fontSize={22} />
-              </button>
+              <span className="ctl-pair">
+                <button
+                  type="button"
+                  className={`ctl${media.microphone ? "" : " off"}`}
+                  aria-label={media.microphone ? "Desligar microfone" : "Ligar microfone"}
+                  title={media.microphone ? "Microfone ligado" : "Microfone desligado"}
+                  disabled={!controlsEnabled || controlPending}
+                  onClick={toggleMicrophone}
+                >
+                  {media.microphone ? <MicRegular fontSize={22} /> : <MicOffRegular fontSize={22} />}
+                </button>
+                <DeviceMenu
+                  label="Opções de entrada"
+                  kinds={[{ kind: "audioinput", label: "Dispositivo de entrada" }]}
+                  devices={media.devices}
+                  disabled={!controlsEnabled || controlPending}
+                  onOpen={setDeviceMenu}
+                  onChange={onDevice}
+                  onSettings={() => {
+                    setSettingsOpen(true);
+                    setMobileRooms(false);
+                  }}
+                />
+              </span>
               <button
                 type="button"
                 className={`ctl${deafened ? " off" : ""}`}
@@ -2324,44 +2294,96 @@ export function MeetingApp() {
               >
                 {deafened ? <SpeakerMuteRegular fontSize={22} /> : <HeadphonesRegular fontSize={22} />}
               </button>
-              {session().browser.screenAudio ? (
-                <label className="share-audio" title="Pede o som do PC junto com a imagem. Muda na próxima vez que compartilhar.">
-                  <input
-                    type="checkbox"
-                    checked={shareAudio}
-                    disabled={media.screen}
-                    onChange={(event) => {
-                      const next = event.currentTarget.checked;
-                      setShareAudio(next);
-                      try {
-                        localStorage.setItem(SHARE_AUDIO_KEY, next ? "1" : "0");
-                      } catch {
-                        // The choice still holds for this window.
-                      }
-                    }}
-                  />
-                  Incluir áudio do PC
-                </label>
-              ) : null}
-              <label className="share-audio" title="Como a tela vai para os outros. Muda na próxima vez que compartilhar.">
-                <select
-                  value={screenMode}
-                  disabled={media.screen}
-                  aria-label="Qualidade da tela"
-                  onChange={(event) => {
-                    const next: ScreenMode = event.currentTarget.value === "motion" ? "motion" : "detail";
-                    setScreenMode(next);
-                    try {
-                      localStorage.setItem(SCREEN_MODE_KEY, next);
-                    } catch {
-                      // The choice still holds for this window.
-                    }
-                  }}
+              <span className="ctl-pair">
+                <button
+                  type="button"
+                  className={`ctl${media.camera ? " on" : ""}`}
+                  aria-label={media.camera ? "Desligar câmera" : "Ligar câmera"}
+                  title={media.camera ? "Câmera ligada" : "Câmera desligada"}
+                  disabled={!controlsEnabled || controlPending}
+                  onClick={toggleCamera}
                 >
-                  <option value="detail">Texto nítido</option>
-                  <option value="motion">Movimento fluido</option>
-                </select>
-              </label>
+                  {media.camera ? <VideoRegular fontSize={22} /> : <VideoOffRegular fontSize={22} />}
+                </button>
+                <DeviceMenu
+                  label="Opções de câmera"
+                  kinds={[{ kind: "videoinput", label: "Câmera" }]}
+                  devices={media.devices}
+                  disabled={!controlsEnabled || controlPending}
+                  onOpen={setDeviceMenu}
+                  onChange={onDevice}
+                  onSettings={() => {
+                    setSettingsOpen(true);
+                    setMobileRooms(false);
+                  }}
+                />
+              </span>
+              <span className="ctl-pair">
+                <button
+                  type="button"
+                  className={`ctl${media.screen ? " on" : ""}`}
+                  aria-label={media.screen ? "Parar compartilhamento" : "Compartilhar tela"}
+                  title={media.screen ? "Parar compartilhamento" : "Compartilhar tela"}
+                  aria-pressed={media.screen}
+                  disabled={!controlsEnabled || controlPending}
+                  onClick={toggleScreen}
+                >
+                  <ShareScreenStartRegular fontSize={22} />
+                </button>
+                <Popover positioning="above" withArrow>
+                  <PopoverTrigger disableButtonEnhancement>
+                    <Button
+                      appearance="subtle"
+                      size="small"
+                      className="device-arrow"
+                      aria-label="Opções de compartilhamento"
+                      title="Opções de compartilhamento"
+                      icon={<ChevronDownRegular />}
+                    />
+                  </PopoverTrigger>
+                  <PopoverSurface className="device-menu">
+                    {session().browser.screenAudio ? (
+                      <label className="share-audio" title="Pede o som do PC junto com a imagem. Muda na próxima vez que compartilhar.">
+                        <input
+                          type="checkbox"
+                          checked={shareAudio}
+                          disabled={media.screen}
+                          onChange={(event) => {
+                            const next = event.currentTarget.checked;
+                            setShareAudio(next);
+                            try {
+                              localStorage.setItem(SHARE_AUDIO_KEY, next ? "1" : "0");
+                            } catch {
+                              // The choice still holds for this window.
+                            }
+                          }}
+                        />
+                        Incluir áudio do PC
+                      </label>
+                    ) : null}
+                    <label className="share-audio" title="Como a tela vai para os outros. Muda na próxima vez que compartilhar.">
+                      <select
+                        value={screenMode}
+                        disabled={media.screen}
+                        aria-label="Qualidade da tela"
+                        onChange={(event) => {
+                          const next: ScreenMode = event.currentTarget.value === "motion" ? "motion" : "detail";
+                          setScreenMode(next);
+                          try {
+                            localStorage.setItem(SCREEN_MODE_KEY, next);
+                          } catch {
+                            // The choice still holds for this window.
+                          }
+                        }}
+                      >
+                        <option value="detail">Texto nítido</option>
+                        <option value="motion">Movimento fluido</option>
+                      </select>
+                    </label>
+                  </PopoverSurface>
+                </Popover>
+              </span>
+              <span className="dock-sep" aria-hidden="true" />
               {!isFullscreen ? (
                 <SoundPanel
                   model={model}
@@ -2386,8 +2408,8 @@ export function MeetingApp() {
                     if (!event.currentTarget.open && media.voiceMonitor) session().setVoiceMonitor(false);
                   }}
                 >
-                  <summary className="ctl" aria-label="Dispositivos e diagnóstico" title="Dispositivos e diagnóstico">
-                    <SettingsRegular fontSize={22} />
+                  <summary className="ctl" aria-label="Mais opções" title="Mais opções">
+                    <MoreHorizontalRegular fontSize={22} />
                   </summary>
                   <div className="more-body">
                     <button
@@ -2403,6 +2425,33 @@ export function MeetingApp() {
                     >
                       Fechar ajustes
                     </button>
+                    <fieldset className="view-controls">
+                      <legend>Exibição</legend>
+                      <div className="segmented" role="group" aria-label="Layout">
+                        <button type="button" aria-pressed={layout === "spotlight"} onClick={() => setLayout("spotlight")}>
+                          Destaque
+                        </button>
+                        <button
+                          type="button"
+                          aria-pressed={layout === "grid"}
+                          onClick={() => {
+                            setLayout("grid");
+                            setFullscreen(false);
+                          }}
+                        >
+                          Grade
+                        </button>
+                      </div>
+                      {layout === "grid" ? (
+                        <div className="segmented" role="group" aria-label="Cards por tela">
+                          {(["auto", 4, 9, 16] as const).map((option) => (
+                            <button key={option} type="button" aria-pressed={gridCapacity === option} onClick={() => setGridCapacity(option)}>
+                              {option === "auto" ? "Auto" : option}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </fieldset>
                     <DeviceSelect label="Entrada" kind="audioinput" devices={media.devices} disabled={!controlsEnabled || controlPending} onChange={onDevice} />
                     <Field label={`Volume de entrada do microfone: ${microphoneVolume}%`}>
                       <Slider

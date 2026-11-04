@@ -933,6 +933,20 @@ a {
   display: block;
 }
 
+.ctl-pair {
+  display: inline-flex;
+  align-items: center;
+}
+
+.view-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
 .device-pair {
   display: inline-flex;
   align-items: center;
