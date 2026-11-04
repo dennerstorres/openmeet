@@ -77,6 +77,9 @@ import {
   MenuList,
   MenuPopover,
   MenuTrigger,
+  Popover,
+  PopoverSurface,
+  PopoverTrigger,
   Select,
   Slider,
   ToggleButton,
@@ -88,6 +91,7 @@ import {
   ArrowSyncRegular,
   CallEndRegular,
   ChatRegular,
+  ChevronDownRegular,
   ClockRegular,
   DeleteRegular,
   EditRegular,
@@ -233,6 +237,25 @@ const AWAY_MS = 5 * 60_000;
 function errorText(code: string | null): string | null {
   if (code === null) return null;
   return ERROR_TEXT[code] ?? "A instância recusou o pedido.";
+}
+
+const MIC_ON_JOIN_KEY = "openmeet.micOnJoin";
+
+// Like Discord, the mic button works outside a call: it decides whether the next call starts with the mic open.
+function storedMicOnJoin(): boolean {
+  try {
+    return localStorage.getItem(MIC_ON_JOIN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function keepMicOnJoin(value: boolean): void {
+  try {
+    localStorage.setItem(MIC_ON_JOIN_KEY, value ? "1" : "0");
+  } catch {
+    // The choice still holds for this window.
+  }
 }
 
 const SHARE_AUDIO_KEY = "openmeet.shareAudio";
@@ -427,6 +450,7 @@ export function MeetingApp() {
   const [fullscreen, setFullscreen] = useState(false);
   // ADR 0013: only this PC, only during the call, never saved.
   const [deafened, setDeafened] = useState(false);
+  const [micOnJoin, setMicOnJoin] = useState(storedMicOnJoin);
   const [shareAudio, setShareAudio] = useState(storedShareAudio);
   const [screenMode, setScreenMode] = useState(storedScreenMode);
   const [microphoneVolume, setMicrophoneVolume] = useState(100);
@@ -798,7 +822,12 @@ export function MeetingApp() {
   const caption = screenCaption(localScreenSurface(media.tiles), media.screen);
   const isFullscreen = inCall && fullscreen && layout === "spotlight";
   const activeServer = state.servers.find((server) => server.id === state.activeServerId);
-  const toggleMicrophone = () => void runControl("microphone", () => session().setMicrophone(!media.microphone));
+  const toggleMicrophone = () => {
+    const next = inCall ? !media.microphone : !micOnJoin;
+    setMicOnJoin(next);
+    keepMicOnJoin(next);
+    if (inCall) void runControl("microphone", () => session().setMicrophone(next));
+  };
   const toggleCamera = () => void runControl("camera", () => session().setCamera(!media.camera));
   const toggleScreen = () => void runControl("screen", () => session().setScreenShare(screenShareAction(media.screen) === "start", shareAudio, screenMode));
   const toggleDeafen = () => setDeafened((current) => !current);
@@ -811,8 +840,20 @@ export function MeetingApp() {
   useEffect(() => {
     if (pinnedId !== null && pin === null) setPinnedId(null);
   }, [pinnedId, pin]);
+  // Opens the mic once per call when the button was left on before joining.
+  const micApplied = useRef(false);
   useEffect(() => {
-    if (!settingsOpen || inCall) return;
+    if (!inCall) {
+      micApplied.current = false;
+      return;
+    }
+    if (!controlsEnabled || micApplied.current) return;
+    micApplied.current = true;
+    if (micOnJoin && !media.microphone) void runControl("microphone", () => session().setMicrophone(true));
+  }, [inCall, controlsEnabled]);
+  const [deviceMenu, setDeviceMenu] = useState(false);
+  useEffect(() => {
+    if ((!settingsOpen && !deviceMenu) || inCall) return;
     let live = true;
     listIdleDevices()
       .then((options) => live && setIdleDevices(options))
@@ -820,7 +861,7 @@ export function MeetingApp() {
     return () => {
       live = false;
     };
-  }, [settingsOpen, inCall]);
+  }, [settingsOpen, deviceMenu, inCall]);
   useEffect(() => {
     // F04-12: once per call, switch to the devices saved in Settings that this PC still has.
     if (!inCall) {
@@ -1393,49 +1434,34 @@ export function MeetingApp() {
               <ToggleButton checked={media.screen} icon={<ShareScreenStartRegular />} disabled={!controlsEnabled || controlPending} onClick={toggleScreen}>
                 Tela
               </ToggleButton>
+              <SoundPanel
+                variant="panel"
+                model={model}
+                session={session}
+                origin={state.origin}
+                serverId={state.activeServerId}
+                servers={state.servers}
+                playing={media.soundPlaying}
+                volume={media.soundVolume}
+                onError={setMediaError}
+              />
             </div>
           </section>
         ) : null}
         <footer className="account">
-          <span className="avatar small" aria-hidden="true">
-            <span>
-              <Face origin={state.origin} imageId={selfMember?.avatarId ?? null} label={selfMember?.label ?? state.userLabel ?? "?"} />
-            </span>
-          </span>
-          <div className="you-name">
-            <strong>{selfMember?.label ?? state.userLabel}</strong>
-            <p className="origin">{inCall ? `Em ${state.activeRoomName ?? "reunião"}` : state.origin}</p>
-          </div>
-          {inCall ? (
-            <>
-              <IconAction
-                label={media.microphone ? "Desligar microfone" : "Ligar microfone"}
-                danger={!media.microphone}
-                disabled={!controlsEnabled || controlPending}
-                icon={media.microphone ? <MicRegular /> : <MicOffRegular />}
-                onClick={toggleMicrophone}
-              />
-              <Tooltip
-                content={deafened ? "Voltar a ouvir as pessoas neste PC" : "Cortar o som de todos neste PC. O microfone não muda."}
-                relationship="description"
-                withArrow
-              >
-                <ToggleButton
-                  appearance="subtle"
-                  size="small"
-                  aria-label="Ensurdecer"
-                  checked={deafened}
-                  icon={deafened ? <SpeakerMuteRegular /> : <HeadphonesRegular />}
-                  onClick={toggleDeafen}
-                />
-              </Tooltip>
-            </>
-          ) : null}
-          <Menu positioning="above-end">
+          <Menu positioning="above-start">
             <MenuTrigger disableButtonEnhancement>
-              <Tooltip content="Conta" relationship="label" withArrow>
-                <Button appearance="subtle" size="small" icon={<SettingsRegular />} />
-              </Tooltip>
+              <button type="button" className="you" aria-label="Conta" title="Conta">
+                <span className="avatar small" aria-hidden="true">
+                  <span>
+                    <Face origin={state.origin} imageId={selfMember?.avatarId ?? null} label={selfMember?.label ?? state.userLabel ?? "?"} />
+                  </span>
+                </span>
+                <span className="you-name">
+                  <strong>{selfMember?.label ?? state.userLabel}</strong>
+                  <span className="origin">{inCall ? `Em ${state.activeRoomName ?? "reunião"}` : state.origin}</span>
+                </span>
+              </button>
             </MenuTrigger>
             <MenuPopover>
               <MenuList>
@@ -1452,15 +1478,6 @@ export function MeetingApp() {
                 ) : null}
                 <MenuItem icon={<ArrowSyncRegular />} disabled={state.pending} onClick={() => void model.reloadRooms()}>
                   Atualizar
-                </MenuItem>
-                <MenuItem
-                  icon={<SettingsRegular />}
-                  onClick={() => {
-                    setSettingsOpen(true);
-                    setMobileRooms(false);
-                  }}
-                >
-                  Configurações
                 </MenuItem>
                 {__WEB__ ? (
                   isWindowsDesktop() ? (
@@ -1486,6 +1503,65 @@ export function MeetingApp() {
               </MenuList>
             </MenuPopover>
           </Menu>
+          <span className="device-pair">
+            <IconAction
+              label={(inCall ? media.microphone : micOnJoin) ? "Desligar microfone" : "Ligar microfone"}
+              danger={!(inCall ? media.microphone : micOnJoin)}
+              disabled={inCall && (!controlsEnabled || controlPending)}
+              icon={(inCall ? media.microphone : micOnJoin) ? <MicRegular /> : <MicOffRegular />}
+              onClick={toggleMicrophone}
+            />
+            <DeviceMenu
+              label="Opções de entrada"
+              kinds={[{ kind: "audioinput", label: "Dispositivo de entrada" }]}
+              devices={inCall ? media.devices : idleDevices}
+              disabled={inCall && (!controlsEnabled || controlPending)}
+              onOpen={setDeviceMenu}
+              onChange={onDevice}
+              onSettings={() => {
+                setSettingsOpen(true);
+                setMobileRooms(false);
+              }}
+            />
+          </span>
+          <span className="device-pair">
+            <Tooltip
+              content={deafened ? "Voltar a ouvir as pessoas neste PC" : "Cortar o som de todos neste PC. O microfone não muda."}
+              relationship="description"
+              withArrow
+            >
+              <ToggleButton
+                appearance="subtle"
+                size="small"
+                aria-label="Ensurdecer"
+                checked={deafened}
+                icon={deafened ? <SpeakerMuteRegular /> : <HeadphonesRegular />}
+                onClick={toggleDeafen}
+              />
+            </Tooltip>
+            {session().browser.outputSelection ? (
+              <DeviceMenu
+                label="Opções de saída"
+                kinds={[{ kind: "audiooutput", label: "Dispositivo de saída" }]}
+                devices={inCall ? media.devices : idleDevices}
+                disabled={inCall && (!controlsEnabled || controlPending)}
+                onOpen={setDeviceMenu}
+                onChange={onDevice}
+                onSettings={() => {
+                  setSettingsOpen(true);
+                  setMobileRooms(false);
+                }}
+              />
+            ) : null}
+          </span>
+          <IconAction
+            label="Configurações"
+            icon={<SettingsRegular />}
+            onClick={() => {
+              setSettingsOpen(true);
+              setMobileRooms(false);
+            }}
+          />
         </footer>
       </aside>
 
@@ -2467,6 +2543,41 @@ function presenceLabel(status: "online" | "away" | "offline" | "invisible", acti
   if (status === "away") return "ausente";
   if (status === "invisible") return activity === "away" ? "invisível · ausente" : "invisível";
   return "desconectado";
+}
+
+// The small arrow next to mic and headphones, as in Discord: pick the device without opening the call settings.
+function DeviceMenu({
+  label,
+  kinds,
+  devices,
+  disabled,
+  onOpen,
+  onChange,
+  onSettings,
+}: {
+  label: string;
+  kinds: { kind: DeviceKind; label: string }[];
+  devices: DeviceOption[];
+  disabled: boolean;
+  onOpen: (open: boolean) => void;
+  onChange: (kind: DeviceKind, deviceId: string) => void;
+  onSettings: () => void;
+}) {
+  return (
+    <Popover positioning="above-end" withArrow onOpenChange={(_, data) => onOpen(data.open)}>
+      <PopoverTrigger disableButtonEnhancement>
+        <Button appearance="subtle" size="small" className="device-arrow" aria-label={label} title={label} icon={<ChevronDownRegular />} />
+      </PopoverTrigger>
+      <PopoverSurface className="device-menu">
+        {kinds.map((item) => (
+          <DeviceSelect key={item.kind} label={item.label} kind={item.kind} devices={devices} disabled={disabled} onChange={onChange} />
+        ))}
+        <Button appearance="subtle" icon={<SettingsRegular />} onClick={onSettings}>
+          Configurações de voz
+        </Button>
+      </PopoverSurface>
+    </Popover>
+  );
 }
 
 function DeviceSelect({

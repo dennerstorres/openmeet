@@ -73,6 +73,8 @@ export function SoundPanel(props: {
   playing: string | null;
   volume: number;
   onError: (message: string | null) => void;
+  /** "panel" sits in the sidebar's voice panel, "dock" (default) in the call bar. */
+  variant?: "dock" | "panel";
 }) {
   const { model, session, origin, serverId, servers, playing, volume, onError } = props;
   const [open, setOpen] = useState(false);
@@ -143,10 +145,10 @@ export function SoundPanel(props: {
 
   return (
     <details className="more sounds" onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary className="ctl" aria-label="Sons" title="Sons">
+      <summary className={props.variant === "panel" ? undefined : "ctl"} aria-label="Sons" title="Sons">
         <svg
-          width={22}
-          height={22}
+          width={props.variant === "panel" ? 18 : 22}
+          height={props.variant === "panel" ? 18 : 22}
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
