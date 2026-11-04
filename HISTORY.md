@@ -797,3 +797,7 @@ Próxima tarefa:
 - UI: lápis ao lado da lixeira abre "Editar sala"; arrastar reordena dentro do grupo (voz ou texto). Voz primeiro, texto depois, com divisória; ícones centralizados na linha.
 - Testes: shared 79/0, server 126/0 (novo teste de rename/ordem), cargo allowed 2/0, desktop 44/1 (falha antiga "atalhos globais").
 - Pendente: teste manual de arrastar no .exe e na web.
+
+## 2026-11-04 — F15-01 perfis de compartilhamento de tela
+
+Branch `task/F15-01-qualidade-tela`. ADR 0029 (proposto), com base na análise do cliente público do salinha.live. Novo `screen-quality.ts` e `setScreenShare(enabled, audio, mode)`. Comandos: `pnpm --filter @openmeet/media typecheck` e `test`, 80/80 passando, no Windows 11. Testes antigos de opções de captura passaram a usar `screenCapture`. Riscos: banda e CPU maiores, VP9 não provado no SFU real. Próximo passo: chamada real nos dois perfis, depois F15-02 (UI).

@@ -17,6 +17,7 @@ import { describeMediaError, mediaActionError, sanitizeDiagnostic, type Diagnost
 import { HANDS_FREE_HINT, isHandsFree, playbackOutput, type AudioDevice } from "./bluetooth-output.js";
 import { InputGain } from "./input-gain.js";
 import { isRadio, radioCapture, radioPublish } from "./radio.js";
+import { DEFAULT_SCREEN_MODE, screenCapture, screenPublish, type ScreenMode } from "./screen-quality.js";
 import { readAudioWorkletSupport, voiceEffectsFor, type VoiceEffect } from "./voice-effects.js";
 import { VideoBackground, type VideoBackgroundOptions } from "./video-background.js";
 import { browserLabel, readBrowserMedia, type BrowserMedia } from "./browser.js";
@@ -562,18 +563,18 @@ export class LiveKitPocSession {
   }
 
   /** The image and, only when asked, the PC audio in the same picker. Stopping ends both. */
-  async setScreenShare(enabled: boolean, requestAudio = false): Promise<void> {
+  async setScreenShare(enabled: boolean, requestAudio = false, mode: ScreenMode = DEFAULT_SCREEN_MODE): Promise<void> {
     // A browser without screen audio is never asked for it (ADR 0014).
     const withAudio = requestAudio && this.browser.screenAudio;
     this.screenAudioRequested = enabled && withAudio;
-    const options = enabled && withAudio ? { audio: true, systemAudio: "include" as const } : { audio: false };
+    const capture = screenCapture(mode, enabled && withAudio);
     // ADR 0022: the radio and the PC audio of a share are never on together.
     const radio = this.radioDevice;
     if (enabled && withAudio && radio !== null) {
       await this.setRadio(null);
       this.note("info", "radio off: screen audio on");
     }
-    await this.toggle(() => this.room.localParticipant.setScreenShareEnabled(enabled, options), "screen");
+    await this.toggle(() => this.room.localParticipant.setScreenShareEnabled(enabled, capture, screenPublish(mode)), "screen");
     if (enabled && withAudio && this.screenAudioPublication() === undefined) {
       this.note("error", "screen audio missing: the source gave no PC audio");
     }
