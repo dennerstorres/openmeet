@@ -55,7 +55,7 @@ Fonte: Discord desktop 1.0.9266 (observado em 04/11/2026) × `apps/desktop/src/m
 ## Estado
 
 Itens 1–5 e 7 implementados na branch `task/discord-paridade-1-4` (WAITING_VALIDATION: falta teste manual no app).
-Item 6 BLOCKED até aceitar o ADR 0031 (proposto).
+Item 6 implementado pelo ADR 0031 (aceito).
 
 ## Prioridade sugerida
 1 (sons) → 2 (mic/fone sempre) → 3 (engrenagem) → 4 (setas) → 5 → 6 → 7.

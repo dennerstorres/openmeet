@@ -493,6 +493,23 @@ a {
   transform: translateY(-50%);
 }
 
+.room-row > .room-chat {
+  position: absolute;
+  top: 17px;
+  right: 68px;
+  opacity: 0;
+  transform: translateY(-50%);
+}
+
+.room-row > .room-chat.solo {
+  right: 4px;
+}
+
+.room-row:hover > .room-chat,
+.room-row > .room-chat:focus-visible {
+  opacity: 1;
+}
+
 .room-row.room-group-start > .room-edit {
   top: 24px;
 }
@@ -1375,6 +1392,29 @@ a {
   flex: 1;
   place-items: center;
   color: var(--text-faint);
+}
+
+/* ADR 0031: the room's chat sits beside the cards, which shrink instead of being covered. */
+.call-body {
+  display: flex;
+  flex: 1;
+  gap: 12px;
+  min-height: 0;
+}
+
+.call-chat {
+  display: flex;
+  flex: 0 0 min(380px, 40%);
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--bg-panel);
+}
+
+.call-chat-toggle.on {
+  color: var(--glow);
 }
 
 .cards {

@@ -1,5 +1,9 @@
 # HISTORY — registro cronológico
 
+### 2026-11-04 — ADR 0031, chat na sala de voz — Claude
+Mesma branch. ADR aceito pelo usuário. Servidor: `roomChat` aceita sala de voz (sai o 409 `voice_room` nas mensagens); `unreadState` conta salas de voz; `endRoom`/`deleteRoom` de sala temporária chamam `purgeRoomMessages` na mesma transação (respostas cortadas, anexos/reações/menções em cascata). SSE e push já seguiam membros do servidor, sem filtro de canal. Cliente: balão ao lado do canal de voz na lista (hover) abre o chat; na chamada, balão no `call-strip` abre o chat ao lado dos cards (`call-body`/`call-chat`), com aviso em sala temporária.
+Windows 11, 2026-11-04: server `messages/unread/events/rooms/delete/push` 33/33 (2 casos novos: voz para membros e 404 para fora; temporária apaga, persistente mantém), typecheck desktop e server, eslint, prettier, desktop 17/17. Sem teste manual; sem caso novo de SSE específico de voz.
+
 ### 2026-11-04 — Paridade com o Discord, itens 5 e 7 — Claude
 Mesma branch. Dock da chamada: [mic ˅ · ensurdecer · câmera ˅ · tela ˅] | [sons · ⋯] | [sair]. A seta da tela leva "Incluir áudio do PC" e a qualidade, que saíram da barra. O botão de engrenagem do dock virou "⋯ Mais opções", com Destaque/Grade e cards por tela no topo (saíram do cabeçalho). Item 6 (chat na sala de voz) BLOCKED: fora do escopo pelo ADR 0024, pede ADR.
 Windows 11, 2026-11-04: typecheck, eslint, prettier; `node --test` scaffold/markdown/dm/chat-events. Sem teste manual.

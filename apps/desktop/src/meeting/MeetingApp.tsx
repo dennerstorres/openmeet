@@ -451,6 +451,7 @@ export function MeetingApp() {
   const [fullscreen, setFullscreen] = useState(false);
   // ADR 0013: only this PC, only during the call, never saved.
   const [deafened, setDeafened] = useState(false);
+  const [callChat, setCallChat] = useState(false);
   const [micOnJoin, setMicOnJoin] = useState(storedMicOnJoin);
   const [shareAudio, setShareAudio] = useState(storedShareAudio);
   const [screenMode, setScreenMode] = useState(storedScreenMode);
@@ -754,7 +755,8 @@ export function MeetingApp() {
   // server keeps the LiveKit name and the initial.
   const selfMember = state.serverPresence?.members.find((member) => member.self);
   const memberById = new Map((state.serverPresence?.members ?? []).map((member) => [member.id, member]));
-  const textRoom = state.rooms.find((room) => room.id === textRoomId && room.channel === "text");
+  // ADR 0031: a voice room opened from its chat button reads like a text room.
+  const textRoom = state.rooms.find((room) => room.id === textRoomId);
   const chatPerson = (id: string): ChatPerson => {
     const member = memberById.get(id);
     return member ? { label: member.label, avatarId: member.avatarId } : { label: "Ex-membro", avatarId: null };
@@ -889,6 +891,7 @@ export function MeetingApp() {
       setFullscreen(false);
       setPinnedId(null);
       setDeafened(false);
+      setCallChat(false);
     }
   }, [inCall]);
   useEffect(() => {
@@ -1272,7 +1275,7 @@ export function MeetingApp() {
                     <button
                       type="button"
                       className={`room-item${room.id === state.activeRoomId || room.id === textRoom?.id ? " active" : ""}${
-                        room.channel === "text" && chatBadge(unread.state, { kind: "room", id: room.id }).unread ? " unread" : ""
+                        chatBadge(unread.state, { kind: "room", id: room.id }).unread ? " unread" : ""
                       }`}
                       disabled={room.channel === "text" ? false : state.pending || room.ended || room.id === state.activeRoomId}
                       aria-current={room.id === textRoom?.id ? "page" : undefined}
@@ -1306,6 +1309,23 @@ export function MeetingApp() {
                         <span className="sr">temporária</span>
                       ) : null}
                     </button>
+                    {room.channel === "voice" ? (
+                      <IconAction
+                        className={`room-chat${state.canCreate ? "" : " solo"}`}
+                        label={`Abrir o chat de ${room.name}`}
+                        icon={<ChatRegular />}
+                        onClick={() => {
+                          if (inCall && room.id === state.activeRoomId) {
+                            setTextRoomId(null);
+                            setCallChat(true);
+                          } else {
+                            setTextRoomId(room.id);
+                            setDmOpenId(null);
+                          }
+                          setMobileRooms(false);
+                        }}
+                      />
+                    ) : null}
                     {state.canCreate ? (
                       <IconAction
                         className="room-edit"
@@ -2207,6 +2227,12 @@ export function MeetingApp() {
                 {reconnectText ? ` · ${reconnectText}` : ""}
                 {media.disconnectReason ? ` · ${media.disconnectReason}` : ""}
               </p>
+              <IconAction
+                className={`call-chat-toggle${callChat ? " on" : ""}`}
+                label={callChat ? "Fechar o chat da sala" : "Abrir o chat da sala"}
+                icon={<ChatRegular />}
+                onClick={() => setCallChat((open) => !open)}
+              />
               {layout === "spotlight" ? (
                 <Button appearance="subtle" size="small" onClick={() => setFullscreen(true)} disabled={placement.featuredId === null}>
                   Tela cheia
@@ -2225,28 +2251,56 @@ export function MeetingApp() {
                 de áudio marcada no seletor.
               </p>
             ) : null}
-            <CardStage
-              cards={cards.map((card) => {
-                const member = callMembers.get(card.identity);
-                return member ? { ...card, label: member.label } : card;
-              })}
-              origin={state.origin}
-              avatarFor={(identity) => callMembers.get(identity)?.avatarId ?? null}
-              accountFor={(identity) => callMembers.get(identity)?.globalName ?? null}
-              tiles={media.tiles}
-              layout={layout}
-              gridCapacity={gridCapacity}
-              featuredId={placement.featuredId}
-              others={placement.others}
-              pinnedId={pin}
-              speakers={media.speakers}
-              deafened={deafened}
-              fullscreen={isFullscreen}
-              levelFor={levelFor}
-              onLevel={changeLevel}
-              onPin={setPinnedId}
-              menuFor={cardMenu}
-            />
+            <div className={`call-body${callChat && !isFullscreen ? " with-chat" : ""}`}>
+              <CardStage
+                cards={cards.map((card) => {
+                  const member = callMembers.get(card.identity);
+                  return member ? { ...card, label: member.label } : card;
+                })}
+                origin={state.origin}
+                avatarFor={(identity) => callMembers.get(identity)?.avatarId ?? null}
+                accountFor={(identity) => callMembers.get(identity)?.globalName ?? null}
+                tiles={media.tiles}
+                layout={layout}
+                gridCapacity={gridCapacity}
+                featuredId={placement.featuredId}
+                others={placement.others}
+                pinnedId={pin}
+                speakers={media.speakers}
+                deafened={deafened}
+                fullscreen={isFullscreen}
+                levelFor={levelFor}
+                onLevel={changeLevel}
+                onPin={setPinnedId}
+                menuFor={cardMenu}
+              />
+              {callChat && !isFullscreen && state.activeRoomId !== null ? (
+                <aside className="call-chat" aria-label="Chat da sala">
+                  <TextRoom
+                    model={model}
+                    chat={{
+                      kind: "room",
+                      id: state.activeRoomId,
+                      name: state.activeRoomName ?? "sala",
+                      closed: null,
+                      canPin: activeServer?.role === "owner" || activeServer?.role === "moderator",
+                    }}
+                    origin={state.origin}
+                    userId={state.userId}
+                    manager={activeServer?.role === "owner" || activeServer?.role === "moderator"}
+                    person={chatPerson}
+                    members={state.serverPresence?.members ?? []}
+                    subscribe={chatHub.subscribe}
+                    banner={
+                      state.rooms.find((room) => room.id === state.activeRoomId)?.kind === "temporary" ? (
+                        <p className="hint">Sala temporária: o chat é apagado quando ela for encerrada.</p>
+                      ) : undefined
+                    }
+                    onClose={() => setCallChat(false)}
+                  />
+                </aside>
+              ) : null}
+            </div>
             <div className={`dock${isFullscreen ? " thin" : ""}`}>
               {media.audioPlayback ? null : (
                 <Button

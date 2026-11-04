@@ -59,13 +59,13 @@ function readChat(row: Record<string, unknown>, kind: ChatKind): UnreadChat | un
   };
 }
 
-/** Every text room of the servers the account is in, and every DM it has not left. */
+/** Every room (text and voice, ADR 0031) of the servers the account is in, and every DM it has not left. */
 export async function unreadState(db: MigrationClient, actor: PublicUser): Promise<UnreadState> {
   const rooms = await db.query(
     `select r.id::text as id, r.server_id::text as server_id, cr.last_read_id::text as last_read_id, p.level::text as level, ${COUNTS("room_id", "r.id")}
      from server_members sm
      join servers s on s.id = sm.server_id and s.deleted_at is null
-     join rooms r on r.server_id = s.id and r.deleted_at is null and r.channel = 'text'
+     join rooms r on r.server_id = s.id and r.deleted_at is null
      left join chat_reads cr on cr.user_id = $1 and cr.room_id = r.id
      left join notify_prefs p on p.user_id = $1 and p.room_id = r.id
      where sm.user_id = $1 and sm.removed_at is null`,

@@ -1,6 +1,6 @@
 # ADR 0031 — chat na sala de voz
 
-Data: 2026-11-04. Estado: proposto.
+Data: 2026-11-04. Estado: aceito pelo usuário em 2026-11-04.
 
 ## Contexto
 
