@@ -1,5 +1,14 @@
 # HISTORY — registro cronológico
 
+### 2026-11-04 — F07-15, preparação da release 0.2.21 — Codex
+Branch `main`. Pedido explícito para commitar, enviar e gerar nova release do `.exe` com os ajustes de densidade e estabilidade descritos abaixo. Versão preparada nos quatro manifests. Windows 11: desktop 45/45, scripts de release 6/6, typecheck, ESLint, Prettier e build PASS; somente o aviso preexistente de chunk acima de 500 kB. Commit, tag, CI, publicação e conferência dos artefatos serão registrados após execução; instalação e atualização no Windows real continuam pendentes.
+
+### 2026-11-04 — F04-05, estabilidade do botão de configurações — Codex
+Branch `main`, sem commit. Corrigido o salto/piscar do ícone de configurações no hover: o alinhamento dependia de `.account > .fui-Button:last-child`; ao montar o Tooltip do Fluent, o botão perdia temporariamente essa condição e voltava ao início da terceira coluna, ao lado do fone. `account-settings` agora fixa coluna, alinhamento e largura em 32 px, independentemente do tooltip. Windows 11: typecheck, ESLint, Prettier e desktop 45/45 PASS. Alteração ainda não publicada; falta confirmar o hover no `.exe`.
+
+### 2026-11-04 — F04-05, ícones no painel compacto — Codex
+Branch `main`, sem commit. Após captura da 0.2.20, removidos os textos visíveis “Câmera” e “Tela” somente de `voice-actions`, seguindo a densidade do Discord; cada botão mantém tooltip dinâmico e `aria-label` de ligar/desligar ou compartilhar/parar. O dock central e a mídia não mudaram. Windows 11: typecheck, ESLint, Prettier e desktop 45/45 PASS. Alteração ainda não publicada; falta inspeção no `.exe`.
+
 ### 2026-11-04 — F07-14, preparação da release 0.2.20 — Codex
 Branch `main`. Pedido explícito para commitar, enviar e gerar nova release do `.exe` com os três ajustes visuais descritos abaixo. Versão preparada nos quatro manifests do desktop. Windows 11: desktop 45/45, scripts de release 6/6, typecheck, ESLint, Prettier e build PASS; somente o aviso preexistente de chunk acima de 500 kB. Commit `1794bb4`, `main` e tag `v0.2.20` enviados. Workflow 41945056162 PASS; release pública com instalador, assinatura, manifesto e checksums. Download conferiu SHA-256 `f448ddb9d3392640e426d212b3b9f2273b116d3fba677a595755d3e9351ca9ca` e `latest.json` consistente. Instalação e atualização no Windows real continuam pendentes; estado `WAITING_VALIDATION`.
 

@@ -1,5 +1,11 @@
 # Fase 07 — distribution
 
+## F07-15 — Release 0.2.21
+
+READY → IN_PROGRESS em 2026-11-04, por pedido explícito do usuário. Escopo: ícones compactos de câmera/tela, correção do salto do botão de configurações no tooltip, registros, quatro manifests em `0.2.21`, commit/push na `main`, tag e publicação pelo workflow. Gates locais e conferência dos quatro assets são obrigatórios; instalação e atualização reais ficam `WAITING_VALIDATION`.
+
+Gates locais PASS em Windows 11: desktop 45/45, scripts de release 6/6, typecheck, ESLint, Prettier e build. O aviso de chunk acima de 500 kB permanece o preexistente.
+
 ## F07-14 — Release 0.2.20
 
 READY → IN_PROGRESS em 2026-11-04, por pedido explícito do usuário. Escopo: três correções visuais F04-05 feitas após a 0.2.19, registros, quatro manifests em `0.2.20`, commit/push na `main`, tag `v0.2.20` e publicação pelo workflow. Gates locais: desktop, scripts de release, typecheck, lint, formatação e build; depois conferir os quatro assets publicados. Instalação e atualização reais ficam `WAITING_VALIDATION`.

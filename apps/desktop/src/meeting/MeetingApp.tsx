@@ -1447,14 +1447,19 @@ export function MeetingApp() {
               <ToggleButton
                 checked={media.camera}
                 icon={media.camera ? <VideoRegular /> : <VideoOffRegular />}
+                aria-label={media.camera ? "Desligar câmera" : "Ligar câmera"}
+                title={media.camera ? "Câmera ligada" : "Câmera desligada"}
                 disabled={!controlsEnabled || controlPending}
                 onClick={toggleCamera}
-              >
-                Câmera
-              </ToggleButton>
-              <ToggleButton checked={media.screen} icon={<ShareScreenStartRegular />} disabled={!controlsEnabled || controlPending} onClick={toggleScreen}>
-                Tela
-              </ToggleButton>
+              />
+              <ToggleButton
+                checked={media.screen}
+                icon={<ShareScreenStartRegular />}
+                aria-label={media.screen ? "Parar compartilhamento" : "Compartilhar tela"}
+                title={media.screen ? "Parar compartilhamento" : "Compartilhar tela"}
+                disabled={!controlsEnabled || controlPending}
+                onClick={toggleScreen}
+              />
               <SoundPanel
                 variant="panel"
                 model={model}
@@ -1576,6 +1581,7 @@ export function MeetingApp() {
             ) : null}
           </span>
           <IconAction
+            className="account-settings"
             label="Configurações"
             icon={<SettingsRegular />}
             onClick={() => {

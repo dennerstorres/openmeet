@@ -925,7 +925,7 @@ a {
 .account {
   position: relative;
   display: grid;
-  grid-template-columns: auto auto 1fr;
+  grid-template-columns: auto auto minmax(32px, 1fr);
   align-items: center;
   gap: 6px;
   min-height: 56px;
@@ -994,8 +994,12 @@ a {
   border-radius: 0 6px 6px 0;
 }
 
-.account > .fui-Button:last-child {
+.account .account-settings.fui-Button {
+  grid-column: 3;
   justify-self: end;
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
 }
 
 .device-menu {

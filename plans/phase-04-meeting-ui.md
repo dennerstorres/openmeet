@@ -9,6 +9,10 @@ Ajuste visual de 2026-11-04: `footer.account` separa identidade e ações em dua
 
 Segundo ajuste visual de 2026-11-04, após capturas da 0.2.19: filhos Fluent de `voice-actions` podem encolher dentro das três colunas; `device-menu`, `Field` e `Select` não ultrapassam o popover; áudio do PC usa o mesmo `Switch` dos demais ajustes. Typecheck, lint, desktop 45/45 e builds desktop/web passaram. Falta conferir os três pontos em sala real.
 
+Terceiro ajuste visual de 2026-11-04, após captura da 0.2.20: os botões de câmera e tela do painel lateral compacto mostram só o ícone; tooltip e nome acessível preservam o significado e o dock central continua com a mesma estrutura. Typecheck, lint, formatação e desktop 45/45 passaram. Falta conferir no `.exe`.
+
+Quarto ajuste visual de 2026-11-04: o botão de configurações do rodapé usa classe, coluna e largura explícitas. O antigo seletor `:last-child` oscilava quando o Tooltip do Fluent montava e desmontava, deslocando o botão para junto do fone. Automatizados passaram; falta confirmar o hover no `.exe`.
+
 Ajuste de 2026-10-23: consentimento de atalhos saiu da tela principal e passou para Configurações no menu da conta. Menus de conta e de dispositivos fecham ao clicar fora. O bundle web continua sem shell nem texto de atalhos nativos.
 
 ## F04-06 — blur de fundo da câmera
