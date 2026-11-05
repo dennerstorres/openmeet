@@ -6,6 +6,8 @@ READY → IN_PROGRESS em 2026-11-04, por pedido explícito do usuário. Escopo: 
 
 Gates locais PASS em Windows 11: desktop 45/45, scripts de release 6/6, typecheck, ESLint, Prettier e build. O aviso de chunk acima de 500 kB permanece o preexistente.
 
+WAITING_VALIDATION: commit `1794bb4`, `main` e tag `v0.2.20` enviados. Workflow 41945056162 PASS; instalador 8m20s e publicação concluída. Release pública com quatro assets; download conferido contra `SHA256SUMS` (`f448ddb9d3392640e426d212b3b9f2273b116d3fba677a595755d3e9351ca9ca`) e `latest.json` aponta para versão, URL e assinatura corretas. Falta instalar e validar atualização 0.2.19 → 0.2.20 em Windows real.
+
 ## F07-13 — Release 0.2.19
 
 READY → IN_PROGRESS em 2026-11-04, por pedido explícito do usuário. Escopo: correção visual F04-05 no rodapé lateral e nos pares ícone/chevron do dock, registros, quatro manifests em `0.2.19`, commit e push na `main`, tag `v0.2.19` e publicação do instalador pelo workflow. Gates locais: testes do desktop, scripts de release, typecheck, lint, formatação e build. Instalação e atualização reais ficam `WAITING_VALIDATION`.

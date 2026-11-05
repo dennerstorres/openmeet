@@ -1,6 +1,6 @@
 # PLAN — roadmap executável (fonte de verdade)
 
-F07-14 — Release 0.2.20: IN_PROGRESS em 2026-11-04, por pedido explícito do usuário. Escopo fechado nos três ajustes visuais após a 0.2.19: contenção dos botões do painel lateral, select de dispositivos dentro do popover e `Switch` para áudio do PC; inclui registros e quatro manifests de versão. Gates locais PASS: desktop 45/45, release 6/6, typecheck, lint, formatação e build. Faltam CI/publicação da tag; instalação e atualização reais permanecem pendentes.
+F07-14 — Release 0.2.20: WAITING_VALIDATION em 2026-11-04, por pedido explícito do usuário. Commit `1794bb4`, `main` e tag `v0.2.20` enviados. Gates locais PASS: desktop 45/45, release 6/6, typecheck, lint, formatação e build. Workflow 41945056162 PASS; release publicada com instalador, assinatura, `latest.json` e `SHA256SUMS`. Download conferido: SHA-256 `f448ddb9d3392640e426d212b3b9f2273b116d3fba677a595755d3e9351ca9ca`, versão/URL/assinatura do manifesto consistentes. Instalação e atualização reais permanecem pendentes.
 
 F07-13 — Release 0.2.19: WAITING_VALIDATION em 2026-11-04, por pedido explícito do usuário. Commit `ed7038a`, `main` e tag `v0.2.19` enviados. Gates locais PASS: desktop 45/45, release 6/6, typecheck, lint, formatação e build. Workflow 41911229682 PASS; release publicada com instalador, assinatura, `latest.json` e `SHA256SUMS`. Download conferido: SHA-256 `f09ef7cd4526c2b6d3464b62e0f68ae1366723aa7952a8586aeb1c7b54053abd`, versão/URL/assinatura do manifesto consistentes. Instalação e atualização reais permanecem pendentes.
 
