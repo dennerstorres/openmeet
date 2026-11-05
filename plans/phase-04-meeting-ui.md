@@ -7,6 +7,8 @@ READY → IN_PROGRESS → WAITING_VALIDATION. Alterados Icons.tsx, MeetingApp.ts
 
 Ajuste visual de 2026-11-04: `footer.account` separa identidade e ações em duas linhas para o nome não ser espremido; os pares do dock agora agrupam botão e chevron como um único controle segmentado. A seta herda o estado desabilitado da ação. Automatizados e builds passaram; falta abrir a sala no `.exe` e na web para aprovar espaçamento e alvos com mouse/teclado.
 
+Segundo ajuste visual de 2026-11-04, após capturas da 0.2.19: filhos Fluent de `voice-actions` podem encolher dentro das três colunas; `device-menu`, `Field` e `Select` não ultrapassam o popover; áudio do PC usa o mesmo `Switch` dos demais ajustes. Typecheck, lint, desktop 45/45 e builds desktop/web passaram. Falta conferir os três pontos em sala real.
+
 Ajuste de 2026-10-23: consentimento de atalhos saiu da tela principal e passou para Configurações no menu da conta. Menus de conta e de dispositivos fecham ao clicar fora. O bundle web continua sem shell nem texto de atalhos nativos.
 
 ## F04-06 — blur de fundo da câmera

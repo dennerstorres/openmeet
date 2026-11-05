@@ -2397,23 +2397,22 @@ export function MeetingApp() {
                   </PopoverTrigger>
                   <PopoverSurface className="device-menu">
                     {session().browser.screenAudio ? (
-                      <label className="share-audio" title="Pede o som do PC junto com a imagem. Muda na próxima vez que compartilhar.">
-                        <input
-                          type="checkbox"
-                          checked={shareAudio}
-                          disabled={media.screen}
-                          onChange={(event) => {
-                            const next = event.currentTarget.checked;
-                            setShareAudio(next);
-                            try {
-                              localStorage.setItem(SHARE_AUDIO_KEY, next ? "1" : "0");
-                            } catch {
-                              // The choice still holds for this window.
-                            }
-                          }}
-                        />
-                        Incluir áudio do PC
-                      </label>
+                      <Switch
+                        className="share-audio"
+                        label="Incluir áudio do PC"
+                        title="Pede o som do PC junto com a imagem. Muda na próxima vez que compartilhar."
+                        checked={shareAudio}
+                        disabled={media.screen}
+                        onChange={(_, data) => {
+                          const next = data.checked === true;
+                          setShareAudio(next);
+                          try {
+                            localStorage.setItem(SHARE_AUDIO_KEY, next ? "1" : "0");
+                          } catch {
+                            // The choice still holds for this window.
+                          }
+                        }}
+                      />
                     ) : null}
                     <label className="share-audio" title="Como a tela vai para os outros. Muda na próxima vez que compartilhar.">
                       <select

@@ -888,7 +888,19 @@ a {
 .voice-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
+}
+
+.voice-actions > .fui-Button,
+.voice-actions > .sounds {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.voice-actions > .fui-Button {
+  padding-inline: 6px;
 }
 
 .voice-actions button:where(:not([class*="fui-"])) {
@@ -991,6 +1003,18 @@ a {
   flex-direction: column;
   gap: 10px;
   width: 260px;
+  max-width: calc(100vw - 24px);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.device-menu .fui-Field,
+.device-menu .fui-Select,
+.device-menu .fui-Select__select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* Discord keeps the soundboard in the "voice connected" panel; the popup opens upward from the sidebar. */
@@ -998,6 +1022,8 @@ a {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
   padding: 6px;
   border-radius: 6px;
   background: var(--bg-main);
@@ -1714,6 +1740,9 @@ video {
   flex-direction: row;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   color: var(--text-muted);
   font-size: 12px;
   font-weight: 500;

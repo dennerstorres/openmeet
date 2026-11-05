@@ -1,5 +1,11 @@
 # HISTORY — registro cronológico
 
+### 2026-11-04 — F07-14, preparação da release 0.2.20 — Codex
+Branch `main`. Pedido explícito para commitar, enviar e gerar nova release do `.exe` com os três ajustes visuais descritos abaixo. Versão preparada nos quatro manifests do desktop. Windows 11: desktop 45/45, scripts de release 6/6, typecheck, ESLint, Prettier e build PASS; somente o aviso preexistente de chunk acima de 500 kB. Commit, tag, CI, publicação e conferência dos artefatos serão registrados após execução; instalação e atualização no Windows real continuam pendentes.
+
+### 2026-11-04 — F04-05, contenção dos controles após a 0.2.19 — Codex
+Branch `main`, sem commit. Três ajustes pedidos por captura: `voice-actions` zera a largura mínima dos botões Fluent e do painel de sons para impedir sobreposição; `device-menu` e os wrappers Fluent de campo/select ficam limitados à largura do popover; o checkbox “Incluir áudio do PC” virou `Switch`, preservando estado, persistência e bloqueio durante compartilhamento. Windows 11: typecheck, ESLint, Prettier, desktop 45/45 e builds desktop/web PASS; aviso preexistente de chunk acima de 500 kB. A fixture Playwright carregou a chamada e confirmou ausência de overflow global em 320 px, mas parou num passo antigo que ainda procura o botão Grade no cabeçalho; a automação do navegador embutido falhou ao inicializar. Validação visual específica dos três popovers permanece pendente. Alterações ainda não commitadas nem publicadas.
+
 ### 2026-11-04 — F07-13, preparação da release 0.2.19 — Codex
 Branch `main`. Pedido explícito para commitar, enviar e gerar a release do `.exe`. Versão preparada em `apps/desktop/package.json`, `src-tauri/Cargo.toml`, `Cargo.lock` e `tauri.conf.json`. A release contém a correção visual F04-05 já descrita abaixo. Windows 11: desktop 45/45, scripts de release 6/6, typecheck, ESLint, Prettier e build PASS; somente o aviso preexistente de chunk acima de 500 kB. Commit `ed7038a`, `main` e tag `v0.2.19` enviados. Workflow 41911229682 PASS; release pública com instalador, assinatura, manifesto e checksums. Download repetido conferiu SHA-256 `f09ef7cd4526c2b6d3464b62e0f68ae1366723aa7952a8586aeb1c7b54053abd` e `latest.json` consistente. Instalação e atualização no Windows real continuam pendentes; estado `WAITING_VALIDATION`.
 
