@@ -67,11 +67,14 @@ test("dialogs and their form controls cannot grow beyond the viewport", () => {
 
 test("the sidebar sound button follows the same outlined control style as its Fluent siblings", () => {
   const css = readFileSync(new URL("../src/App.css", import.meta.url), "utf8");
+  const meeting = readFileSync(new URL("../src/meeting/MeetingApp.tsx", import.meta.url), "utf8");
   assert.match(
     css,
     /\.voice-actions \.sounds summary\s*{[^}]*min-height:\s*32px;[^}]*border:\s*1px solid var\(--colorNeutralStroke1, #3a423f\);[^}]*border-radius:\s*4px;[^}]*background:\s*transparent;/s,
   );
   assert.match(css, /\.voice-actions \.sounds\[open\] summary\s*{[^}]*background:\s*var\(--bg-active\);/s);
+  assert.equal(meeting.match(/<SoundPanel/g)?.length, 1);
+  assert.match(meeting, /<SoundPanel\s+variant="panel"/);
 });
 
 test("quick device menus contain only selectors and the call has an output volume", () => {

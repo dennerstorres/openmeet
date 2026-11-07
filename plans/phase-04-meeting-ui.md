@@ -39,6 +39,8 @@ READY → IN_PROGRESS → WAITING_VALIDATION em 2026-10-26, branch `task/F04-10-
 
 Correção visual em 2026-11-06: o botão Sons no painel de voz acompanha os botões de câmera e compartilhamento em altura, ícone, borda, raio e fundo. O preenchimento indica painel aberto, não o estado normal. Teste estrutural adicionado; falta conferir no `.exe`.
 
+Simplificação em 2026-11-06: removida a segunda entrada de Sons do dock central da chamada. A biblioteca permanece acessível somente pelo painel lateral de voz, junto aos controles de microfone e fone. Teste estrutural garante uma única instância do painel; mudança preparada para v0.2.23.
+
 Arquivos previstos: migration `0009` (`sound`, `server_sound`); rotas de sons no servidor com testes de permissão; leitor/validador WAV em `packages/shared`; rotas na lista fechada do Rust (F10-18) e no cliente web; `packages/media/src/sound-board.ts` (conversão para WAV 24 kHz mono, tocar/parar, ganho do painel); `input-gain.ts` com a entrada dos sons e a voz em zero para tocar mutado; painel em `MeetingApp.tsx`.
 
 Escopo: listar a biblioteca do servidor, subir, renomear o próprio som, tocar, parar, importar o próprio som para outro servidor, tirar da biblioteca (dono do som, dono e moderadores do servidor) e apagar de vez (dono do som). Volume do painel salvo neste aparelho. Mutado, a faixa abre só durante o som com a voz em zero.

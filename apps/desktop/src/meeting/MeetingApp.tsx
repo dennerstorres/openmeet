@@ -2455,18 +2455,6 @@ export function MeetingApp() {
                 </Popover>
               </span>
               <span className="dock-sep" aria-hidden="true" />
-              {!isFullscreen ? (
-                <SoundPanel
-                  model={model}
-                  session={session}
-                  origin={state.origin}
-                  serverId={state.activeServerId}
-                  servers={state.servers}
-                  playing={media.soundPlaying}
-                  volume={media.soundVolume}
-                  onError={setMediaError}
-                />
-              ) : null}
               {isFullscreen ? (
                 <Button appearance="subtle" onClick={() => setFullscreen(false)}>
                   Sair da tela cheia

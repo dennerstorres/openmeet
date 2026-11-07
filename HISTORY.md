@@ -926,6 +926,15 @@ ADR 0030 aceito pelo usuário em 2026-11-04.
 - Windows 11, 2026-11-06: Prettier, desktop 50/50, typecheck, ESLint e build web PASS. O build mantém o aviso preexistente de chunk principal acima de 500 kB.
 - Correção posterior à tag `v0.2.22`; falta nova conferência visual e release seguinte.
 
+## 2026-11-06 — F04-10 acesso único aos sons e preparação v0.2.23
+
+- Pedido do usuário: retirar o botão Sons do dock da chamada, pois a mesma biblioteca já está disponível no painel lateral de voz junto de microfone e fone.
+- `apps/desktop/src/meeting/MeetingApp.tsx`: removida somente a instância duplicada de `SoundPanel` do dock; a instância lateral e toda a lógica de reprodução permanecem.
+- `apps/desktop/test/scaffold.test.mjs`: teste estrutural exige exatamente uma instância de `SoundPanel` e confirma que ela usa a variante lateral.
+- Versão preparada de `0.2.22` para `0.2.23` no pacote desktop, Cargo, lockfile e configuração Tauri.
+- Windows 11, 2026-11-06: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build` e `cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml` PASS. Testes: workspace 27/27, shared 79/79, mídia 84/84, servidor 128/128 e desktop 50/50. O build mantém o aviso preexistente de chunk principal acima de 500 kB.
+- Commit, push, tag e publicação ainda pendentes neste ponto. Validação visual do `.exe` permanece `WAITING_VALIDATION`.
+
 ## 2026-11-04 — web.test.mjs volta a passar
 
 O bundle web levava "atalhos globais" (texto do DesktopOffer, desde f3042ba) e "openmeet.instance" (funções de instância sem guarda `__WEB__`). O texto do convite mudou para "atalhos de teclado" e as funções retornam cedo no web. Desktop 45/45, typecheck e lint ok.
