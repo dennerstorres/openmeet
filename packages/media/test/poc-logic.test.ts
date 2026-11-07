@@ -6,7 +6,7 @@ import { screenAudioState } from "../src/layout.js";
 import { describeMediaError, mediaActionError, sanitizeDiagnostic } from "../src/diagnostics.js";
 import { LiveKitPocSession, participantLabel, shouldAttachPlayback, shouldShowLiveVideo } from "../src/session.js";
 import { classifyDisconnect, nextPhase, type ConnectionPhase } from "../src/phase.js";
-import { collectTrackReports, readDisplaySurface, summarizeRtcStats, toStatLike } from "../src/stats.js";
+import { collectTrackReports, readDisplaySurface, screenRampSample, summarizeRtcStats, toStatLike, withinScreenRamp } from "../src/stats.js";
 
 test("device list shows labels after permission, refreshes, and marks the active device", () => {
   const session = new LiveKitPocSession();
@@ -227,6 +227,52 @@ test("track stats keep candidate and outbound fields", () => {
   assert.equal(pair.nominated, true);
   assert.equal(pair.localCandidateId, "c1");
   assert.equal(toStatLike({ type: "local-candidate", id: "c1", candidateType: "srflx" }).candidateType, "srflx");
+});
+
+test("screen ramp computes bitrate by delta and resolves the negotiated codec", () => {
+  const first = screenRampSample(
+    [
+      { type: "codec", id: "codec-1", mimeType: "video/VP9" },
+      {
+        type: "outbound-rtp",
+        kind: "video",
+        bytesSent: 100_000,
+        frameWidth: 2560,
+        frameHeight: 1440,
+        framesPerSecond: 15,
+        codecId: "codec-1",
+        targetBitrate: 4_000_000,
+        qualityLimitationReason: "bandwidth",
+      },
+      { type: "candidate-pair", availableOutgoingBitrate: 1_250_000 },
+    ],
+    0,
+    1_000,
+    null,
+  );
+  assert.equal(first.sample?.bitrateKbps, null);
+  assert.equal(first.sample?.codec, "vp9");
+  assert.equal(first.sample?.availableOutgoingBitrateKbps, 1250);
+  const second = screenRampSample(
+    [{ type: "outbound-rtp", kind: "video", bytesSent: 250_000, frameWidth: 2560, frameHeight: 1440 }],
+    1_000,
+    2_000,
+    first.counter,
+  );
+  assert.equal(second.sample?.bitrateKbps, 1200);
+});
+
+test("screen ramp rejects a restarted byte counter and ignores reports without outgoing video", () => {
+  const restarted = screenRampSample([{ type: "outbound-rtp", kind: "video", bytesSent: 10 }], 2_000, 3_000, { at: 2_000, bytesSent: 100 });
+  assert.equal(restarted.sample?.bitrateKbps, null);
+  assert.equal(screenRampSample([{ type: "inbound-rtp", kind: "video" }], 0, 1, null).sample, null);
+});
+
+test("screen ramp is limited to the initial fifteen seconds", () => {
+  assert.equal(withinScreenRamp(0), true);
+  assert.equal(withinScreenRamp(15_000), true);
+  assert.equal(withinScreenRamp(15_001), false);
+  assert.equal(withinScreenRamp(Number.NaN), false);
 });
 
 test("a closed track report does not reject the stats refresh", async () => {

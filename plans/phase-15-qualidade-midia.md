@@ -7,6 +7,7 @@
 | F15-03 | `adaptiveStream` + `dynacast` no Room | IMPLEMENTED | ADR 0029 |
 | F15-04 | Jitter buffer baixo no vídeo da tela, com medição | IMPLEMENTED | F15-01 |
 | F15-05 | RNNoise local no microfone | IMPLEMENTED | ADR 0030 (aceito) |
+| F15-06 | Telemetria da rampa inicial do compartilhamento | WAITING_VALIDATION | F15-01 |
 
 ## F15-01
 
@@ -31,3 +32,11 @@ Seletor "Texto nítido" / "Movimento fluido" ao lado de "Incluir áudio do PC" (
 ## F15-05
 
 ADR 0030. `InputGain.setDenoise` e `session.setNoiseSuppression`, com o switch "Reduzir ruído do microfone" nos ajustes (`openmeet.noiseSuppression`). Os assets ficam em `public/media/rnnoise/` e os avisos de licença em `THIRD_PARTY_NOTICES.txt`. A biblioteca é importada sob demanda. Mídia 83/83 e lint ok. Desktop 44 passando, 1 falha preexistente. Falta ouvir numa chamada real, medir a CPU e testar com fone Bluetooth.
+
+## F15-06
+
+Escopo: durante os primeiros 15 s de uma publicação local de tela, coletar uma amostra por segundo exclusivamente da faixa `screen_share`. Cada amostra registra tempo relativo, bitrate calculado por delta de `bytesSent`, resolução/FPS, codec, `qualityLimitationReason`, `targetBitrate` e `availableOutgoingBitrate` quando o WebRTC os fornecer. O resultado entra apenas no diagnóstico consentido, sem conteúdo audiovisual, nomes, SDP, IP, SSRC ou IDs persistentes.
+
+Testes: parser de stats, cálculo por delta, descarte de contador reiniciado e limite temporal; exportação preserva somente campos permitidos. Validação real no `.exe` e navegador continua obrigatória para atribuir a causa e fica `WAITING_VALIDATION` depois da implementação.
+
+Implementado em 2026-11-07 na branch `task/F15-06-telemetria-rampa`. A coleta fica somente em memória, recomeça a cada compartilhamento e para ao fim da janela, ao parar a tela ou ao desconectar. O JSON só recebe `screenRamp` depois do consentimento já exigido para exportar. Windows 11: mídia 87/87, typecheck, build e ESLint PASS; typecheck do desktop, Prettier e `git diff --check` PASS. Chamada real não executada.

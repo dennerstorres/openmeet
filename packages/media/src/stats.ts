@@ -14,6 +14,35 @@ export interface StatLike {
   frameWidth?: number;
   frameHeight?: number;
   kind?: string;
+  bytesSent?: number;
+  targetBitrate?: number;
+  qualityLimitationReason?: string;
+  codecId?: string;
+  mimeType?: string;
+  availableOutgoingBitrate?: number;
+}
+
+export interface ScreenRampSample {
+  elapsedMs: number;
+  bitrateKbps: number | null;
+  width: number | null;
+  height: number | null;
+  fps: number | null;
+  codec: string | null;
+  qualityLimitationReason: string | null;
+  targetBitrateKbps: number | null;
+  availableOutgoingBitrateKbps: number | null;
+}
+
+export interface ScreenRampCounter {
+  at: number;
+  bytesSent: number;
+}
+
+export const SCREEN_RAMP_DURATION_MS = 15_000;
+
+export function withinScreenRamp(elapsedMs: number): boolean {
+  return Number.isFinite(elapsedMs) && elapsedMs >= 0 && elapsedMs <= SCREEN_RAMP_DURATION_MS;
 }
 
 export interface RtcContext {
@@ -50,6 +79,12 @@ interface RawStat {
   frameWidth?: unknown;
   frameHeight?: unknown;
   kind?: unknown;
+  bytesSent?: unknown;
+  targetBitrate?: unknown;
+  qualityLimitationReason?: unknown;
+  codecId?: unknown;
+  mimeType?: unknown;
+  availableOutgoingBitrate?: unknown;
 }
 
 export interface TrackReportSource {
@@ -107,6 +142,12 @@ export function toStatLike(stat: RawStat): StatLike {
   const frameHeight = asNumber(stat.frameHeight);
   const kind = asString(stat.kind);
   const state = asString(stat.state);
+  const bytesSent = asNumber(stat.bytesSent);
+  const targetBitrate = asNumber(stat.targetBitrate);
+  const qualityLimitationReason = asString(stat.qualityLimitationReason);
+  const codecId = asString(stat.codecId);
+  const mimeType = asString(stat.mimeType);
+  const availableOutgoingBitrate = asNumber(stat.availableOutgoingBitrate);
   if (id) {
     like.id = id;
   }
@@ -143,7 +184,49 @@ export function toStatLike(stat: RawStat): StatLike {
   if (kind) {
     like.kind = kind;
   }
+  if (bytesSent !== undefined) like.bytesSent = bytesSent;
+  if (targetBitrate !== undefined) like.targetBitrate = targetBitrate;
+  if (qualityLimitationReason) like.qualityLimitationReason = qualityLimitationReason;
+  if (codecId) like.codecId = codecId;
+  if (mimeType) like.mimeType = mimeType;
+  if (availableOutgoingBitrate !== undefined) like.availableOutgoingBitrate = availableOutgoingBitrate;
   return like;
+}
+
+/** Reduces one screen-track report to fields safe for the consented diagnostic export. */
+export function screenRampSample(
+  report: Iterable<StatLike>,
+  elapsedMs: number,
+  now: number,
+  previous: ScreenRampCounter | null,
+): { sample: ScreenRampSample | null; counter: ScreenRampCounter | null } {
+  const stats = [...report];
+  const codecs = new Map(stats.filter((stat) => stat.type === "codec" && stat.id && stat.mimeType).map((stat) => [stat.id as string, stat.mimeType as string]));
+  const outbound = stats
+    .filter((stat) => stat.type === "outbound-rtp" && stat.kind !== "audio")
+    .sort((left, right) => (right.frameWidth ?? 0) * (right.frameHeight ?? 0) - (left.frameWidth ?? 0) * (left.frameHeight ?? 0))[0];
+  if (!outbound) return { sample: null, counter: previous };
+  const counter = typeof outbound.bytesSent === "number" ? { at: now, bytesSent: outbound.bytesSent } : null;
+  let bitrateKbps: number | null = null;
+  if (counter && previous && counter.at > previous.at && counter.bytesSent >= previous.bytesSent) {
+    bitrateKbps = Math.round(((counter.bytesSent - previous.bytesSent) * 8) / (counter.at - previous.at));
+  }
+  const available = stats.find((stat) => stat.type === "candidate-pair" && typeof stat.availableOutgoingBitrate === "number")?.availableOutgoingBitrate;
+  const codec = outbound.codecId ? codecs.get(outbound.codecId) : undefined;
+  return {
+    sample: {
+      elapsedMs: Math.max(0, Math.round(elapsedMs)),
+      bitrateKbps,
+      width: outbound.frameWidth ?? null,
+      height: outbound.frameHeight ?? null,
+      fps: typeof outbound.framesPerSecond === "number" ? Math.round(outbound.framesPerSecond) : null,
+      codec: codec?.replace(/^video\//i, "").toLowerCase() ?? null,
+      qualityLimitationReason: outbound.qualityLimitationReason ?? null,
+      targetBitrateKbps: typeof outbound.targetBitrate === "number" ? Math.round(outbound.targetBitrate / 1000) : null,
+      availableOutgoingBitrateKbps: typeof available === "number" ? Math.round(available / 1000) : null,
+    },
+    counter,
+  };
 }
 
 export function emptyStats(): RtcSnapshot {

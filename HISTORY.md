@@ -956,3 +956,18 @@ O bundle web levava "atalhos globais" (texto do DesktopOffer, desde f3042ba) e "
 - Resultado final: workflow 41899548934 PASS (windows-installer e publish); CI da tag 41899548742 PASS. Release publicada em 2026-11-04 15:53 America/Cuiaba: https://github.com/dennerstorres/openmeet/releases/tag/v0.2.18.
 - `gh release download v0.2.18 --repo dennerstorres/openmeet --dir <diretório temporário exclusivo>` e `Get-FileHash -Algorithm SHA256`: PASS. Instalador de 8.402.711 bytes, SHA256 `df4faa64ba3e68e6fc961418ac30c72bda50b9b92c3cdee319ff279e5394413f`, igual a SHA256SUMS e ao digest do GitHub. Manifest 0.2.18 aponta para o instalador correto e contém a mesma assinatura do asset .sig. Não executado o instalador nem validada criptograficamente a assinatura pelo cliente; próximo passo humano: instalar/atualizar e testar chamada/chat.
 
+## 2026-11-07 — F15-06 telemetria da rampa inicial da tela
+
+- Branch: `task/F15-06-telemetria-rampa`; commit ainda não criado. Pedido do usuário: iniciar a correção da baixa legibilidade nos primeiros segundos do compartilhamento com evidência antes de alterar codec, FPS ou `dynacast`.
+- `packages/media/src/stats.ts`: parser seguro dos campos WebRTC da publicação de tela e amostra com tempo relativo, bitrate por delta de `bytesSent`, resolução/FPS, codec, `qualityLimitationReason`, `targetBitrate` e `availableOutgoingBitrate`. Reinício do contador não produz bitrate falso.
+- `packages/media/src/session.ts` e `report.ts`: uma amostra por segundo nos primeiros 15 s da tela local, somente em memória; coleta para ao parar/desconectar e entra apenas na exportação consentida. Não inclui mídia, nomes, SDP, IP, SSRC ou IDs persistentes.
+- Windows 11, 2026-11-07: `pnpm --filter @openmeet/media test` PASS (87/87); `pnpm --filter @openmeet/media typecheck`, `pnpm --filter @openmeet/media build`, `pnpm exec eslint packages/media/src packages/media/test` e `pnpm --filter @openmeet/desktop typecheck` PASS; Prettier e `git diff --check` PASS.
+- Estado: `WAITING_VALIDATION`. Não foi feita chamada real. Próximo passo humano: compartilhar uma tela por pelo menos 15 s no `.exe` e no navegador, exportar o diagnóstico e comparar `screenRamp` para decidir entre ajuste de perfil, pedido de camada alta/keyframe ou mudança em `dynacast`/`adaptiveStream`.
+
+## 2026-11-07 — F07-17 preparação da release 0.2.24
+
+- Pedido explícito do usuário para commit, push na `main` e nova release do `.exe`. Escopo: F15-06 (telemetria consentida dos primeiros 15 s da tela), registros e versão `0.2.24` nos quatro manifests do desktop.
+- Windows 11, 2026-11-07: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test` e `pnpm build` PASS. Testes: workspace 27/27, shared 79/79, mídia 87/87, servidor 128/128 e desktop 50/50. Scripts de checksum/manifesto 6/6 PASS. O build mantém o aviso preexistente de chunk principal acima de 500 kB.
+- `C:\Users\Administrador\.cargo\bin\cargo.exe check --manifest-path apps/desktop/src-tauri/Cargo.toml` PASS com Rust 1.98.1; o primeiro comando `cargo check` sem caminho não executou porque `cargo` não estava no `PATH`, e não foi contado como evidência.
+- Branch: `task/F15-06-telemetria-rampa`; commit, merge fast-forward, tag, push, CI/publicação e conferência de assets ainda pendentes neste ponto. Instalação, atualização e chamada real continuam `WAITING_VALIDATION`.
+

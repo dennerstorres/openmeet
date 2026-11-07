@@ -2926,7 +2926,7 @@ dependencies = [
 
 [[package]]
 name = "openmeet-desktop"
-version = "0.2.23"
+version = "0.2.24"
 dependencies = [
  "keyring",
  "reqwest",

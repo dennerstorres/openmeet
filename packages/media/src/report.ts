@@ -1,5 +1,5 @@
 import { redactText, type DiagnosticEvent } from "./diagnostics.js";
-import type { RtcSnapshot } from "./stats.js";
+import type { RtcSnapshot, ScreenRampSample } from "./stats.js";
 
 export interface ReconnectMark {
   startedAt: number;
@@ -78,6 +78,7 @@ export interface DiagnosticExportInput {
   stats: RtcSnapshot;
   events: readonly DiagnosticEvent[];
   reconnect: ReconnectSummary;
+  screenRamp?: readonly ScreenRampSample[];
   secrets: readonly string[];
 }
 
@@ -105,6 +106,7 @@ export function buildDiagnosticExport(input: DiagnosticExportInput, consent: boo
       outboundWidth: input.stats.outboundWidth,
       outboundHeight: input.stats.outboundHeight,
     },
+    screenRamp: (input.screenRamp ?? []).map((sample) => ({ ...sample })),
     events: input.events.map((event) => ({
       at: text(event.at),
       level: event.level,

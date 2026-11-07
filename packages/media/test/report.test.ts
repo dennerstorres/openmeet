@@ -42,6 +42,19 @@ test("export needs consent and strips tokens, mail and bearer values", () => {
       { at: "2026-10-18T00:00:00.000Z", level: "info" as const, message: "joined unit-test-token as ada@example.com Bearer abc.def" },
       { at: "2026-10-18T00:00:01.000Z", level: "error" as const, message: "eyJhbGci.eyJzdWI.sig" },
     ],
+    screenRamp: [
+      {
+        elapsedMs: 1000,
+        bitrateKbps: 850,
+        width: 2560,
+        height: 1440,
+        fps: 15,
+        codec: "vp9",
+        qualityLimitationReason: "bandwidth",
+        targetBitrateKbps: 4000,
+        availableOutgoingBitrateKbps: 1200,
+      },
+    ],
   };
   assert.equal(buildDiagnosticExport(input, false), null);
   const body = buildDiagnosticExport(input, true);
@@ -52,6 +65,7 @@ test("export needs consent and strips tokens, mail and bearer values", () => {
   assert.match(body ?? "", /"lastDurationMs":1500/);
   assert.match(body ?? "", /"candidateType":"relay"/);
   assert.equal(body?.includes("identity"), false);
+  assert.match(body ?? "", /"screenRamp":\[\{"elapsedMs":1000,"bitrateKbps":850/);
 });
 
 test("the session records one recovery and does not export the join token", async () => {

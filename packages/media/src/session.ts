@@ -25,7 +25,18 @@ import { browserLabel, readBrowserMedia, type BrowserMedia } from "./browser.js"
 import { buildDiagnosticExport, dropOpenReconnect, pushReconnect, summarizeReconnect, type ReconnectMark, type ReconnectSummary } from "./report.js";
 import { screenAudioState, type ScreenAudioState } from "./layout.js";
 import { classifyDisconnect, nextPhase, type ConnectionPhase } from "./phase.js";
-import { collectTrackReports, emptyStats, readDisplaySurface, readUserAgent, summarizeRtcStats, type RtcSnapshot } from "./stats.js";
+import {
+  collectTrackReports,
+  emptyStats,
+  readDisplaySurface,
+  readUserAgent,
+  SCREEN_RAMP_DURATION_MS,
+  screenRampSample,
+  summarizeRtcStats,
+  type RtcSnapshot,
+  type ScreenRampCounter,
+  type ScreenRampSample,
+} from "./stats.js";
 
 export type DeviceKind = "audioinput" | "audiooutput" | "videoinput";
 
@@ -178,6 +189,10 @@ export class LiveKitPocSession {
   private soundOpenedMic = false;
   private stats: RtcSnapshot;
   private marks: ReconnectMark[] = [];
+  private screenRamp: ScreenRampSample[] = [];
+  private screenRampCounter: ScreenRampCounter | null = null;
+  private screenRampStartedAt = 0;
+  private screenRampTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(options?: {
     appVersion?: string;
@@ -219,6 +234,7 @@ export class LiveKitPocSession {
       this.note("info", "reconnected");
     });
     this.room.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
+      this.stopScreenRamp();
       const explicitLeave = this.explicitLeave;
       const outcome = classifyDisconnect(reason, explicitLeave);
       this.explicitLeave = false;
@@ -357,6 +373,7 @@ export class LiveKitPocSession {
         stats: snapshot.stats,
         events: snapshot.diagnostics,
         reconnect: snapshot.reconnect,
+        screenRamp: this.screenRamp,
         secrets: this.secrets,
       },
       consent,
@@ -592,6 +609,8 @@ export class LiveKitPocSession {
       this.note("info", "radio off: screen audio on");
     }
     await this.toggle(() => this.room.localParticipant.setScreenShareEnabled(enabled, capture, screenPublish(mode)), "screen");
+    if (enabled) this.startScreenRamp();
+    else this.stopScreenRamp();
     if (enabled && withAudio && this.screenAudioPublication() === undefined) {
       this.note("error", "screen audio missing: the source gave no PC audio");
     }
@@ -601,6 +620,38 @@ export class LiveKitPocSession {
       await this.setRadio(kept).catch((error: unknown) => {
         this.note("error", `radio lost: ${describeMediaError(error)}`);
       });
+    }
+  }
+
+  private startScreenRamp(): void {
+    this.stopScreenRamp();
+    this.screenRamp = [];
+    this.screenRampCounter = null;
+    this.screenRampStartedAt = Date.now();
+    void this.collectScreenRampSample();
+    this.screenRampTimer = setInterval(() => void this.collectScreenRampSample(), 1_000);
+  }
+
+  private stopScreenRamp(): void {
+    if (this.screenRampTimer !== null) clearInterval(this.screenRampTimer);
+    this.screenRampTimer = null;
+  }
+
+  private async collectScreenRampSample(): Promise<void> {
+    const now = Date.now();
+    if (now - this.screenRampStartedAt > SCREEN_RAMP_DURATION_MS) {
+      this.stopScreenRamp();
+      return;
+    }
+    const track = this.room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track;
+    if (!track) return;
+    try {
+      const report = await collectTrackReports([track]);
+      const next = screenRampSample(report, now - this.screenRampStartedAt, now, this.screenRampCounter);
+      this.screenRampCounter = next.counter;
+      if (next.sample) this.screenRamp.push(next.sample);
+    } catch {
+      // A stopped share can close the sender while a sample is in flight.
     }
   }
 

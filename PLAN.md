@@ -1,5 +1,7 @@
 # PLAN — roadmap executável (fonte de verdade)
 
+F07-17 — Release 0.2.24: IN_PROGRESS em 2026-11-07, por pedido explícito do usuário. Escopo: incluir F15-06, atualizar os quatro manifests do desktop, executar gates locais, commit, integração fast-forward na `main`, tag `v0.2.24`, push atômico, CI/publicação e conferência dos quatro assets. Instalação, atualização e chamada real permanecem `WAITING_VALIDATION`.
+
 F07-16 — Release 0.2.22: IN_PROGRESS em 2026-11-06. Inclui correções de tela cheia, destaque automático de compartilhamento, contenção de modais, consistência do botão Sons, menus rápidos de dispositivo e volume geral de saída. Gates locais completos PASS; falta commit, tag, push, CI/publicação e validação real no `.exe`.
 
 F07-15 — Release 0.2.21: WAITING_VALIDATION em 2026-11-04, por pedido explícito do usuário. Commit `9806a63`, `main` e tag `v0.2.21` enviados. Gates locais PASS: desktop 45/45, release 6/6, typecheck, lint, formatação e build. Workflow 41954982856 PASS; release publicada com instalador, assinatura, `latest.json` e `SHA256SUMS`. Download conferido: SHA-256 `421168734f39504b77ae887df2ea82b956bab8f7c640ce632870b54a2a2d65b4`, versão/URL/assinatura do manifesto consistentes. Instalação e atualização reais permanecem pendentes.
@@ -14,6 +16,7 @@ Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, 
 
 
 F15 — Qualidade da mídia: ADR 0029 aceito em 2026-11-04. F15-01 IMPLEMENTED na branch `task/F15-01-qualidade-tela`: perfis de tela detail/motion, VP9 com reserva, prioridade alta. F15-02 WAITING_VALIDATION (seletor na UI). F15-03 IMPLEMENTED (adaptiveStream + dynacast). F15-04 IMPLEMENTED (buffer baixo no vídeo da tela). F15-05 IMPLEMENTED (RNNoise, ADR 0030 aceito). Falta chamada real e revisão. Ver plans/phase-15-qualidade-midia.md.
+F15-06 — Telemetria da rampa inicial da tela: WAITING_VALIDATION em 2026-11-07. Os primeiros 15 s da publicação local de tela são amostrados em memória a cada segundo; o diagnóstico consentido leva bitrate por delta, resolução/FPS, codec, limitação de qualidade, bitrate alvo e banda disponível, sem conteýo de mídia ou identificador pessoal. Mídia 87/87, typecheck/build/lint e integração de tipos do desktop PASS. Falta chamada real no `.exe` e navegador para atribuir a causa; não está `DONE`.
 F09-03 — Correção de tela cheia em 2026-11-06: IMPLEMENTED. A grade externa agora usa somente a área da chamada em tela cheia, inclusive no web estreito; teste estrutural adicionado. Falta conferir visualmente numa chamada real no `.exe` e no navegador, portanto a tarefa não está `DONE`.
 F09-03 — Auditoria de modais em 2026-11-06: IMPLEMENTED. Modais e controles de formulário agora respeitam o viewport e nomes longos não ampliam o diálogo. Falta inspeção visual nos modais reais em larguras desktop e móvel; não marcar `DONE`.
 F09-03 — Destaque automático em 2026-11-06: IMPLEMENTED. Nova tela compartilhada fica fixada e muda Grade para Destaque; escolhas manuais posteriores não são sobrescritas. Falta provar numa chamada real com dois compartilhamentos; não marcar `DONE`.
