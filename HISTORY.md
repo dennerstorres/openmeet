@@ -935,6 +935,13 @@ ADR 0030 aceito pelo usuário em 2026-11-04.
 - Windows 11, 2026-11-06: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build` e `cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml` PASS. Testes: workspace 27/27, shared 79/79, mídia 84/84, servidor 128/128 e desktop 50/50. O build mantém o aviso preexistente de chunk principal acima de 500 kB.
 - Commit, push, tag e publicação ainda pendentes neste ponto. Validação visual do `.exe` permanece `WAITING_VALIDATION`.
 
+## 2026-11-06 — Publicação v0.2.23
+
+- Commit `8ffe5ec`, tag anotada `v0.2.23` e `main` enviados atomicamente ao GitHub. Release publicada em <https://github.com/dennerstorres/openmeet/releases/tag/v0.2.23>.
+- GitHub Actions: CI da `main` `42328229001` PASS, CI da tag `42328229028` PASS e workflow de release `42328229066` PASS.
+- Artefatos baixados e verificados: `OpenMeet_0.2.23_x64-setup.exe`, `.sig`, `latest.json` e `SHA256SUMS`. SHA-256 do instalador confere (`baead02e02a6b9a5f9e0d24f10358428ecbde7485342f8b51b8feff3d4790a4d`); manifesto declara `0.2.23`, aponta para o instalador correto e contém a mesma assinatura publicada no `.sig`.
+- A remoção duplicada do botão Sons está publicada; instalação e validação visual do `.exe` permanecem `WAITING_VALIDATION`.
+
 ## 2026-11-04 — web.test.mjs volta a passar
 
 O bundle web levava "atalhos globais" (texto do DesktopOffer, desde f3042ba) e "openmeet.instance" (funções de instância sem guarda `__WEB__`). O texto do convite mudou para "atalhos de teclado" e as funções retornam cedo no web. Desktop 45/45, typecheck e lint ok.
