@@ -903,6 +903,21 @@ ADR 0030 aceito pelo usuário em 2026-11-04.
 - Windows 11, 2026-11-06: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test` e `pnpm build` PASS. Testes: workspace 27/27, shared 79/79, mídia 84/84, servidor 128/128 e desktop 49/49. Build mantém o aviso preexistente de chunk principal acima de 500 kB.
 - Commit/tag/push e workflow de release ainda não executados neste ponto. Instalação, atualização e mídia reais permanecem `WAITING_VALIDATION`.
 
+## 2026-11-06 — F04-12 painel de opções cortado no topo
+
+- A validação visual do usuário em `http://127.0.0.1:4173` mostrou o painel “Mais opções” maior que o espaço acima do dock e cortado no topo. A largura aparente era estreita, mas o breakpoint desktop ainda estava ativo; somente a regra móvel limitava a altura.
+- `apps/desktop/src/App.css`: `.more-body` ganha `max-height` baseado em `100dvh`, rolagem vertical própria, contenção de overscroll, gutter estável e `box-sizing` em todas as larguras.
+- `apps/desktop/test/scaffold.test.mjs`: teste estrutural protege a contenção independente do breakpoint.
+- Windows 11, 2026-11-06: Prettier, teste estrutural do desktop 9/9, typecheck, ESLint e build web PASS. O build mantém o aviso preexistente de chunk principal acima de 500 kB.
+- A tag v0.2.22 já havia sido enviada antes desta evidência e não foi movida ou apagada. Correção destinada à próxima release; falta nova conferência visual do usuário.
+
+## 2026-11-06 — Publicação v0.2.22
+
+- Commit `61a2a7b`, tag anotada `v0.2.22` e `main` enviados ao GitHub. A release foi publicada em <https://github.com/dennerstorres/openmeet/releases/tag/v0.2.22>.
+- GitHub Actions: CI da `main` `42325596131` PASS e workflow de release `42325596893` PASS. O CI adicional disparado pela tag ainda estava em execução no momento deste registro.
+- Artefatos verificados após download: `OpenMeet_0.2.22_x64-setup.exe`, assinatura, `latest.json` e `SHA256SUMS`. SHA-256 do instalador confere (`3d1b91bce85d14338c5f3ae9b5967dcad195b017075272281312b9676de9153f`), manifesto declara `0.2.22`, aponta para o instalador correto e contém a mesma assinatura publicada no arquivo `.sig`.
+- A correção subsequente de contenção do painel “Mais opções” não pertence à `v0.2.22`; deverá compor uma próxima versão após validação visual.
+
 ## 2026-11-04 — web.test.mjs volta a passar
 
 O bundle web levava "atalhos globais" (texto do DesktopOffer, desde f3042ba) e "openmeet.instance" (funções de instância sem guarda `__WEB__`). O texto do convite mudou para "atalhos de teclado" e as funções retornam cedo no web. Desktop 45/45, typecheck e lint ok.

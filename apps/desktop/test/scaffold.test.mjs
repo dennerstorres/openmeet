@@ -82,3 +82,11 @@ test("quick device menus contain only selectors and the call has an output volum
   assert.match(meeting, /Volume de saída da chamada:/);
   assert.match(meeting, /outputVolume=\{outputVolume \/ 100\}/);
 });
+
+test("the call options panel always fits the viewport and scrolls internally", () => {
+  const css = readFileSync(new URL("../src/App.css", import.meta.url), "utf8");
+  assert.match(
+    css,
+    /\.more-body\s*{[^}]*max-height:\s*calc\(100dvh - 128px\);[^}]*overflow-y:\s*auto;[^}]*overscroll-behavior:\s*contain;[^}]*box-sizing:\s*border-box;/s,
+  );
+});

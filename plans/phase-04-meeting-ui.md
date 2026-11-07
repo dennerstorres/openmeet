@@ -62,6 +62,8 @@ READY → IN_PROGRESS → WAITING_VALIDATION em 2026-10-27, branch `task/F04-12-
 
 Revisão em 2026-11-06: menus rápidos de microfone, fone e câmera ficam restritos à troca de dispositivo e não abrem mais Configurações globais. O dock passa a oferecer troca da saída quando suportada. Ajustes da chamada ganham volume geral de saída, aplicado sobre os volumes individuais sem sobrescrevê-los. A engrenagem continua sendo a entrada explícita para Configurações globais.
 
+Correção posterior em 2026-11-06: a validação visual mostrou “Mais opções” cortado no topo em uma janela estreita que ainda usava o layout desktop. O limite de altura e a rolagem interna passam a valer em todas as larguras. Esta correção é posterior à tag v0.2.22 e precisa de release seguinte.
+
 Prova humana antes de DONE: escolher saída e câmera fora da chamada, entrar e ver os dois aplicados; trocar dentro da chamada pelas Configurações; dispositivo salvo desconectado cai no padrão sem erro; painel da chamada cabe em 768 px de altura; `.exe` e web.
 
 ## Execução

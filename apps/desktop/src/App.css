@@ -1823,6 +1823,11 @@ video {
   flex-direction: column;
   gap: 10px;
   width: min(420px, 80vw);
+  max-height: calc(100dvh - 128px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  box-sizing: border-box;
   padding: 16px;
   border-radius: 8px;
   background: #0c0f0e;
