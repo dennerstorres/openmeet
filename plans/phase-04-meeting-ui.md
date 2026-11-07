@@ -37,6 +37,8 @@ Prova humana antes de DONE: dois PCs, cada efeito ouvido do outro lado no `.exe`
 ## F04-10 — biblioteca de sons do servidor
 READY → IN_PROGRESS → WAITING_VALIDATION em 2026-10-26, branch `task/F04-10-biblioteca-de-sons`, em três commits (API; ponte e mídia; UI). Entregue: `sound.ts` em shared (validador e codificador WAV), migration `0009_sounds.sql`, `rooms/sounds.ts` e rotas, `instance_sound` no Rust, `fetchSound` web/nativo, chamadas no `MeetingModel`, portão de voz e barramento de sons no `InputGain`, `playSound`/`stopSound`/`setSoundVolume` na sessão e `sounds.tsx` (biblioteca do servidor da chamada, envio, importar e apagar com dois cliques). Renomear existe na API e não tem tela. Durante o som com mic mutado, o próprio botão do mic aparece ligado. Grande: dividir em commits de API, ponte nativa, mídia e UI.
 
+Correção visual em 2026-11-06: o botão Sons no painel de voz acompanha os botões de câmera e compartilhamento em altura, ícone, borda, raio e fundo. O preenchimento indica painel aberto, não o estado normal. Teste estrutural adicionado; falta conferir no `.exe`.
+
 Arquivos previstos: migration `0009` (`sound`, `server_sound`); rotas de sons no servidor com testes de permissão; leitor/validador WAV em `packages/shared`; rotas na lista fechada do Rust (F10-18) e no cliente web; `packages/media/src/sound-board.ts` (conversão para WAV 24 kHz mono, tocar/parar, ganho do painel); `input-gain.ts` com a entrada dos sons e a voz em zero para tocar mutado; painel em `MeetingApp.tsx`.
 
 Escopo: listar a biblioteca do servidor, subir, renomear o próprio som, tocar, parar, importar o próprio som para outro servidor, tirar da biblioteca (dono do som, dono e moderadores do servidor) e apagar de vez (dono do som). Volume do painel salvo neste aparelho. Mutado, a faixa abre só durante o som com a voz em zero.
@@ -57,6 +59,8 @@ Prova humana antes de DONE: dois PCs no `.exe` e na web; VB-Audio Cable e mixage
 
 ## F04-12 — configurações globais
 READY → IN_PROGRESS → WAITING_VALIDATION em 2026-10-27, branch `task/F04-12-ajustes-globais`. Pedido do usuário: o painel de ajustes da chamada não cabia na tela. Ficam na chamada: entrada, volume do microfone, efeito de voz, "Ouvir minha voz" e rádio, mais um botão para Configurações. Vão para Configurações (desktop e web): saída, câmera, blur e intensidade, atualizar dispositivos, diagnóstico e exportação. A escolha de entrada, saída e câmera fica em `localStorage` (`openmeet.device.<tipo>`) e é aplicada uma vez por chamada, quando conecta, se o aparelho ainda existir. O blur continua começando desligado (ADR 0016). Sem mudança de mídia, servidor, grant ou CSP.
+
+Revisão em 2026-11-06: menus rápidos de microfone, fone e câmera ficam restritos à troca de dispositivo e não abrem mais Configurações globais. O dock passa a oferecer troca da saída quando suportada. Ajustes da chamada ganham volume geral de saída, aplicado sobre os volumes individuais sem sobrescrevê-los. A engrenagem continua sendo a entrada explícita para Configurações globais.
 
 Prova humana antes de DONE: escolher saída e câmera fora da chamada, entrar e ver os dois aplicados; trocar dentro da chamada pelas Configurações; dispositivo salvo desconectado cai no padrão sem erro; painel da chamada cabe em 768 px de altura; `.exe` e web.
 

@@ -147,8 +147,8 @@ export function SoundPanel(props: {
     <details className="more sounds" onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary className={props.variant === "panel" ? undefined : "ctl"} aria-label="Sons" title="Sons">
         <svg
-          width={props.variant === "panel" ? 18 : 22}
-          height={props.variant === "panel" ? 18 : 22}
+          width={props.variant === "panel" ? 20 : 22}
+          height={props.variant === "panel" ? 20 : 22}
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"

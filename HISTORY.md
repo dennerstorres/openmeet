@@ -854,6 +854,55 @@ ADR 0030 proposto. Dependência @sapphi-red/web-noise-suppressor 0.4.1 (MIT) + R
 
 ADR 0030 aceito pelo usuário em 2026-11-04.
 
+## 2026-11-06 — F09-03 correção da tela cheia
+
+- Branch/commit: branch corrente, commit ainda não criado. Escopo: corrigir a regressão visual do modo tela cheia sem alterar captura ou transporte de mídia.
+- `apps/desktop/src/App.css`: a grade externa passa de quatro áreas para somente `call` durante a tela cheia; em viewport web estreita, a navegação móvel é escondida e sobra uma única linha para a chamada.
+- `apps/desktop/test/scaffold.test.mjs`: teste estrutural impede que as regras desktop e web estreita voltem a preservar o mapa parcial.
+- Windows 11, 2026-11-06: `node --test apps/desktop/test/scaffold.test.mjs` PASS (5/5); typecheck do desktop, ESLint de `src` + teste, Prettier dos arquivos alterados, build desktop e build web PASS. A suíte desktop completa avançou por 34 testes sem falha, incluindo a nova regressão, mas ficou sem progresso nos testes paralelos de bundle e foi interrompida; não é registrada como PASS.
+- Risco restante: conferir numa chamada real no `.exe` e no navegador; até lá F09-03 não é `DONE`.
+
+## 2026-11-06 — F09-03 auditoria de overflow em modais
+
+- Branch/commit: branch corrente, commit ainda não criado. Escopo: corrigir controles e conteúdo que ultrapassam modais, sem alterar fluxos ou componentes funcionais.
+- `apps/desktop/src/App.css`: todos os `DialogSurface` Fluent passam a respeitar o viewport; corpo, conteúdo, formulários e seções podem encolher; `Input`/`Select`/campos nativos ficam limitados a 100%; títulos e dicas longos quebram linha; a coluna de imagem deixa de impor largura mínima.
+- `apps/desktop/test/scaffold.test.mjs`: teste estrutural para limites do modal, clipping horizontal e encolhimento dos controles.
+- Windows 11, 2026-11-06: Prettier PASS; teste estrutural do desktop PASS (6/6); typecheck e ESLint PASS; builds desktop e web PASS. Os builds mantêm o aviso preexistente de chunk principal acima de 500 kB.
+- Pendente inspeção visual nos modais reais em viewport estreito e no `.exe`.
+
+## 2026-11-06 — F09-03 destaque automático do compartilhamento
+
+- Branch/commit: branch corrente, commit ainda não criado. Escopo: destacar automaticamente uma tela nova sem bloquear escolhas locais posteriores.
+- `packages/media/src/layout.ts`: `newShareCard` detecta compartilhamentos ainda não vistos e prioriza o remoto; teste cobre prioridade e reação única.
+- `apps/desktop/src/meeting/MeetingApp.tsx`: ao chegar uma tela, fixa seu card, muda Grade para Destaque e sai de tela cheia; a lista de telas vistas é atualizada a cada mudança, então fixar outro card ou voltar à Grade depois não é revertido.
+- Windows 11, 2026-11-06: Prettier PASS; mídia 84/84 PASS; build e typecheck da mídia PASS; typecheck e ESLint do desktop PASS; builds desktop e web PASS. A primeira tentativa de typecheck do desktop encontrou o `dist` anterior da mídia sem a nova exportação; após o build obrigatório do pacote, passou. Os builds mantêm o aviso preexistente de chunk principal acima de 500 kB.
+- Pendente chamada real com duas pessoas e chegada/saída de compartilhamentos.
+
+## 2026-11-06 — F04-10 consistência do botão Sons
+
+- Branch/commit: branch corrente, commit ainda não criado. A captura enviada mostrou o botão Sons preenchido e arredondado ao lado de dois botões Fluent contornados.
+- `apps/desktop/src/App.css`: o `summary` de Sons no painel de voz passa a ter 32 px, borda neutra, raio de 4 px e fundo transparente; hover acompanha a paleta e o preenchimento fica reservado ao painel aberto.
+- `apps/desktop/src/meeting/sounds.tsx`: ícone do painel passa de 18 para 20 px, igual aos controles vizinhos.
+- `apps/desktop/test/scaffold.test.mjs`: teste estrutural protege o estilo contornado e o estado aberto.
+- Windows 11, 2026-11-06: Prettier PASS; teste estrutural do desktop PASS (7/7); typecheck e ESLint PASS; build desktop PASS. O build mantém o aviso preexistente de chunk principal acima de 500 kB.
+- Pendente inspeção visual no `.exe`.
+
+## 2026-11-06 — F04-12 menus de dispositivo e volume de saída
+
+- Branch/commit: branch corrente, commit ainda não criado. Escopo: separar troca rápida de dispositivo dos ajustes da chamada e das Configurações globais.
+- `MeetingApp.tsx`: menus rápidos deixam de oferecer “Configurações de voz”; o fone ganha seletor de saída também no dock quando `setSinkId` é suportado; ajustes da chamada ganham volume geral de saída de 0–100%.
+- `Cards.tsx` e `packages/media/src/playback.ts`: o volume geral multiplica o volume de cada áudio recebido sem alterar a preferência individual do card; ensurdecer continua tendo precedência.
+- Testes: unidade cobre composição de volume geral + individual; teste estrutural cobre ausência do atalho, seletor de saída e slider da chamada.
+- Windows 11, 2026-11-06: Prettier PASS; mídia 84/84 PASS; desktop estrutural 8/8 PASS; build da mídia, typecheck do desktop e ESLint PASS; builds desktop e web PASS. Os builds mantêm o aviso preexistente de chunk principal acima de 500 kB.
+- Pendente ouvir o volume e trocar a saída no `.exe`/WebView2 real.
+
+## 2026-11-06 — F07-16 preparação da release 0.2.22
+
+- Pedido explícito do usuário para commit, push na `main` e nova release. `main` estava sincronizada com `origin/main`; versão elevada de 0.2.21 para 0.2.22 em `package.json`, `tauri.conf.json`, `Cargo.toml` e entrada `openmeet-desktop` do `Cargo.lock`.
+- Escopo: tela cheia ocupa a janela; compartilhamento novo vira destaque fixado; modais contêm campos longos; botão Sons acompanha os controles vizinhos; menus rápidos mostram só dispositivos; saída pode ser escolhida no dock; volume geral de saída preserva volumes individuais.
+- Windows 11, 2026-11-06: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test` e `pnpm build` PASS. Testes: workspace 27/27, shared 79/79, mídia 84/84, servidor 128/128 e desktop 49/49. Build mantém o aviso preexistente de chunk principal acima de 500 kB.
+- Commit/tag/push e workflow de release ainda não executados neste ponto. Instalação, atualização e mídia reais permanecem `WAITING_VALIDATION`.
+
 ## 2026-11-04 — web.test.mjs volta a passar
 
 O bundle web levava "atalhos globais" (texto do DesktopOffer, desde f3042ba) e "openmeet.instance" (funções de instância sem guarda `__WEB__`). O texto do convite mudou para "atalhos de teclado" e as funções retornam cedo no web. Desktop 45/45, typecheck e lint ok.

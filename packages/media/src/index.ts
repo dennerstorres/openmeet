@@ -11,6 +11,7 @@ export {
   featuredCard,
   keepPin,
   localScreenSurface,
+  newShareCard,
   placeCards,
   screenAudioState,
   screenCaption,

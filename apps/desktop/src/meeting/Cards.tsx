@@ -27,6 +27,8 @@ export interface CardStageProps {
   pinnedId: string | null;
   speakers: readonly string[];
   deafened: boolean;
+  /** Master playback level for this call; card levels remain unchanged. */
+  outputVolume: number;
   fullscreen: boolean;
   levelFor: (cardId: string) => PlaybackLevel;
   onLevel: (cardId: string, patch: Partial<PlaybackLevel>) => void;
@@ -122,7 +124,7 @@ export function CardStage(props: CardStageProps) {
           const tile = tileById.get(id);
           return tile === undefined || !shouldAttachPlayback(tile)
             ? []
-            : [<AudioSink key={id} tile={tile} playback={effectivePlayback(props.levelFor(card.id), props.deafened)} />];
+            : [<AudioSink key={id} tile={tile} playback={effectivePlayback(props.levelFor(card.id), props.deafened, props.outputVolume)} />];
         }),
       )}
     </div>

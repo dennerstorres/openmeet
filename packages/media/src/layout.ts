@@ -152,6 +152,12 @@ export function keepPin(cards: readonly MeetingCard[], pinnedId: string | null):
   return pinnedId !== null && cards.some((card) => card.id === pinnedId) ? pinnedId : null;
 }
 
+/** A newly published remote share takes focus before a local one; an already-seen share never steals focus again. */
+export function newShareCard(cards: readonly MeetingCard[], seenIds: ReadonlySet<string>): string | null {
+  const shares = cards.filter((card) => card.kind === "share" && !seenIds.has(card.id));
+  return shares.find((card) => !card.local)?.id ?? shares[0]?.id ?? null;
+}
+
 export function cardInitial(label: string): string {
   const first = label.trim().codePointAt(0);
   return first === undefined ? "?" : String.fromCodePoint(first).toLocaleUpperCase("pt-BR");

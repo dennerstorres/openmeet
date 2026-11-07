@@ -1027,10 +1027,12 @@ a {
   align-items: center;
   justify-content: center;
   width: 100%;
+  min-height: 32px;
   box-sizing: border-box;
-  padding: 6px;
-  border-radius: 6px;
-  background: var(--bg-main);
+  padding: 5px 6px;
+  border: 1px solid var(--colorNeutralStroke1, #3a423f);
+  border-radius: 4px;
+  background: transparent;
   cursor: pointer;
   list-style: none;
 }
@@ -1040,6 +1042,12 @@ a {
 }
 
 .voice-actions .sounds summary:hover {
+  border-color: var(--colorNeutralStroke1Hover, #4b5551);
+  background: var(--bg-hover);
+}
+
+.voice-actions .sounds[open] summary {
+  border-color: var(--colorNeutralStroke1Pressed, #4b5551);
   background: var(--bg-active);
 }
 
@@ -1222,6 +1230,48 @@ a {
   margin: 0;
 }
 
+/* Keep every Fluent dialog inside the window, even with long device names or server names. */
+.fui-DialogSurface {
+  width: min(600px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.fui-DialogBody,
+.fui-DialogContent,
+.fui-DialogTitle,
+.fui-DialogSurface form,
+.fui-DialogSurface fieldset,
+.fui-DialogSurface .modal-section {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.fui-DialogContent {
+  overflow-x: hidden;
+}
+
+.fui-DialogTitle,
+.fui-DialogSurface .hint {
+  overflow-wrap: anywhere;
+}
+
+.fui-DialogSurface .fui-Field,
+.fui-DialogSurface .fui-Input,
+.fui-DialogSurface .fui-Select,
+.fui-DialogSurface .fui-Select__select,
+.fui-DialogSurface input,
+.fui-DialogSurface select,
+.fui-DialogSurface textarea {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 .modal-section h2 {
   color: var(--text);
   font-size: 16px;
@@ -1264,6 +1314,8 @@ a {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .profile-face {
@@ -1803,7 +1855,8 @@ video {
 }
 
 .server-shell.is-fullscreen {
-  grid-template-columns: 1fr;
+  grid-template-areas: "call";
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .server-shell.is-fullscreen .server-bar,
@@ -1988,8 +2041,7 @@ textarea {
 
   .web-shell,
   .web-shell.members-open,
-  .web-shell.members-closed,
-  .web-shell.is-fullscreen {
+  .web-shell.members-closed {
     grid-template-areas: none;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
@@ -1997,6 +2049,16 @@ textarea {
     height: 100dvh;
     box-sizing: border-box;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  .web-shell.is-fullscreen {
+    grid-template-areas: "call";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .web-shell.is-fullscreen .mobile-navigation {
+    display: none;
   }
 
   .web-shell .room-head-actions .mobile-members-button {

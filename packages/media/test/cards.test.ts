@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildCards, cardInitial, featuredCard, keepPin, placeCards } from "../src/layout.js";
+import { buildCards, cardInitial, featuredCard, keepPin, newShareCard, placeCards } from "../src/layout.js";
 
 const ana = { identity: "ana", label: "Ana" };
 const bia = { identity: "bia", label: "Bia" };
@@ -78,6 +78,13 @@ test("a pin chooses the center until it is released or its card leaves", () => {
 test("the grid puts shares first and ignores the pin for size", () => {
   const cards = buildCards([ana, bia], [tile("bia-screen", "bia", "screen", "video")]);
   assert.deepEqual(placeCards(cards, "grid", "person:ana"), { featuredId: null, others: ["share:bia-screen", "person:ana", "person:bia"] });
+});
+
+test("a new remote share requests focus once, including while the user was in grid", () => {
+  const cards = buildCards([self, ana], [tile("my-screen", "eu", "screen", "video", true), tile("ana-screen", "ana", "screen", "video")]);
+  assert.equal(newShareCard(cards, new Set()), "share:ana-screen");
+  assert.equal(newShareCard(cards, new Set(["share:ana-screen"])), "share:my-screen");
+  assert.equal(newShareCard(cards, new Set(cards.filter((card) => card.kind === "share").map((card) => card.id))), null);
 });
 
 test("the initial is the first letter of the name", () => {

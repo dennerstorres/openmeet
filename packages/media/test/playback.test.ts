@@ -34,6 +34,8 @@ test("deafening cuts every card here and gives each card its own level back", ()
   assert.deepEqual(effectivePlayback(muted, true), { heard: false, volume: 0.8 });
   assert.equal(effectivePlayback(quiet, false), quiet);
   assert.equal(effectivePlayback(muted, false), muted);
+  assert.deepEqual(effectivePlayback(quiet, false, 0.5), { heard: true, volume: 0.15 });
+  assert.deepEqual(effectivePlayback(quiet, true, 0.5), { heard: false, volume: 0.15 });
   const element = { muted: false, volume: 1 };
   applyPlayback(element, effectivePlayback(quiet, true));
   assert.deepEqual(element, { muted: true, volume: 0.3 });

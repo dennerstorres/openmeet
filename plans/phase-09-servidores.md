@@ -17,6 +17,12 @@ ADR 0012. Depende de F09-01. O convite copiado é `openmeet://`, preso ao host d
 ## F09-03
 ADR 0009. Depende de F09-01. Barra de servidores, sidebar de salas e área de cards. Card de pessoa com ou sem câmera. Card próprio por compartilhamento. Destaque, grade, fixar e tela cheia. Dá para ver outro servidor sem sair da chamada.
 
+Correção em 2026-11-06: o modo tela cheia passa a mapear a grade externa somente para a área da chamada; antes, a grade mantinha as quatro áreas e deixava o card central restrito a uma parte da janela. No web estreito, a navegação móvel também some e a chamada ocupa a única linha. Teste estrutural cobre as regras; a inspeção em chamada real continua pendente.
+
+Auditoria responsiva em 2026-11-06: modais Fluent passam a respeitar largura e altura do viewport; campos, inputs e selects podem encolher dentro do modal; títulos, dicas e nomes longos quebram linha. A correção é comum a perfil, servidor, edição, criação e confirmações. Teste estrutural cobre os limites; inspeção visual em viewport estreito continua pendente.
+
+Comportamento de destaque em 2026-11-06: um compartilhamento recém-publicado passa automaticamente a card fixado e troca Grade por Destaque. Compartilhamento remoto tem prioridade quando mais de um chega junto. A automação ocorre só na chegada; depois, fixar outro card ou voltar à Grade continua sendo escolha local do usuário.
+
 ## F09-04
 ADR 0011. Depende de F09-03. A API lê o LiveKit e a sidebar mostra os nomes. A ocupação não vai para o Postgres. Falha na consulta esconde os nomes e mantém as salas. O anel verde usa o alto-falante ativo da sala atual.
 

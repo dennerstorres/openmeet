@@ -16,6 +16,7 @@ import {
   mediaActionError,
   EMPTY_RECONNECT,
   meetingElapsedMs,
+  newShareCard,
   nextPlayback,
   placeCards,
   reconnectLabel,
@@ -448,6 +449,7 @@ export function MeetingApp() {
   const [gridCapacity, setGridCapacity] = useState<GridCapacity>("auto");
   const [mobileRooms, setMobileRooms] = useState(true);
   const [pinnedId, setPinnedId] = useState<string | null>(null);
+  const seenShareIds = useRef<Set<string>>(new Set());
   const [fullscreen, setFullscreen] = useState(false);
   // ADR 0013: only this PC, only during the call, never saved.
   const [deafened, setDeafened] = useState(false);
@@ -456,6 +458,7 @@ export function MeetingApp() {
   const [shareAudio, setShareAudio] = useState(storedShareAudio);
   const [screenMode, setScreenMode] = useState(storedScreenMode);
   const [microphoneVolume, setMicrophoneVolume] = useState(100);
+  const [outputVolume, setOutputVolume] = useState(100);
   // ADR 0022: the input picked for the radio before turning it on.
   const [radioInput, setRadioInput] = useState("");
   const [blurRadius, setBlurRadius] = useState(storedBlurRadius);
@@ -843,6 +846,18 @@ export function MeetingApp() {
   useEffect(() => {
     if (pinnedId !== null && pin === null) setPinnedId(null);
   }, [pinnedId, pin]);
+  useEffect(() => {
+    if (!inCall) {
+      seenShareIds.current = new Set();
+      return;
+    }
+    const nextShare = newShareCard(cards, seenShareIds.current);
+    seenShareIds.current = new Set(cards.filter((card) => card.kind === "share").map((card) => card.id));
+    if (nextShare === null) return;
+    setPinnedId(nextShare);
+    setLayout("spotlight");
+    setFullscreen(false);
+  }, [inCall, cards]);
   // Opens the mic once per call when the button was left on before joining.
   const micApplied = useRef(false);
   useEffect(() => {
@@ -1544,10 +1559,6 @@ export function MeetingApp() {
               disabled={inCall && (!controlsEnabled || controlPending)}
               onOpen={setDeviceMenu}
               onChange={onDevice}
-              onSettings={() => {
-                setSettingsOpen(true);
-                setMobileRooms(false);
-              }}
             />
           </span>
           <span className="device-pair">
@@ -1573,10 +1584,6 @@ export function MeetingApp() {
                 disabled={inCall && (!controlsEnabled || controlPending)}
                 onOpen={setDeviceMenu}
                 onChange={onDevice}
-                onSettings={() => {
-                  setSettingsOpen(true);
-                  setMobileRooms(false);
-                }}
               />
             ) : null}
           </span>
@@ -2274,6 +2281,7 @@ export function MeetingApp() {
                 pinnedId={pin}
                 speakers={media.speakers}
                 deafened={deafened}
+                outputVolume={outputVolume / 100}
                 fullscreen={isFullscreen}
                 levelFor={levelFor}
                 onLevel={changeLevel}
@@ -2338,22 +2346,30 @@ export function MeetingApp() {
                   disabled={!controlsEnabled || controlPending}
                   onOpen={setDeviceMenu}
                   onChange={onDevice}
-                  onSettings={() => {
-                    setSettingsOpen(true);
-                    setMobileRooms(false);
-                  }}
                 />
               </span>
-              <button
-                type="button"
-                className={`ctl${deafened ? " off" : ""}`}
-                aria-label="Ensurdecer"
-                aria-pressed={deafened}
-                title={deafened ? "Voltar a ouvir as pessoas neste PC" : "Cortar o som de todos neste PC. O microfone não muda."}
-                onClick={toggleDeafen}
-              >
-                {deafened ? <SpeakerMuteRegular fontSize={22} /> : <HeadphonesRegular fontSize={22} />}
-              </button>
+              <span className="ctl-pair">
+                <button
+                  type="button"
+                  className={`ctl${deafened ? " off" : ""}`}
+                  aria-label="Ensurdecer"
+                  aria-pressed={deafened}
+                  title={deafened ? "Voltar a ouvir as pessoas neste PC" : "Cortar o som de todos neste PC. O microfone não muda."}
+                  onClick={toggleDeafen}
+                >
+                  {deafened ? <SpeakerMuteRegular fontSize={22} /> : <HeadphonesRegular fontSize={22} />}
+                </button>
+                {session().browser.outputSelection ? (
+                  <DeviceMenu
+                    label="Opções de saída"
+                    kinds={[{ kind: "audiooutput", label: "Dispositivo de saída" }]}
+                    devices={media.devices}
+                    disabled={!controlsEnabled || controlPending}
+                    onOpen={setDeviceMenu}
+                    onChange={onDevice}
+                  />
+                ) : null}
+              </span>
               <span className="ctl-pair">
                 <button
                   type="button"
@@ -2372,10 +2388,6 @@ export function MeetingApp() {
                   disabled={!controlsEnabled || controlPending}
                   onOpen={setDeviceMenu}
                   onChange={onDevice}
-                  onSettings={() => {
-                    setSettingsOpen(true);
-                    setMobileRooms(false);
-                  }}
                 />
               </span>
               <span className="ctl-pair">
@@ -2528,6 +2540,17 @@ export function MeetingApp() {
                       />
                     </Field>
                     <p className="hint">100% mantém o nível original. Acima disso, o som pode distorcer. 0% corta sua voz.</p>
+                    <Field label={`Volume de saída da chamada: ${outputVolume}%`}>
+                      <Slider
+                        min={0}
+                        max={100}
+                        step={1}
+                        value={outputVolume}
+                        aria-valuetext={`${outputVolume}%`}
+                        onChange={(_, data) => setOutputVolume(data.value)}
+                      />
+                    </Field>
+                    <p className="hint">Ajusta todo o áudio recebido sem apagar o volume individual de cada pessoa.</p>
                     <Switch
                       className="effect-toggle"
                       label="Reduzir ruído do microfone"
@@ -2661,7 +2684,6 @@ function DeviceMenu({
   disabled,
   onOpen,
   onChange,
-  onSettings,
 }: {
   label: string;
   kinds: { kind: DeviceKind; label: string }[];
@@ -2669,7 +2691,6 @@ function DeviceMenu({
   disabled: boolean;
   onOpen: (open: boolean) => void;
   onChange: (kind: DeviceKind, deviceId: string) => void;
-  onSettings: () => void;
 }) {
   return (
     <Popover positioning="above-end" withArrow onOpenChange={(_, data) => onOpen(data.open)}>
@@ -2680,9 +2701,6 @@ function DeviceMenu({
         {kinds.map((item) => (
           <DeviceSelect key={item.kind} label={item.label} kind={item.kind} devices={devices} disabled={disabled} onChange={onChange} />
         ))}
-        <Button appearance="subtle" icon={<SettingsRegular />} onClick={onSettings}>
-          Configurações de voz
-        </Button>
       </PopoverSurface>
     </Popover>
   );
