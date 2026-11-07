@@ -1835,6 +1835,10 @@ video {
   transform: translateX(-50%);
 }
 
+.more-body > * {
+  flex-shrink: 0;
+}
+
 .export {
   flex-direction: row;
   align-items: center;

@@ -89,4 +89,5 @@ test("the call options panel always fits the viewport and scrolls internally", (
     css,
     /\.more-body\s*{[^}]*max-height:\s*calc\(100dvh - 128px\);[^}]*overflow-y:\s*auto;[^}]*overscroll-behavior:\s*contain;[^}]*box-sizing:\s*border-box;/s,
   );
+  assert.match(css, /\.more-body\s*>\s*\*\s*{[^}]*flex-shrink:\s*0;/s);
 });

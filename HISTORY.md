@@ -918,6 +918,14 @@ ADR 0030 aceito pelo usuário em 2026-11-04.
 - Artefatos verificados após download: `OpenMeet_0.2.22_x64-setup.exe`, assinatura, `latest.json` e `SHA256SUMS`. SHA-256 do instalador confere (`3d1b91bce85d14338c5f3ae9b5967dcad195b017075272281312b9676de9153f`), manifesto declara `0.2.22`, aponta para o instalador correto e contém a mesma assinatura publicada no arquivo `.sig`.
 - A correção subsequente de contenção do painel “Mais opções” não pertence à `v0.2.22`; deverá compor uma próxima versão após validação visual.
 
+## 2026-11-06 — F04-12 botão final comprimido
+
+- A segunda validação visual do usuário mostrou o botão “Saída, câmera e diagnóstico” comprimido na base do painel. A altura máxima e a rolagem estavam corretas, mas os filhos diretos do contêiner flexível ainda podiam encolher.
+- `apps/desktop/src/App.css`: filhos diretos de `.more-body` passam a usar `flex-shrink: 0`, preservando suas alturas enquanto o painel rola.
+- `apps/desktop/test/scaffold.test.mjs`: o teste de contenção agora também protege contra regressão do encolhimento.
+- Windows 11, 2026-11-06: Prettier, desktop 50/50, typecheck, ESLint e build web PASS. O build mantém o aviso preexistente de chunk principal acima de 500 kB.
+- Correção posterior à tag `v0.2.22`; falta nova conferência visual e release seguinte.
+
 ## 2026-11-04 — web.test.mjs volta a passar
 
 O bundle web levava "atalhos globais" (texto do DesktopOffer, desde f3042ba) e "openmeet.instance" (funções de instância sem guarda `__WEB__`). O texto do convite mudou para "atalhos de teclado" e as funções retornam cedo no web. Desktop 45/45, typecheck e lint ok.

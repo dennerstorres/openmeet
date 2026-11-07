@@ -64,6 +64,8 @@ Revisão em 2026-11-06: menus rápidos de microfone, fone e câmera ficam restri
 
 Correção posterior em 2026-11-06: a validação visual mostrou “Mais opções” cortado no topo em uma janela estreita que ainda usava o layout desktop. O limite de altura e a rolagem interna passam a valer em todas as larguras. Esta correção é posterior à tag v0.2.22 e precisa de release seguinte.
 
+Segundo ajuste posterior em 2026-11-06: os filhos flexíveis do painel deixam de encolher quando a altura disponível acaba. Assim, a rolagem interna absorve o excesso e preserva a altura do botão final “Saída, câmera e diagnóstico”. Correção posterior à tag v0.2.22; falta validação visual e release seguinte.
+
 Prova humana antes de DONE: escolher saída e câmera fora da chamada, entrar e ver os dois aplicados; trocar dentro da chamada pelas Configurações; dispositivo salvo desconectado cai no padrão sem erro; painel da chamada cabe em 768 px de altura; `.exe` e web.
 
 ## Execução
