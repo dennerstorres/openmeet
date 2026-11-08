@@ -1,6 +1,6 @@
 # PLAN — roadmap executável (fonte de verdade)
 
-F07-17 — Release 0.2.24: IN_PROGRESS em 2026-11-07, por pedido explícito do usuário. Escopo: incluir F15-06, atualizar os quatro manifests do desktop, executar gates locais, commit, integração fast-forward na `main`, tag `v0.2.24`, push atômico, CI/publicação e conferência dos quatro assets. Instalação, atualização e chamada real permanecem `WAITING_VALIDATION`.
+F07-17 — Release 0.2.24: WAITING_VALIDATION em 2026-11-07. Commit `a11e8ad`, `main` e tag `v0.2.24` enviados; CI da tag 42427235195 e release 42427235208 PASS. Release publicada com instalador, assinatura, `latest.json` e `SHA256SUMS`; SHA-256 conferido: `5f19cdcc28f3738e69a7f85f1094a64434163e6a8c413fc1431b8f77297c42f8`. O CI redundante da `main` 42427235269 seguia nos testes no último acompanhamento. Instalação, atualização e chamada real permanecem pendentes.
 
 F07-16 — Release 0.2.22: IN_PROGRESS em 2026-11-06. Inclui correções de tela cheia, destaque automático de compartilhamento, contenção de modais, consistência do botão Sons, menus rápidos de dispositivo e volume geral de saída. Gates locais completos PASS; falta commit, tag, push, CI/publicação e validação real no `.exe`.
 

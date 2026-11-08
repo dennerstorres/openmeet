@@ -971,3 +971,10 @@ O bundle web levava "atalhos globais" (texto do DesktopOffer, desde f3042ba) e "
 - `C:\Users\Administrador\.cargo\bin\cargo.exe check --manifest-path apps/desktop/src-tauri/Cargo.toml` PASS com Rust 1.98.1; o primeiro comando `cargo check` sem caminho não executou porque `cargo` não estava no `PATH`, e não foi contado como evidência.
 - Branch: `task/F15-06-telemetria-rampa`; commit, merge fast-forward, tag, push, CI/publicação e conferência de assets ainda pendentes neste ponto. Instalação, atualização e chamada real continuam `WAITING_VALIDATION`.
 
+## 2026-11-07 — Publicação v0.2.24
+
+- Commit `a11e8ad`, `main` e tag anotada `v0.2.24` enviados atomicamente. Release publicada em <https://github.com/dennerstorres/openmeet/releases/tag/v0.2.24>.
+- GitHub Actions: CI da tag `42427235195` PASS; workflow de release `42427235208` PASS (`windows-installer` 11m17s e `publish` 6s). O CI redundante da `main` `42427235269` permanecia no passo Test no último acompanhamento, depois de format, lint e typecheck PASS; não foi alegado como concluído.
+- Assets baixados em diretório temporário exclusivo: `OpenMeet_0.2.24_x64-setup.exe` (8.403.471 bytes), `.sig`, `latest.json` e `SHA256SUMS`. SHA-256 do instalador `5f19cdcc28f3738e69a7f85f1094a64434163e6a8c413fc1431b8f77297c42f8`, igual ao arquivo e ao digest publicado; manifesto declara `0.2.24`, URL correta e assinatura idêntica ao `.sig`.
+- Estado `WAITING_VALIDATION`: instalador não executado; atualização 0.2.23 → 0.2.24 e chamada real de 15 s com exportação de `screenRamp` continuam pendentes.
+

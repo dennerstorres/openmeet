@@ -6,6 +6,8 @@ READY → IN_PROGRESS em 2026-11-07, por pedido explícito do usuário. Escopo: 
 
 Gates locais PASS em Windows 11: workspace 27/27, shared 79/79, mídia 87/87, servidor 128/128, desktop 50/50 e scripts de release 6/6; formatação, lint, typecheck, build e `cargo check` com Rust 1.98.1 PASS. O aviso preexistente de chunk principal acima de 500 kB permanece. Falta commit, push, CI, publicação e conferência dos assets.
 
+WAITING_VALIDATION: commit `a11e8ad`, `main` e tag anotada `v0.2.24` enviados atomicamente. CI da tag 42427235195 PASS e workflow de release 42427235208 PASS (`windows-installer` 11m17s, publicação 6s). Os quatro assets foram baixados: instalador com 8.403.471 bytes e SHA-256 `5f19cdcc28f3738e69a7f85f1094a64434163e6a8c413fc1431b8f77297c42f8`, igual ao `SHA256SUMS` e ao digest do GitHub; `latest.json` declara `0.2.24`, URL correta e a mesma assinatura do `.sig`. O CI redundante da `main` 42427235269 permanecia no passo de testes no último acompanhamento; a execução idêntica da tag passou. Falta instalar, validar a atualização 0.2.23 → 0.2.24 e fazer a chamada real que exporta `screenRamp`.
+
 ## F07-15 — Release 0.2.21
 
 READY → IN_PROGRESS em 2026-11-04, por pedido explícito do usuário. Escopo: ícones compactos de câmera/tela, correção do salto do botão de configurações no tooltip, registros, quatro manifests em `0.2.21`, commit/push na `main`, tag e publicação pelo workflow. Gates locais e conferência dos quatro assets são obrigatórios; instalação e atualização reais ficam `WAITING_VALIDATION`.
