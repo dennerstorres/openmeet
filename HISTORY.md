@@ -978,3 +978,18 @@ O bundle web levava "atalhos globais" (texto do DesktopOffer, desde f3042ba) e "
 - Assets baixados em diretório temporário exclusivo: `OpenMeet_0.2.24_x64-setup.exe` (8.403.471 bytes), `.sig`, `latest.json` e `SHA256SUMS`. SHA-256 do instalador `5f19cdcc28f3738e69a7f85f1094a64434163e6a8c413fc1431b8f77297c42f8`, igual ao arquivo e ao digest publicado; manifesto declara `0.2.24`, URL correta e assinatura idêntica ao `.sig`.
 - Estado `WAITING_VALIDATION`: instalador não executado; atualização 0.2.23 → 0.2.24 e chamada real de 15 s com exportação de `screenRamp` continuam pendentes.
 
+## 2026-11-07 — F04-12 remove scrollbar horizontal de Mais opções
+
+- Branch: `task/F04-12-overflow-horizontal-opcoes`; commit ainda não criado. A captura do usuário no Windows mostrou que nomes longos de dispositivos, selects e botões ampliavam o conteúdo e criavam rolagem horizontal.
+- `apps/desktop/src/App.css`: o painel mantém somente rolagem vertical; filhos diretos, `Field`, `Select`, seletor nativo e a seção Rádio podem encolher e ficam limitados a 100% da largura; dicas longas usam `overflow-wrap: anywhere`.
+- `apps/desktop/test/scaffold.test.mjs`: o teste do painel protege `overflow-x: hidden`, contenção dos controles e quebra dos textos.
+- Windows 11, 2026-11-07: teste estrutural 9/9 e desktop 50/50 PASS; typecheck, ESLint, Prettier e build do desktop PASS. O build mantém o aviso preexistente de chunk principal acima de 500 kB.
+- Estado: `WAITING_VALIDATION`. Falta abrir “Mais opções” no `.exe`, com os mesmos nomes longos, e confirmar ausência da barra horizontal e acesso aos botões.
+
+## 2026-11-07 — F07-18 preparação da release 0.2.25
+
+- Pedido explícito do usuário para integrar na `main`, commitar, enviar e gerar nova release do `.exe`. Escopo: F04-12 (contenção horizontal de “Mais opções”), registros e versão `0.2.25` nos quatro manifests.
+- Windows 11, 2026-11-07: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test` e `pnpm build` PASS. Testes: workspace 27/27, shared 79/79, mídia 87/87, servidor 128/128 e desktop 50/50. Scripts de checksum/manifesto 6/6 PASS. O build mantém o aviso preexistente de chunk principal acima de 500 kB.
+- `C:\Users\Administrador\.cargo\bin\cargo.exe check --manifest-path apps/desktop/src-tauri/Cargo.toml` PASS com Rust 1.98.1.
+- Branch: `task/F04-12-overflow-horizontal-opcoes`; commit, merge fast-forward, tag, push, CI/publicação e conferência de assets ainda pendentes neste ponto. Instalação e inspeção visual continuam `WAITING_VALIDATION`.
+

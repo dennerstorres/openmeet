@@ -1,5 +1,11 @@
 # Fase 07 — distribution
 
+## F07-18 — Release 0.2.25
+
+READY → IN_PROGRESS em 2026-11-07, por pedido explícito do usuário. Escopo: publicar a correção F04-12 que remove a rolagem horizontal de “Mais opções”, atualizar os quatro manifests do desktop para `0.2.25`, executar gates locais, integrar por fast-forward na `main`, criar `v0.2.25` e publicar pelo workflow existente. Conferir instalador, assinatura, `latest.json` e `SHA256SUMS`; instalação e inspeção visual no `.exe` ficam `WAITING_VALIDATION`.
+
+Gates locais PASS em Windows 11: workspace 27/27, shared 79/79, mídia 87/87, servidor 128/128, desktop 50/50 e scripts de release 6/6; formatação, lint, typecheck, build e `cargo check` com Rust 1.98.1 PASS. O aviso preexistente de chunk principal acima de 500 kB permanece. Falta commit, push, CI, publicação e conferência dos assets.
+
 ## F07-17 — Release 0.2.24
 
 READY → IN_PROGRESS em 2026-11-07, por pedido explícito do usuário. Escopo: publicar a telemetria F15-06 da rampa inicial da tela, atualizar `apps/desktop/package.json`, `tauri.conf.json`, `Cargo.toml` e a entrada do pacote desktop em `Cargo.lock` para `0.2.24`, executar gates locais, integrar por fast-forward na `main`, criar `v0.2.24` e publicar pelo workflow existente. Conferir instalador, assinatura, `latest.json` e `SHA256SUMS`; instalação, atualização e chamada real ficam `WAITING_VALIDATION`.

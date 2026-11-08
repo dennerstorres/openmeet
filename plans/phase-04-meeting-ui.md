@@ -68,6 +68,10 @@ Correção posterior em 2026-11-06: a validação visual mostrou “Mais opçõe
 
 Segundo ajuste posterior em 2026-11-06: os filhos flexíveis do painel deixam de encolher quando a altura disponível acaba. Assim, a rolagem interna absorve o excesso e preserva a altura do botão final “Saída, câmera e diagnóstico”. Correção posterior à tag v0.2.22; falta validação visual e release seguinte.
 
+Quarto ajuste em 2026-11-07: captura do `.exe` mostrou scrollbar horizontal porque nomes longos de dispositivos e controles Fluent impunham largura mínima ao painel. Escopo: conter `Field`, `Select`, botões, seção de rádio e textos na largura útil, mantendo somente a rolagem vertical. Branch `task/F04-12-overflow-horizontal-opcoes`; validação visual no Windows continua obrigatória.
+
+Implementado na mesma data: `.more-body` usa `overflow-x: hidden`; filhos diretos e controles Fluent recebem `min-width: 0` e `max-width: 100%`; fields/selects/rádio ocupam a largura disponível e dicas longas quebram em qualquer ponto. Teste estrutural 9/9 e desktop 50/50 PASS; typecheck, ESLint, Prettier e build PASS. Estado `WAITING_VALIDATION` até nova captura do `.exe`.
+
 Prova humana antes de DONE: escolher saída e câmera fora da chamada, entrar e ver os dois aplicados; trocar dentro da chamada pelas Configurações; dispositivo salvo desconectado cai no padrão sem erro; painel da chamada cabe em 768 px de altura; `.exe` e web.
 
 ## Execução

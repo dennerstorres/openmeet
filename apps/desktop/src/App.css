@@ -1825,6 +1825,7 @@ video {
   width: min(420px, 80vw);
   max-height: calc(100dvh - 128px);
   overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   box-sizing: border-box;
@@ -1837,6 +1838,23 @@ video {
 
 .more-body > * {
   flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.more-body .fui-Field,
+.more-body .fui-Select,
+.more-body .fui-Select__select,
+.more-body .radio-controls {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.more-body .hint {
+  overflow-wrap: anywhere;
 }
 
 .export {

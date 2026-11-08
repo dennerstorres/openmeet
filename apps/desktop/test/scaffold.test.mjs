@@ -90,7 +90,12 @@ test("the call options panel always fits the viewport and scrolls internally", (
   const css = readFileSync(new URL("../src/App.css", import.meta.url), "utf8");
   assert.match(
     css,
-    /\.more-body\s*{[^}]*max-height:\s*calc\(100dvh - 128px\);[^}]*overflow-y:\s*auto;[^}]*overscroll-behavior:\s*contain;[^}]*box-sizing:\s*border-box;/s,
+    /\.more-body\s*{[^}]*max-height:\s*calc\(100dvh - 128px\);[^}]*overflow-y:\s*auto;[^}]*overflow-x:\s*hidden;[^}]*overscroll-behavior:\s*contain;[^}]*box-sizing:\s*border-box;/s,
   );
-  assert.match(css, /\.more-body\s*>\s*\*\s*{[^}]*flex-shrink:\s*0;/s);
+  assert.match(css, /\.more-body\s*>\s*\*\s*{[^}]*flex-shrink:\s*0;[^}]*min-width:\s*0;[^}]*max-width:\s*100%;/s);
+  assert.match(
+    css,
+    /\.more-body \.fui-Field,[\s\S]*\.more-body \.fui-Select__select,[\s\S]*\.more-body \.radio-controls\s*{[^}]*width:\s*100%;[^}]*min-width:\s*0;[^}]*max-width:\s*100%;/,
+  );
+  assert.match(css, /\.more-body \.hint\s*{[^}]*overflow-wrap:\s*anywhere;/s);
 });
