@@ -980,7 +980,7 @@ O bundle web levava "atalhos globais" (texto do DesktopOffer, desde f3042ba) e "
 
 ## 2026-11-07 — F04-12 remove scrollbar horizontal de Mais opções
 
-- Branch: `task/F04-12-overflow-horizontal-opcoes`; commit ainda não criado. A captura do usuário no Windows mostrou que nomes longos de dispositivos, selects e botões ampliavam o conteúdo e criavam rolagem horizontal.
+- Branch: `task/F04-12-overflow-horizontal-opcoes`; commit `3729971`. A captura do usuário no Windows mostrou que nomes longos de dispositivos, selects e botões ampliavam o conteúdo e criavam rolagem horizontal.
 - `apps/desktop/src/App.css`: o painel mantém somente rolagem vertical; filhos diretos, `Field`, `Select`, seletor nativo e a seção Rádio podem encolher e ficam limitados a 100% da largura; dicas longas usam `overflow-wrap: anywhere`.
 - `apps/desktop/test/scaffold.test.mjs`: o teste do painel protege `overflow-x: hidden`, contenção dos controles e quebra dos textos.
 - Windows 11, 2026-11-07: teste estrutural 9/9 e desktop 50/50 PASS; typecheck, ESLint, Prettier e build do desktop PASS. O build mantém o aviso preexistente de chunk principal acima de 500 kB.
@@ -991,5 +991,8 @@ O bundle web levava "atalhos globais" (texto do DesktopOffer, desde f3042ba) e "
 - Pedido explícito do usuário para integrar na `main`, commitar, enviar e gerar nova release do `.exe`. Escopo: F04-12 (contenção horizontal de “Mais opções”), registros e versão `0.2.25` nos quatro manifests.
 - Windows 11, 2026-11-07: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test` e `pnpm build` PASS. Testes: workspace 27/27, shared 79/79, mídia 87/87, servidor 128/128 e desktop 50/50. Scripts de checksum/manifesto 6/6 PASS. O build mantém o aviso preexistente de chunk principal acima de 500 kB.
 - `C:\Users\Administrador\.cargo\bin\cargo.exe check --manifest-path apps/desktop/src-tauri/Cargo.toml` PASS com Rust 1.98.1.
-- Branch: `task/F04-12-overflow-horizontal-opcoes`; commit, merge fast-forward, tag, push, CI/publicação e conferência de assets ainda pendentes neste ponto. Instalação e inspeção visual continuam `WAITING_VALIDATION`.
+- Branch `task/F04-12-overflow-horizontal-opcoes`, commit `3729971`, integrada por fast-forward na `main`; `main` e tag anotada `v0.2.25` enviadas atomicamente.
+- GitHub Actions: workflow de release `42430073901` PASS (`windows-installer` 10m23s e `publish` 9s). CI da tag `42430073884` e CI redundante da `main` `42430074126` ainda estavam em execução no momento deste registro.
+- Assets baixados em diretório temporário exclusivo: `OpenMeet_0.2.25_x64-setup.exe` (8.403.171 bytes), `.sig`, `latest.json` e `SHA256SUMS`. SHA-256 do instalador `e4033df6485bed4570774ce2641790c692c713d93884a63cb062514e9e301f1b`, igual ao arquivo publicado; manifesto declara `0.2.25`, aponta para a URL correta e contém a mesma assinatura do `.sig`.
+- Estado `WAITING_VALIDATION`: instalador não executado; falta abrir “Mais opções” no `.exe` com nomes longos e confirmar ausência da barra horizontal e acesso aos controles.
 

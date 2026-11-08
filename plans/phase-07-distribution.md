@@ -2,9 +2,11 @@
 
 ## F07-18 — Release 0.2.25
 
-READY → IN_PROGRESS em 2026-11-07, por pedido explícito do usuário. Escopo: publicar a correção F04-12 que remove a rolagem horizontal de “Mais opções”, atualizar os quatro manifests do desktop para `0.2.25`, executar gates locais, integrar por fast-forward na `main`, criar `v0.2.25` e publicar pelo workflow existente. Conferir instalador, assinatura, `latest.json` e `SHA256SUMS`; instalação e inspeção visual no `.exe` ficam `WAITING_VALIDATION`.
+READY → IN_PROGRESS → WAITING_VALIDATION em 2026-11-07, por pedido explícito do usuário. Escopo: publicar a correção F04-12 que remove a rolagem horizontal de “Mais opções”, atualizar os quatro manifests do desktop para `0.2.25`, executar gates locais, integrar por fast-forward na `main`, criar `v0.2.25` e publicar pelo workflow existente. Instalação e inspeção visual no `.exe` continuam pendentes.
 
-Gates locais PASS em Windows 11: workspace 27/27, shared 79/79, mídia 87/87, servidor 128/128, desktop 50/50 e scripts de release 6/6; formatação, lint, typecheck, build e `cargo check` com Rust 1.98.1 PASS. O aviso preexistente de chunk principal acima de 500 kB permanece. Falta commit, push, CI, publicação e conferência dos assets.
+Gates locais PASS em Windows 11: workspace 27/27, shared 79/79, mídia 87/87, servidor 128/128, desktop 50/50 e scripts de release 6/6; formatação, lint, typecheck, build e `cargo check` com Rust 1.98.1 PASS. O aviso preexistente de chunk principal acima de 500 kB permanece.
+
+Commit `3729971` integrado por fast-forward e enviado atomicamente com a tag `v0.2.25`. Workflow de release 42430073901 PASS (`windows-installer` 10m23s; `publish` 9s). Assets publicados: instalador de 8.403.171 bytes, `.sig`, `latest.json` e `SHA256SUMS`; SHA-256 conferido `e4033df6485bed4570774ce2641790c692c713d93884a63cb062514e9e301f1b`, versão/URL do manifesto corretas e assinatura idêntica ao `.sig`. CI da tag e CI redundante da `main` ainda estavam em execução no momento do registro; instalação e inspeção visual permanecem `WAITING_VALIDATION`.
 
 ## F07-17 — Release 0.2.24
 

@@ -1,6 +1,6 @@
 # PLAN — roadmap executável (fonte de verdade)
 
-F07-18 — Release 0.2.25: IN_PROGRESS em 2026-11-07, por pedido explícito do usuário. Escopo: incluir a correção F04-12 do overflow horizontal de “Mais opções”, atualizar os quatro manifests, executar gates locais, commit, integração fast-forward na `main`, tag `v0.2.25`, push atômico, CI/publicação e conferência dos quatro assets. Instalação e validação visual permanecem `WAITING_VALIDATION`.
+F07-18 — Release 0.2.25: WAITING_VALIDATION em 2026-11-07. Commit `3729971`, integração fast-forward, `main` e tag `v0.2.25` enviados; workflow de release 42430073901 PASS. Instalador, assinatura, `latest.json` e `SHA256SUMS` publicados e conferidos; SHA-256 `e4033df6485bed4570774ce2641790c692c713d93884a63cb062514e9e301f1b`. Instalação e validação visual do painel permanecem pendentes.
 
 F07-17 — Release 0.2.24: WAITING_VALIDATION em 2026-11-07. Commit `a11e8ad`, `main` e tag `v0.2.24` enviados; CI da tag 42427235195 e release 42427235208 PASS. Release publicada com instalador, assinatura, `latest.json` e `SHA256SUMS`; SHA-256 conferido: `5f19cdcc28f3738e69a7f85f1094a64434163e6a8c413fc1431b8f77297c42f8`. O CI redundante da `main` 42427235269 seguia nos testes no último acompanhamento. Instalação, atualização e chamada real permanecem pendentes.
 
