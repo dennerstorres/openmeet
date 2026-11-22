@@ -1,5 +1,11 @@
 # HISTORY — registro cronológico
 
+### 2026-11-22 — F16, planejamento mobile nativo e viabilidade xtool — ChatGPT
+
+Branch `docs/F16-mobile-native-xtool-20261122`, proposta de atualização documental (sem código de aplicativo, sem deploy e sem release). Solicitado pelo usuário: apps Android/iOS completos, Bluetooth, áudio com tela bloqueada, câmera e compartilhamento de tela inteira; no iOS, sem Mac e sem assinatura Apple Developer paga agora. Incluídos: fase 16, especificação, arquitetura, roteiro xtool X01-X09, matriz A/I/X, ADR 0032 **PROPOSTO** e gate G16; SPEC/PLAN atualizados. Base para desenvolvimento futuro via tarefas independentes, respeitando desktop/web.
+
+Verificações realizadas: leitura dos contratos atuais no repositório e documentação pública de Apple, LiveKit Swift e xtool (links nos novos documentos); revisão de consistência documental planejada. **Não executados:** toolchains, build Android/iOS, instalação em iPhone, testes de câmera/áudio/BT/tela, CI e aprovação humana do ADR. F16-01 READY; F16-00 WAITING_VALIDATION; demais PENDING. Riscos: xtool beta/SDKs binários/entitlements, expiração Personal Team em 7 dias, ScreenCaptureKit iOS 27+ vs ReplayKit em versões anteriores, APNs/TestFlight/App Store indisponíveis com conta gratuita. Próxima tarefa: F16-01 POC com iPhone físico e logs sanitizados; registrar GO/NO-GO sem inventar evidência.
+
 ### 2026-11-04 — F07-15, preparação da release 0.2.21 — Codex
 Branch `main`. Pedido explícito para commitar, enviar e gerar nova release do `.exe` com os ajustes de densidade e estabilidade descritos abaixo. Versão preparada nos quatro manifests. Windows 11: desktop 45/45, scripts de release 6/6, typecheck, ESLint, Prettier e build PASS; somente o aviso preexistente de chunk acima de 500 kB. Commit `9806a63`, `main` e tag `v0.2.21` enviados. Workflow 41954982856 PASS; release pública com instalador, assinatura, manifesto e checksums. Download conferiu SHA-256 `421168734f39504b77ae887df2ea82b956bab8f7c640ce632870b54a2a2d65b4` e `latest.json` consistente. Instalação e atualização no Windows real continuam pendentes; estado `WAITING_VALIDATION`.
 
