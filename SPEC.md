@@ -1,7 +1,7 @@
 # SPEC — OpenMeet (codinome) v0.1
 
 ## Visão
-Cliente desktop Windows e cliente web, servido pela própria instância, para salas de reunião persistentes ou temporárias, com áudio, vídeo, compartilhamento de janela/monitor e diagnóstico de qualidade; implantação self-hosted, contas independentes por instância, sem dependência de uma conta global. Uma instância pode ter vários servidores, e cada servidor tem suas salas.
+Cliente desktop Windows e cliente web, servido pela própria instância, para salas de reunião persistentes ou temporárias, com áudio, vídeo, compartilhamento de janela/monitor e diagnóstico de qualidade; implantação self-hosted, contas independentes por instância, sem dependência de uma conta global. Uma instância pode ter vários servidores, e cada servidor tem suas salas. **Expansão planejada F16:** clientes móveis nativos Android/iOS, sem implementação validada; escopo em `docs/MOBILE_SPEC.md` e decisão proposta no ADR 0032.
 
 ## Personas e jornadas
 - **Operador:** instala a stack numa VPS, configura domínio/TLS/portas, inicializa administrador, cria servidores e controla inscrições.
@@ -33,9 +33,10 @@ Cliente desktop Windows e cliente web, servido pela própria instância, para sa
 22. Rádio: uma entrada de áudio do PC escolhida pelo participante, transmitida na sala como faixa própria. ADR 0022. Não implementado.
 23. Salas de texto no servidor, mensagem direta (1:1 e grupo de até 10), menções, reações, anexos, emoji próprio por servidor e notificação no app e na aba da web, entregues por SSE e guardadas para sempre. ADR 0024. Não implementado.
 24. Cliente web instalável como PWA, com cache que nunca prende versão velha e notificação push (Web Push/VAPID, sem serviço pago) para menção, DM e resposta. ADR 0027. Não implementado.
+25. **Fase 16 (expansão, planejada):** apps Android/iOS nativos com servidores, chamadas voz/vídeo, Bluetooth, áudio com tela bloqueada, compartilhamento da tela **inteira** e visualização da tela remota, chat/DM e recuperação. Sem assinatura Apple paga para testes pessoais; compatibilidade xtool/LiveKit sujeita a POC. Especificação: `docs/MOBILE_SPEC.md`; ADR 0032 PROPOSTO.
 
 ## Out of scope — MVP
-Federação, apps móveis, macOS/Linux, gravações, transcrição, E2EE, plugins, quadro branco, acesso remoto, múltiplos nós, bots, integrações além do login Google, captura nativa do áudio do Windows, juntar conta Google a uma conta de senha e link que entra direto numa sala.
+Federação, macOS/Linux desktop, gravações, transcrição, E2EE, plugins, quadro branco, acesso remoto, múltiplos nós, bots, integrações além do login Google, captura nativa do áudio do Windows, juntar conta Google a uma conta de senha e link que entra direto numa sala. **Apps móveis deixam este out-of-scope somente como expansão F16, não como funcionalidade do MVP original.** Publicação na App Store/TestFlight e push APNs sem Apple Developer Program seguem fora do escopo desta expansão.
 
 ## Requisitos funcionais
 - RF-01: Usuário adiciona instância por HTTPS; cliente verifica metadados e não envia credenciais a host inesperado.
@@ -65,15 +66,19 @@ Federação, apps móveis, macOS/Linux, gravações, transcrição, E2EE, plugin
 - RF-25: Cada servidor tem uma biblioteca de sons que todo membro usa. O som nasce no servidor do upload e só quem subiu o importa para outro servidor de que é membro. Sem limite de quantidade; até 20 s, enviado como WAV PCM 16 bits mono 24 kHz e validado pela API. Toca um por vez para a sala, misturado no microfone, mesmo mutado. Dono e moderadores tiram sons do servidor. ADR 0021.
 - RF-26: O participante liga um rádio a partir de uma entrada de áudio do aparelho (cabo virtual, mixagem estéreo), publicada como faixa separada do microfone, sem filtros de voz e com preset de música. Aparece como card próprio; cada pessoa ajusta volume e mute só para si, e só quem ligou para ou troca a entrada. Acaba quando essa pessoa sai. Sem bot no servidor nem integração com YouTube ou Spotify. ADR 0022.
 - RF-27: No cliente web em Windows de computador, um aviso discreto oferece o app desktop uma vez, até a pessoa fechar, sem bloquear a entrada na sala; o menu do usuário mantém "Baixar app para Windows". O link aponta para a release mais recente. Depois de baixar, "Abrir no app" usa `openmeet://instancia?host=` para o app entrar nesta instância, só quando ainda não tem nenhuma; nunca troca a instância de um app já conectado.
+- RF-28 (F16, planejado): Apps Android/iOS nativos entram em salas e mantêm áudio/microfone com a tela bloqueada usando mecanismos do SO, roteam comunicação via Bluetooth/alto-falante e exibem interrupções; validação real obrigatória.
+- RF-29 (F16, planejado): Apps Android/iOS publicam câmera e compartilham a **tela inteira do dispositivo**, inclusive outros apps, com consentimento e stop, e recebem telas remotas; tecnologias/limites por SO em `docs/MOBILE_ARCHITECTURE.md`.
+- RF-30 (F16, planejado): Mobile mantém isolamento de instâncias, autenticação e chat/DM; refresh no armazenamento seguro nativo, sem reutilizar cookies web e sem afrouxar validações de Origin/CSRF.
+- RF-31 (F16, planejado): Android gera APK; iOS usa teste pessoal por assinatura gratuita/xtool **somente se POC passar**. App Store/TestFlight/APNs não são requisitos viáveis sob a restrição atual de conta gratuita.
 
 ## Requisitos não funcionais
 - Segredo jamais incluído no repo, logs ou CI; TLS em produção; Argon2id com parâmetros documentados.
 - Sem pré-requisito de Node/Rust para o usuário final (runtime WebView2 considerado pela instalação).
-- Suporte inicial Windows 10/11 em versões suportadas pelo Tauri/WebView2; matriz de versões testadas explicitamente. Web: Chrome, Edge e Firefox atuais em computador; responsividade mínima para navegador de celular (F12-08), mídia em aparelho físico ainda não validada.
+- Suporte inicial Windows 10/11 em versões suportadas pelo Tauri/WebView2; matriz de versões testadas explicitamente. Web: Chrome, Edge e Firefox atuais em computador; responsividade mínima para navegador de celular (F12-08), mídia em aparelho físico ainda não validada. Mobile F16: Android/iOS nativos com versões mínimas a definir pela matriz real; nenhuma compatibilidade iOS/xtool afirmada antes de X01-X09.
 - Teste funcional de cinco participantes simultâneos e reunião contínua de 60 min em ambiente homologado.
 - Meta de p95 de entrada <= 5s em rede estável e sessão pronta; reconexão <=15s após queda de 5s, mediante servidor alcançável. São metas, não garantias.
 - Monitoramento: logs JSON no backend, requestId/roomId pseudonimizados e healthchecks; retenção configurável.
 - Não prometer E2EE no MVP. SRTP/DTLS de transporte não equivale a E2EE entre participantes.
 
 ## Aceite do produto
-Todos os itens de `docs/ACCEPTANCE.md` marcados PASS com evidência, sem falha crítica de segurança, e POC aprovada no gate G2. Testes não realizados são NOT_RUN, nunca PASS.
+Todos os itens de `docs/ACCEPTANCE.md` marcados PASS com evidência, sem falha crítica de segurança, e POC aprovada no gate G2. Testes não realizados são NOT_RUN, nunca PASS. A **expansão móvel F16** tem aceite separado no G16 e em `docs/MOBILE_TEST_MATRIX.md`, sem alterar retroativamente o aceite do MVP desktop/web.

@@ -13,4 +13,6 @@
 
 - **G12 Web:** ADR 0014. Cliente web na mesma origem da API, sem token legível por JavaScript, cookie `HttpOnly; Secure; SameSite=Strict`, CSRF recusado sem `Origin` e cabeçalho web, CSP sem `unsafe-inline` e com só o domínio do LiveKit, e o `.exe` sem regressão. Chrome, Edge e Firefox reais ficam `WAITING_VALIDATION` até prova humana.
 
+**G16 Mobile (F16):** ADR 0032 aceito para código de produção; viabilidade iOS sem macOS demonstrada por X01-X04, com xtool, LiveKit Swift, assinatura Personal Team e iPhone físico; testes A01-A08, I01-I09 e X10-X12 da `docs/MOBILE_TEST_MATRIX.md` com resultados/evidências reais. Exige mic/áudio contínuo com tela bloqueada, Bluetooth (inclusive alternância de rota), câmera, compartilhamento da **tela inteira de outros apps** e recepção de tela entre Android/iOS/desktop. Testar login/refresh seguro, revogação, permissão negada, TURN/reconexão, regressão desktop/web, cinco participantes/60 min e revisão de segurança. Restrições App Store/APNs e requisitos por versão iOS explicitados; não aceitar PWA como substituto, não alegar GO por compilação isolada. Se aparelho/Apple ID não disponível: `WAITING_VALIDATION`/`NOT_RUN`, nunca PASS.
+
 Se uma ação exige contexto fora da máquina do agente (2 PCs, rede, VPS) marcar WAITING_VALIDATION e fornecer roteiro ao humano, nunca declarar PASS.

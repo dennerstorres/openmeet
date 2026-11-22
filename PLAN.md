@@ -16,6 +16,8 @@ F07-12 — Release 0.2.18: WAITING_VALIDATION em 2026-11-04, retomada explicitam
 
 Status: `PENDING`, `READY`, `IN_PROGRESS`, `IMPLEMENTED`, `WAITING_VALIDATION`, `VERIFIED`, `DONE`, `BLOCKED`.
 
+**F16 — OpenMeet Mobile nativo (planejada 2026-11-22):** Android Kotlin/Compose + LiveKit e iOS SwiftUI + LiveKit, com **áudio em tela bloqueada, Bluetooth, câmera e compartilhamento da tela inteira**. Conta Apple gratuita e xtool sem Mac são restrições, não builds comprovados. ADR 0032 **PROPOSTO**, F16-00 **WAITING_VALIDATION** (aceite humano); F16-01 **READY** (POC SwiftUI/xtool isolado), F16-02 a F16-16 **PENDING**. Testes X01-X09 e A/I/X mobile **NOT_RUN**. Detalhes e dependências em `plans/phase-16-mobile.md`, `docs/MOBILE_SPEC.md`, `docs/MOBILE_IOS_XTOOL.md` e gate G16.
+
 
 F15 — Qualidade da mídia: ADR 0029 aceito em 2026-11-04. F15-01 IMPLEMENTED na branch `task/F15-01-qualidade-tela`: perfis de tela detail/motion, VP9 com reserva, prioridade alta. F15-02 WAITING_VALIDATION (seletor na UI). F15-03 IMPLEMENTED (adaptiveStream + dynacast). F15-04 IMPLEMENTED (buffer baixo no vídeo da tela). F15-05 IMPLEMENTED (RNNoise, ADR 0030 aceito). Falta chamada real e revisão. Ver plans/phase-15-qualidade-midia.md.
 F15-06 — Telemetria da rampa inicial da tela: WAITING_VALIDATION em 2026-11-07. Os primeiros 15 s da publicação local de tela são amostrados em memória a cada segundo; o diagnóstico consentido leva bitrate por delta, resolução/FPS, codec, limitação de qualidade, bitrate alvo e banda disponível, sem conteýo de mídia ou identificador pessoal. Mídia 87/87, typecheck/build/lint e integração de tipos do desktop PASS. Falta chamada real no `.exe` e navegador para atribuir a causa; não está `DONE`.
@@ -170,6 +172,23 @@ F09-08 — Presença dos membros do servidor: WAITING_VALIDATION. Implementada e
 | F14-05 | PWA | Envio de push em menção, DM e resposta | F14-04,F13-13 | IMPLEMENTED | Grok | G4,G10 |
 | F14-06 | PWA | Ativar push na UI e clique abre a conversa | F14-03,F14-05 | WAITING_VALIDATION | Grok | G12 |
 | F14-07 | PWA | Prova: atualização com app aberto e push em Chrome, Firefox e Android | F14-06 | PENDING | Humano | G12 |
+| F16-00 | Mobile | Aprovação ADR 0032 e SO mínimo | — | WAITING_VALIDATION | Humano + Claude review | G16 |
+| F16-01 | Mobile | POC SwiftUI/xtool com conta Apple gratuita em iPhone físico | — | READY | Grok + Humano | G16 |
+| F16-02 | Mobile | POC LiveKit Swift/xtool, BT/background/captura | F16-01 | PENDING | Grok + Humano | G16 |
+| F16-03 | Mobile | Contratos API/fixtures Kotlin e Swift | F16-00 | PENDING | Grok + Codex | G3,G16 |
+| F16-04 | Mobile | Autenticação nativa segura e deep links/Google | F16-03 | PENDING | Grok + Claude | G3,G10,G16 |
+| F16-05 | Mobile | Android Kotlin/Compose scaffold/APK | F16-00,F16-03 | PENDING | Grok | G1,G16 |
+| F16-06 | Mobile | iOS SwiftUI scaffold/xtool após GO | F16-00,F16-02 | PENDING | Grok | G1,G16 |
+| F16-07 | Mobile | UI servidores/salas/perfis/convites | F16-04,F16-05,F16-06 | PENDING | Grok | G9,G16 |
+| F16-08 | Mobile | LiveKit Android áudio/vídeo/recepção de tela | F16-04,F16-05 | PENDING | Grok | G4,G16 |
+| F16-09 | Mobile | LiveKit iOS áudio/vídeo/recepção de tela | F16-04,F16-06 | PENDING | Grok | G4,G16 |
+| F16-10 | Mobile | Background audio/Bluetooth Android e iOS | F16-08,F16-09 | PENDING | Grok + Humano | G16 |
+| F16-11 | Mobile | MediaProjection Android tela completa | F16-08 | PENDING | Grok | G16 |
+| F16-12 | Mobile | ScreenCaptureKit/ReplayKit iOS tela completa | F16-02,F16-09 | PENDING | Grok | G16 |
+| F16-13 | Mobile | Chat/DM/presença e paridade de recursos avançados | F16-07,F16-08,F16-09 | PENDING | Grok | G4,G9,G16 |
+| F16-14 | Mobile | Notificações e limitações de push | F16-13 | PENDING | Grok + Claude | G10,G16 |
+| F16-15 | Mobile | Provas físicas, segurança, revisão e 60 min | F16-10,F16-11,F16-12,F16-13,F16-14 | PENDING | Humano + Codex/Claude | G3,G4,G16 |
+| F16-16 | Mobile | Packaging e documentação de distribuição | F16-15 | PENDING | Grok | G7,G16 |
 
 ## Estado em 2026-10-19
 
