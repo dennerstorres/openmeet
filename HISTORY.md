@@ -1029,3 +1029,8 @@ O bundle web levava "atalhos globais" (texto do DesktopOffer, desde f3042ba) e "
 - Windows 11, 2026-11-27: `pnpm format:check`, `lint`, `typecheck` e `build` PASS. Testes: workspace 27/27, shared 79/79, mídia 102/102, servidor 128/128, desktop 50/50. Observação: `pnpm test` completo travou uma vez no desktop com saída redirecionada para arquivo; rodado isolado (`pnpm --filter @openmeet/desktop test`) passou 50/50, e a rodada completa anterior com a mesma suíte também passou.
 - Estado: F17-07 APPROVED; G17 aprovado tecnicamente, exceto F17-08 (WAITING_VALIDATION, depende de chamada real `.exe` × navegador). Limitações aceitas listadas na revisão.
 
+## 2026-11-27 — F07-19 preparação da release 0.2.26
+
+- Pedido explícito do usuário para subir a F17 e gerar nova release do `.exe` (release pública escolhida). Escopo: F17 (G17 aprovado tecnicamente, padrões do ADR 0029 inalterados) e versão `0.2.26` nos quatro manifests. A F16 (PR #2) não entra nesta release.
+- Antes, teste local do usuário com `.exe` release da branch (`tauri build --no-bundle`), sozinho na sala: compartilhamento aparentemente nítido; não conta como F17-08 (sem receptor pelo SFU nem exportação).
+- Windows 11, 2026-11-27: `pnpm format:check`, `lint`, `typecheck` e `build` PASS. Testes: workspace 27/27, shared 79/79, mídia 102/102, servidor 128/128, desktop 50/50. `cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml` PASS com Rust 1.98.1.

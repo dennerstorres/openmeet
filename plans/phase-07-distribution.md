@@ -1,5 +1,9 @@
 # Fase 07 — distribution
 
+## F07-19 — Release 0.2.26
+
+READY → IN_PROGRESS em 2026-11-27, por pedido explícito do usuário. Escopo: publicar a F17 (branch `audit/F17-screen-quality`: auditoria, telemetria por track consentida, bancada offline e interruptores `openmeet.screenExperiment`), sem alterar padrões de produção de mídia. Quatro manifests em `0.2.26`, gates locais, fast-forward na `main`, tag `v0.2.26` e workflow existente. Conferir instalador, assinatura, `latest.json` e `SHA256SUMS`; instalação e F17-08 ficam `WAITING_VALIDATION`.
+
 ## F07-18 — Release 0.2.25
 
 READY → IN_PROGRESS → WAITING_VALIDATION em 2026-11-07, por pedido explícito do usuário. Escopo: publicar a correção F04-12 que remove a rolagem horizontal de “Mais opções”, atualizar os quatro manifests do desktop para `0.2.25`, executar gates locais, integrar por fast-forward na `main`, criar `v0.2.25` e publicar pelo workflow existente. Instalação e inspeção visual no `.exe` continuam pendentes.
