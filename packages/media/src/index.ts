@@ -34,4 +34,7 @@ export type { DiagnosticEvent } from "./diagnostics.js";
 export type { ConnectionPhase } from "./phase.js";
 export type { DeviceKind, DeviceOption, PocSnapshot, TrackTile } from "./session.js";
 export type { RtcSnapshot } from "./stats.js";
-export { DEFAULT_SCREEN_MODE, lowerScreenLatency, screenCapture, screenPublish, type ScreenMode } from "./screen-quality.js";
+export { DEFAULT_SCREEN_MODE, lowerScreenLatency, screenCapture, screenContentHint, screenProfile, screenPublish, type ScreenMode } from "./screen-quality.js";
+export { describeScreenExperiment, parseScreenExperiment, readScreenExperiment, SCREEN_EXPERIMENT_KEY, type ScreenExperiment } from "./screen-experiment.js";
+export { analyzeScreenTrace } from "./screen-trace.js";
+export type { ScreenTraceSample, ScreenTraceVerdict, ScreenTraceView } from "./screen-trace.js";

@@ -996,3 +996,12 @@ O bundle web levava "atalhos globais" (texto do DesktopOffer, desde f3042ba) e "
 - Assets baixados em diretório temporário exclusivo: `OpenMeet_0.2.25_x64-setup.exe` (8.403.171 bytes), `.sig`, `latest.json` e `SHA256SUMS`. SHA-256 do instalador `e4033df6485bed4570774ce2641790c692c713d93884a63cb062514e9e301f1b`, igual ao arquivo publicado; manifesto declara `0.2.25`, aponta para a URL correta e contém a mesma assinatura do `.sig`.
 - Estado `WAITING_VALIDATION`: instalador não executado; falta abrir “Mais opções” no `.exe` com nomes longos e confirmar ausência da barra horizontal e acesso aos controles.
 
+
+## 2026-11-27 — F17 auditoria da qualidade do compartilhamento de tela
+
+- Branch `audit/F17-screen-quality` em worktree isolada (`../openmeet-F17`), base `main` `b111b88`; sem commit, push, merge, release ou deploy. PR #2 (F16 mobile) segue aberto e não integrado; nenhum arquivo da F16 foi tocado. Rebasear após o merge do PR #2 preservando os blocos F16 em `PLAN.md`, `HISTORY.md` e `QUALITY_GATES.md`.
+- Achado confirmado no `livekit-client` 2.23.0 (`dist/livekit-client.esm.mjs:33150-33168`): ao publicar VP9 a tela vira L1T3 e o SDK força `contentHint = "motion"`, descartando o `detail` do perfil "Texto nítido". Demais achados (C2–C7) e hipóteses H1–H6 em `docs/reviews/F17-codex-audit.md`.
+- Implementado sem mudar padrões de produção: telemetria por track de tela (envio e recepção, layout e DPR, limitada a 240 amostras/60 visões, só no diagnóstico consentido) em `packages/media/src/screen-trace.ts`; experimentos de uma variável em `screen-experiment.ts` (chave local `openmeet.screenExperiment`); analisador e `scripts/screen-trace-report.mjs` para comparar exportações offline; `noteScreenView` em `MeetingApp.tsx`.
+- Windows 11, 2026-11-27: `pnpm format:check`, `pnpm lint`, `pnpm typecheck` e `pnpm build` PASS. `pnpm test`: workspace 27/27, shared 79/79, mídia 96/96 (+9), servidor 128/128 PASS; desktop falhou uma vez em `test/update.test.mjs:79` (teste de temporização de 10 ms, sem relação com mídia, sob carga do run paralelo) e passou 50/50 em duas reexecuções isoladas de `pnpm --filter @openmeet/desktop test`.
+- Estados: F17-01 a F17-05 IMPLEMENTED (experimentos NOT_RUN), F17-06 PENDING, F17-07 READY, F17-08 WAITING_VALIDATION. Bancada com `livekit-server` local não automatizada. Nenhuma prova de qualidade no WebView2.
+- Próximo passo humano: roteiro da seção 9 do relatório (`.exe` × navegador na mesma máquina, linha de base + `contentHint=detail`, `codec=vp8`, `codec=h264`).

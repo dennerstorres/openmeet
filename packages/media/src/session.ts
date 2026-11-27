@@ -12,13 +12,26 @@ import {
   type RemoteTrack,
   type RemoteTrackPublication,
   type TrackPublication,
+  VideoQuality,
 } from "livekit-client";
 import { describeMediaError, mediaActionError, sanitizeDiagnostic, type DiagnosticEvent } from "./diagnostics.js";
 import { HANDS_FREE_HINT, isHandsFree, playbackOutput, type AudioDevice } from "./bluetooth-output.js";
 import { InputGain } from "./input-gain.js";
 import { isRadio, radioCapture, radioPublish } from "./radio.js";
 import { roomOptions } from "./room-options.js";
-import { DEFAULT_SCREEN_MODE, lowerScreenLatency, screenCapture, screenPublish, type ScreenMode } from "./screen-quality.js";
+import { DEFAULT_SCREEN_MODE, lowerScreenLatency, screenCapture, screenContentHint, screenProfile, screenPublish, type ScreenMode } from "./screen-quality.js";
+import { describeScreenExperiment, readScreenExperiment, type ScreenExperiment } from "./screen-experiment.js";
+import {
+  largestElement,
+  pushBounded,
+  screenTraceSample,
+  SCREEN_TRACE_INTERVAL_MS,
+  SCREEN_TRACE_MAX_SAMPLES,
+  SCREEN_TRACE_MAX_VIEWS,
+  type ScreenTraceCounter,
+  type ScreenTraceSample,
+  type ScreenTraceView,
+} from "./screen-trace.js";
 import { readAudioWorkletSupport, voiceEffectsFor, type VoiceEffect } from "./voice-effects.js";
 import { VideoBackground, type VideoBackgroundOptions } from "./video-background.js";
 import { browserLabel, readBrowserMedia, type BrowserMedia } from "./browser.js";
@@ -193,6 +206,15 @@ export class LiveKitPocSession {
   private screenRampCounter: ScreenRampCounter | null = null;
   private screenRampStartedAt = 0;
   private screenRampTimer: ReturnType<typeof setInterval> | null = null;
+  /** F17-02: per-track screen trace for the whole call, bounded; F17-04 experiment that produced it. */
+  private readonly screenExperiment: ScreenExperiment | null;
+  private screenTrace: ScreenTraceSample[] = [];
+  private screenViews: ScreenTraceView[] = [];
+  private screenTraceCounters = new Map<string, ScreenTraceCounter>();
+  private screenTraceIndex = new Map<string, number>();
+  private screenTraceStartedAt = 0;
+  private screenTraceTimer: ReturnType<typeof setInterval> | null = null;
+  private screenRequest: { width: number; height: number } | null = null;
 
   constructor(options?: {
     appVersion?: string;
@@ -202,8 +224,11 @@ export class LiveKitPocSession {
     videoBackground?: VideoBackgroundOptions;
     audioWorklet?: boolean;
     createRadioTrack?: (options: ReturnType<typeof radioCapture>) => Promise<LocalTrack>;
+    /** F17-04: `undefined` reads the local setting, `null` forces production. */
+    screenExperiment?: ScreenExperiment | null;
   }) {
-    this.room = options?.room ?? new Room(roomOptions());
+    this.screenExperiment = options?.screenExperiment === undefined ? readScreenExperiment() : options.screenExperiment;
+    this.room = options?.room ?? new Room(roomOptions(this.screenExperiment));
     this.videoBackground = new VideoBackground(options?.videoBackground);
     this.appVersion = options?.appVersion ?? null;
     this.client = options?.client ?? null;
@@ -235,6 +260,7 @@ export class LiveKitPocSession {
     });
     this.room.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
       this.stopScreenRamp();
+      this.stopScreenTrace();
       const explicitLeave = this.explicitLeave;
       const outcome = classifyDisconnect(reason, explicitLeave);
       this.explicitLeave = false;
@@ -258,6 +284,10 @@ export class LiveKitPocSession {
     });
     this.room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
       lowerScreenLatency(track);
+      // F17-04 "focusQuality": adaptiveStream is off for this run, so the viewer may pin the top layer by hand.
+      if (this.screenExperiment?.kind === "focusQuality" && track.source === Track.Source.ScreenShare) {
+        publication.setVideoQuality(VideoQuality.HIGH);
+      }
       this.rememberTrack(
         track,
         publication.trackSid,
@@ -374,6 +404,9 @@ export class LiveKitPocSession {
         events: snapshot.diagnostics,
         reconnect: snapshot.reconnect,
         screenRamp: this.screenRamp,
+        screenExperiment: describeScreenExperiment(this.screenExperiment),
+        screenTrace: this.screenTrace,
+        screenViews: this.screenViews,
         secrets: this.secrets,
       },
       consent,
@@ -389,6 +422,7 @@ export class LiveKitPocSession {
     this.emit();
     try {
       await this.room.connect(url, token);
+      this.startScreenTrace();
       this.phase = nextPhase(this.phase, "connected");
       this.note("info", "connected");
     } catch (error) {
@@ -601,14 +635,21 @@ export class LiveKitPocSession {
     // A browser without screen audio is never asked for it (ADR 0014).
     const withAudio = requestAudio && this.browser.screenAudio;
     this.screenAudioRequested = enabled && withAudio;
-    const capture = screenCapture(mode, enabled && withAudio);
+    const capture = screenCapture(mode, enabled && withAudio, this.screenExperiment);
+    const profile = screenProfile(mode, this.screenExperiment);
+    this.screenRequest = enabled ? { width: profile.width, height: profile.height } : null;
     // ADR 0022: the radio and the PC audio of a share are never on together.
     const radio = this.radioDevice;
     if (enabled && withAudio && radio !== null) {
       await this.setRadio(null);
       this.note("info", "radio off: screen audio on");
     }
-    await this.toggle(() => this.room.localParticipant.setScreenShareEnabled(enabled, capture, screenPublish(mode)), "screen");
+    await this.toggle(() => this.room.localParticipant.setScreenShareEnabled(enabled, capture, screenPublish(mode, this.screenExperiment)), "screen");
+    // F17-04 "contentHint": LiveKit forces "motion" on VP9 screens at publish; this run puts the asked hint back.
+    if (enabled && this.screenExperiment?.kind === "contentHint") {
+      const media = this.room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track?.mediaStreamTrack;
+      if (media && "contentHint" in media) media.contentHint = screenContentHint(mode, this.screenExperiment);
+    }
     if (enabled) this.startScreenRamp();
     else this.stopScreenRamp();
     if (enabled && withAudio && this.screenAudioPublication() === undefined) {
@@ -635,6 +676,80 @@ export class LiveKitPocSession {
   private stopScreenRamp(): void {
     if (this.screenRampTimer !== null) clearInterval(this.screenRampTimer);
     this.screenRampTimer = null;
+  }
+
+  /**
+   * F17-02: where and how big the screen is shown changes the layer adaptiveStream asks for, so each change of
+   * layout, full screen or focus is kept next to the samples. Called by the UI; nothing identifies the sharer.
+   */
+  noteScreenView(view: { layout: string; fullscreen: boolean; focusedScreen: boolean }): void {
+    if (this.screenTraceTimer === null) return;
+    const last = this.screenViews[this.screenViews.length - 1];
+    if (last && last.layout === view.layout && last.fullscreen === view.fullscreen && last.focusedScreen === view.focusedScreen) return;
+    pushBounded(
+      this.screenViews,
+      {
+        elapsedMs: Date.now() - this.screenTraceStartedAt,
+        layout: view.layout.slice(0, 20),
+        fullscreen: view.fullscreen,
+        focusedScreen: view.focusedScreen,
+        devicePixelRatio: readDevicePixelRatio(),
+      },
+      SCREEN_TRACE_MAX_VIEWS,
+    );
+  }
+
+  private startScreenTrace(): void {
+    this.stopScreenTrace();
+    this.screenTrace = [];
+    this.screenViews = [];
+    this.screenTraceCounters.clear();
+    this.screenTraceIndex.clear();
+    this.screenTraceStartedAt = Date.now();
+    this.screenTraceTimer = setInterval(() => void this.collectScreenTrace(), SCREEN_TRACE_INTERVAL_MS);
+    // The trace never keeps a process (tests, a closing window) alive on its own.
+    (this.screenTraceTimer as { unref?: () => void }).unref?.();
+  }
+
+  private stopScreenTrace(): void {
+    if (this.screenTraceTimer !== null) clearInterval(this.screenTraceTimer);
+    this.screenTraceTimer = null;
+  }
+
+  private async collectScreenTrace(): Promise<void> {
+    const now = Date.now();
+    const targets: { key: string; direction: "send" | "recv"; track: Track }[] = [];
+    const local = this.room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track;
+    if (local) targets.push({ key: "send", direction: "send", track: local });
+    for (const participant of this.room.remoteParticipants.values()) {
+      const remote = participant.getTrackPublication(Track.Source.ScreenShare);
+      if (remote?.track) targets.push({ key: `recv:${remote.trackSid}`, direction: "recv", track: remote.track });
+    }
+    const dpr = readDevicePixelRatio();
+    for (const target of targets) {
+      if (!this.screenTraceIndex.has(target.key)) this.screenTraceIndex.set(target.key, this.screenTraceIndex.size);
+      try {
+        const report = await collectTrackReports([target.track]);
+        const next = screenTraceSample(
+          report,
+          {
+            elapsedMs: now - this.screenTraceStartedAt,
+            now,
+            direction: target.direction,
+            track: this.screenTraceIndex.get(target.key) ?? 0,
+            requested: this.screenRequest,
+            contentHint: target.direction === "send" ? readContentHint(target.track) : null,
+            element: target.direction === "recv" ? largestElement(target.track.attachedElements) : null,
+            devicePixelRatio: dpr,
+          },
+          this.screenTraceCounters.get(target.key) ?? null,
+        );
+        if (next.counter) this.screenTraceCounters.set(target.key, next.counter);
+        if (next.sample) pushBounded(this.screenTrace, next.sample, SCREEN_TRACE_MAX_SAMPLES);
+      } catch {
+        // A track that ends between the listing and the stats call is simply skipped this round.
+      }
+    }
   }
 
   private async collectScreenRampSample(): Promise<void> {
@@ -813,4 +928,14 @@ export class LiveKitPocSession {
     }
     this.emit();
   }
+}
+
+function readDevicePixelRatio(): number | null {
+  return typeof window !== "undefined" && typeof window.devicePixelRatio === "number" ? Math.round(window.devicePixelRatio * 100) / 100 : null;
+}
+
+/** The hint the encoder really sees: LiveKit may have replaced the one the capture asked for. */
+function readContentHint(track: Track): string | null {
+  const hint = (track.mediaStreamTrack as { contentHint?: unknown } | undefined)?.contentHint;
+  return typeof hint === "string" ? hint.slice(0, 20) : null;
 }

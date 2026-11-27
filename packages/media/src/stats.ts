@@ -20,7 +20,24 @@ export interface StatLike {
   codecId?: string;
   mimeType?: string;
   availableOutgoingBitrate?: number;
+  /** F17-02: per-track counters for the screen trace; all numeric or short implementation labels. */
+  bytesReceived?: number;
+  packetsReceived?: number;
+  framesDropped?: number;
+  framesDecoded?: number;
+  framesEncoded?: number;
+  freezeCount?: number;
+  pliCount?: number;
+  nackCount?: number;
+  qualityLimitationCpuS?: number;
+  qualityLimitationBandwidthS?: number;
+  encoderImplementation?: string;
+  decoderImplementation?: string;
+  powerEfficientEncoder?: boolean;
+  powerEfficientDecoder?: boolean;
 }
+
+const TRACE_NUMBERS = ["bytesReceived", "packetsReceived", "framesDropped", "framesDecoded", "framesEncoded", "freezeCount", "pliCount", "nackCount"] as const;
 
 export interface ScreenRampSample {
   elapsedMs: number;
@@ -82,6 +99,19 @@ interface RawStat {
   bytesSent?: unknown;
   targetBitrate?: unknown;
   qualityLimitationReason?: unknown;
+  qualityLimitationDurations?: unknown;
+  encoderImplementation?: unknown;
+  decoderImplementation?: unknown;
+  powerEfficientEncoder?: unknown;
+  powerEfficientDecoder?: unknown;
+  bytesReceived?: unknown;
+  packetsReceived?: unknown;
+  framesDropped?: unknown;
+  framesDecoded?: unknown;
+  framesEncoded?: unknown;
+  freezeCount?: unknown;
+  pliCount?: unknown;
+  nackCount?: unknown;
   codecId?: unknown;
   mimeType?: unknown;
   availableOutgoingBitrate?: unknown;
@@ -190,6 +220,24 @@ export function toStatLike(stat: RawStat): StatLike {
   if (codecId) like.codecId = codecId;
   if (mimeType) like.mimeType = mimeType;
   if (availableOutgoingBitrate !== undefined) like.availableOutgoingBitrate = availableOutgoingBitrate;
+  for (const key of TRACE_NUMBERS) {
+    const value = asNumber(stat[key]);
+    if (value !== undefined) like[key] = value;
+  }
+  const durations = stat.qualityLimitationDurations as Record<string, unknown> | undefined;
+  if (durations && typeof durations === "object") {
+    const cpu = asNumber(durations.cpu);
+    const bandwidth = asNumber(durations.bandwidth);
+    if (cpu !== undefined) like.qualityLimitationCpuS = cpu;
+    if (bandwidth !== undefined) like.qualityLimitationBandwidthS = bandwidth;
+  }
+  // Implementation names are short library labels ("libvpx", "ExternalEncoder"); cap them so nothing else rides along.
+  const encoder = asString(stat.encoderImplementation);
+  const decoder = asString(stat.decoderImplementation);
+  if (encoder) like.encoderImplementation = encoder.slice(0, 60);
+  if (decoder) like.decoderImplementation = decoder.slice(0, 60);
+  if (typeof stat.powerEfficientEncoder === "boolean") like.powerEfficientEncoder = stat.powerEfficientEncoder;
+  if (typeof stat.powerEfficientDecoder === "boolean") like.powerEfficientDecoder = stat.powerEfficientDecoder;
   return like;
 }
 
