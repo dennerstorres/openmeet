@@ -14,7 +14,7 @@ Relatório técnico: [`docs/reviews/F17-codex-audit.md`](../docs/reviews/F17-cod
 | F17-04 | Experimentos de codec, resolução, simulcast, `contentHint` e qualidade explícita | IMPLEMENTED (interruptores); experimentos NOT_RUN | F17-02 | Claude + Humano | G17 |
 | F17-05 | Investigação de `adaptiveStream`, `dynacast` e `pixelDensity` | IMPLEMENTED (interruptores); experimentos NOT_RUN | F17-02 | Claude + Humano | G17 |
 | F17-06 | Correções comprovadas e testes de regressão | PENDING (sem correção de padrão até haver evidência de F17-04/05) | F17-04,F17-05 | Grok | G4,G17 |
-| F17-07 | Revisão técnica independente do diff e do relatório | READY | F17-01..F17-05 | Grok + Codex | G17 |
+| F17-07 | Revisão técnica independente do diff e do relatório | IMPLEMENTED (revisão Codex feita e 9 achados corrigidos; falta segunda leitura) | F17-01..F17-05 | Codex | G17 |
 | F17-08 | Validação manual posterior no `.exe` e no navegador | WAITING_VALIDATION | F17-07 | Humano | G17 |
 
 ## F17-01 — auditoria

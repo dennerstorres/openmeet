@@ -22,6 +22,7 @@ import { roomOptions } from "./room-options.js";
 import { DEFAULT_SCREEN_MODE, lowerScreenLatency, screenCapture, screenContentHint, screenProfile, screenPublish, type ScreenMode } from "./screen-quality.js";
 import { describeScreenExperiment, readScreenExperiment, type ScreenExperiment } from "./screen-experiment.js";
 import {
+  traceLabel,
   largestElement,
   pushBounded,
   screenTraceSample,
@@ -212,9 +213,17 @@ export class LiveKitPocSession {
   private screenViews: ScreenTraceView[] = [];
   private screenTraceCounters = new Map<string, ScreenTraceCounter>();
   private screenTraceIndex = new Map<string, number>();
+  private screenTraceNextIndex = 0;
+  /** Bumped on every start/stop: a round still awaiting getStats from an older call never writes. */
+  private screenTraceGeneration = 0;
+  private screenTraceBusy = false;
   private screenTraceStartedAt = 0;
   private screenTraceTimer: ReturnType<typeof setInterval> | null = null;
-  private screenRequest: { width: number; height: number } | null = null;
+  private screenRequest: { width: number; height: number; hint: string } | null = null;
+  private screenExperimentOverridden = false;
+  private screenRequestPending: { width: number; height: number; hint: string } | null = null;
+  /** In memory only: which focused screen is which local number, so switching A → B is a view change. */
+  private screenFocusIndex = new Map<string, number>();
 
   constructor(options?: {
     appVersion?: string;
@@ -308,6 +317,8 @@ export class LiveKitPocSession {
       this.setTrackMuted(publication.trackSid, false);
     });
     this.room.on(RoomEvent.LocalTrackPublished, (publication: LocalTrackPublication) => {
+      // F17-04: LiveKit sets "motion" again on every VP9 (re)publish, including after a signal restart.
+      if (publication.source === Track.Source.ScreenShare) this.applyScreenHintExperiment(publication.track);
       if (publication.track) {
         this.rememberTrack(
           publication.track,
@@ -404,7 +415,7 @@ export class LiveKitPocSession {
         events: snapshot.diagnostics,
         reconnect: snapshot.reconnect,
         screenRamp: this.screenRamp,
-        screenExperiment: describeScreenExperiment(this.screenExperiment),
+        screenExperiment: describeScreenExperiment(this.screenExperiment) + (this.screenExperimentOverridden ? " (overridden)" : ""),
         screenTrace: this.screenTrace,
         screenViews: this.screenViews,
         secrets: this.secrets,
@@ -637,7 +648,7 @@ export class LiveKitPocSession {
     this.screenAudioRequested = enabled && withAudio;
     const capture = screenCapture(mode, enabled && withAudio, this.screenExperiment);
     const profile = screenProfile(mode, this.screenExperiment);
-    this.screenRequest = enabled ? { width: profile.width, height: profile.height } : null;
+    this.screenRequestPending = enabled ? { width: profile.width, height: profile.height, hint: screenContentHint(mode, this.screenExperiment) } : null;
     // ADR 0022: the radio and the PC audio of a share are never on together.
     const radio = this.radioDevice;
     if (enabled && withAudio && radio !== null) {
@@ -645,11 +656,11 @@ export class LiveKitPocSession {
       this.note("info", "radio off: screen audio on");
     }
     await this.toggle(() => this.room.localParticipant.setScreenShareEnabled(enabled, capture, screenPublish(mode, this.screenExperiment)), "screen");
-    // F17-04 "contentHint": LiveKit forces "motion" on VP9 screens at publish; this run puts the asked hint back.
-    if (enabled && this.screenExperiment?.kind === "contentHint") {
-      const media = this.room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track?.mediaStreamTrack;
-      if (media && "contentHint" in media) media.contentHint = screenContentHint(mode, this.screenExperiment);
-    }
+    // The requested size and hint belong to the trace only once the share really is published.
+    const published = this.room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track;
+    this.screenRequest = enabled && published ? this.screenRequestPending : null;
+    if (enabled) this.applyScreenHintExperiment(published);
+    if (enabled) this.checkDynacastExperiment();
     if (enabled) this.startScreenRamp();
     else this.stopScreenRamp();
     if (enabled && withAudio && this.screenAudioPublication() === undefined) {
@@ -682,21 +693,37 @@ export class LiveKitPocSession {
    * F17-02: where and how big the screen is shown changes the layer adaptiveStream asks for, so each change of
    * layout, full screen or focus is kept next to the samples. Called by the UI; nothing identifies the sharer.
    */
-  noteScreenView(view: { layout: string; fullscreen: boolean; focusedScreen: boolean }): void {
+  noteScreenView(view: { layout: string; fullscreen: boolean; focusedScreenId: string | null }): void {
     if (this.screenTraceTimer === null) return;
+    let focusedScreen: number | null = null;
+    if (view.focusedScreenId !== null) {
+      if (!this.screenFocusIndex.has(view.focusedScreenId)) this.screenFocusIndex.set(view.focusedScreenId, this.screenFocusIndex.size);
+      focusedScreen = this.screenFocusIndex.get(view.focusedScreenId) ?? null;
+    }
+    const layout = traceLabel(view.layout, 20);
     const last = this.screenViews[this.screenViews.length - 1];
-    if (last && last.layout === view.layout && last.fullscreen === view.fullscreen && last.focusedScreen === view.focusedScreen) return;
+    if (last && last.layout === layout && last.fullscreen === view.fullscreen && last.focusedScreen === focusedScreen) return;
     pushBounded(
       this.screenViews,
-      {
-        elapsedMs: Date.now() - this.screenTraceStartedAt,
-        layout: view.layout.slice(0, 20),
-        fullscreen: view.fullscreen,
-        focusedScreen: view.focusedScreen,
-        devicePixelRatio: readDevicePixelRatio(),
-      },
+      { elapsedMs: Date.now() - this.screenTraceStartedAt, layout, fullscreen: view.fullscreen, focusedScreen, devicePixelRatio: readDevicePixelRatio() },
       SCREEN_TRACE_MAX_VIEWS,
     );
+  }
+
+  /** F17-04 "contentHint": put the asked hint back after LiveKit replaced it. No-op in production. */
+  private applyScreenHintExperiment(track: Track | undefined): void {
+    if (this.screenExperiment?.kind !== "contentHint" || !track || track.kind !== Track.Kind.Video) return;
+    const media = track.mediaStreamTrack as { contentHint?: string } | undefined;
+    if (media && "contentHint" in media) media.contentHint = this.screenExperiment.value;
+  }
+
+  /** F17-05: LiveKit turns dynacast back on to publish a backup codec; say so instead of mislabeling the run. */
+  private checkDynacastExperiment(): void {
+    if (this.screenExperiment?.kind !== "dynacast" || this.screenExperiment.enabled) return;
+    if (this.room.options.dynacast) {
+      this.screenExperimentOverridden = true;
+      this.note("info", "screen experiment dynacast=off overridden by the SDK (backup codec)");
+    }
   }
 
   private startScreenTrace(): void {
@@ -705,6 +732,8 @@ export class LiveKitPocSession {
     this.screenViews = [];
     this.screenTraceCounters.clear();
     this.screenTraceIndex.clear();
+    this.screenTraceNextIndex = 0;
+    this.screenFocusIndex.clear();
     this.screenTraceStartedAt = Date.now();
     this.screenTraceTimer = setInterval(() => void this.collectScreenTrace(), SCREEN_TRACE_INTERVAL_MS);
     // The trace never keeps a process (tests, a closing window) alive on its own.
@@ -714,10 +743,23 @@ export class LiveKitPocSession {
   private stopScreenTrace(): void {
     if (this.screenTraceTimer !== null) clearInterval(this.screenTraceTimer);
     this.screenTraceTimer = null;
+    this.screenTraceGeneration += 1;
+    this.screenTraceBusy = false;
   }
 
   private async collectScreenTrace(): Promise<void> {
-    const now = Date.now();
+    // One round at a time: a slow getStats skips the next tick instead of racing it.
+    if (this.screenTraceBusy) return;
+    this.screenTraceBusy = true;
+    const generation = this.screenTraceGeneration;
+    try {
+      await this.collectScreenTraceRound(generation);
+    } finally {
+      if (generation === this.screenTraceGeneration) this.screenTraceBusy = false;
+    }
+  }
+
+  private async collectScreenTraceRound(generation: number): Promise<void> {
     const targets: { key: string; direction: "send" | "recv"; track: Track }[] = [];
     const local = this.room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track;
     if (local) targets.push({ key: "send", direction: "send", track: local });
@@ -725,11 +767,16 @@ export class LiveKitPocSession {
       const remote = participant.getTrackPublication(Track.Source.ScreenShare);
       if (remote?.track) targets.push({ key: `recv:${remote.trackSid}`, direction: "recv", track: remote.track });
     }
+    // Ended tracks lose their counters; their numbers are never reused in this call.
+    const live = new Set(targets.map((target) => target.key));
+    for (const key of [...this.screenTraceCounters.keys()]) if (!live.has(key)) this.screenTraceCounters.delete(key);
     const dpr = readDevicePixelRatio();
     for (const target of targets) {
-      if (!this.screenTraceIndex.has(target.key)) this.screenTraceIndex.set(target.key, this.screenTraceIndex.size);
+      if (!this.screenTraceIndex.has(target.key)) this.screenTraceIndex.set(target.key, this.screenTraceNextIndex++);
       try {
         const report = await collectTrackReports([target.track]);
+        if (generation !== this.screenTraceGeneration) return;
+        const now = Date.now();
         const next = screenTraceSample(
           report,
           {
@@ -738,6 +785,7 @@ export class LiveKitPocSession {
             direction: target.direction,
             track: this.screenTraceIndex.get(target.key) ?? 0,
             requested: this.screenRequest,
+            requestedHint: this.screenRequest?.hint ?? null,
             contentHint: target.direction === "send" ? readContentHint(target.track) : null,
             element: target.direction === "recv" ? largestElement(target.track.attachedElements) : null,
             devicePixelRatio: dpr,
@@ -937,5 +985,5 @@ function readDevicePixelRatio(): number | null {
 /** The hint the encoder really sees: LiveKit may have replaced the one the capture asked for. */
 function readContentHint(track: Track): string | null {
   const hint = (track.mediaStreamTrack as { contentHint?: unknown } | undefined)?.contentHint;
-  return typeof hint === "string" ? hint.slice(0, 20) : null;
+  return typeof hint === "string" ? traceLabel(hint, 20) : null;
 }

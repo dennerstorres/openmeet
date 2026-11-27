@@ -8,6 +8,8 @@ export type ScreenTraceDirection = "send" | "recv";
 
 export interface ScreenTraceSample {
   elapsedMs: number;
+  /** Real time since the previous sample of the same RTP stream; null on the first one or after a stream change. */
+  intervalMs: number | null;
   direction: ScreenTraceDirection;
   /** Index of the remote screen in arrival order, so two sharers stay apart without an identity. */
   track: number;
@@ -19,6 +21,7 @@ export interface ScreenTraceSample {
   /** send only */
   requestedWidth: number | null;
   requestedHeight: number | null;
+  requestedHint: string | null;
   contentHint: string | null;
   qualityLimitationReason: string | null;
   cpuLimitedMsDelta: number | null;
@@ -42,12 +45,15 @@ export interface ScreenTraceView {
   elapsedMs: number;
   layout: string;
   fullscreen: boolean;
-  focusedScreen: boolean;
+  /** Local number of the screen in focus (null: none), so a switch from one screen to another is visible. */
+  focusedScreen: number | null;
   devicePixelRatio: number | null;
 }
 
 export interface ScreenTraceCounter {
   at: number;
+  /** Stats id of the RTP stream the counters belong to; another id means another stream, so no delta. */
+  rtpId: string | null;
   bytes: number | null;
   packetsLost: number | null;
   framesDropped: number | null;
@@ -63,6 +69,7 @@ export interface ScreenTraceContext {
   direction: ScreenTraceDirection;
   track: number;
   requested?: { width: number; height: number } | null;
+  requestedHint?: string | null;
   contentHint?: string | null;
   element?: { width: number; height: number } | null;
   devicePixelRatio?: number | null;
@@ -101,6 +108,7 @@ export function screenTraceSample(
   const send = context.direction === "send";
   const counter: ScreenTraceCounter = {
     at: context.now,
+    rtpId: rtp.id ?? null,
     bytes: num(send ? rtp.bytesSent : rtp.bytesReceived),
     packetsLost: num(rtp.packetsLost),
     framesDropped: num(rtp.framesDropped),
@@ -109,19 +117,24 @@ export function screenTraceSample(
     cpuS: num(rtp.qualityLimitationCpuS),
     bandwidthS: num(rtp.qualityLimitationBandwidthS),
   };
-  const fresh = previous !== null && counter.at > previous.at;
+  const fresh = previous !== null && counter.at > previous.at && previous.rtpId === counter.rtpId;
+  const intervalMs = fresh && previous ? counter.at - previous.at : null;
   const bytes = fresh ? delta(counter.bytes, previous?.bytes) : null;
-  const bitrateKbps = bytes === null || !previous ? null : Math.round((bytes * 8) / (counter.at - previous.at));
+  const bitrateKbps = bytes === null || intervalMs === null ? null : Math.round((bytes * 8) / intervalMs);
   const limitedMs = (next: number | null, before: number | null | undefined): number | null => {
     const d = fresh ? delta(next, before) : null;
     return d === null ? null : Math.round(d * 1000);
   };
-  const available = stats.find((stat) => stat.type === "candidate-pair" && typeof stat.availableOutgoingBitrate === "number")?.availableOutgoingBitrate;
+  // The selected pair is the nominated, succeeded one; another pair's estimate is not this transport's.
+  const pairs = stats.filter((stat) => stat.type === "candidate-pair" && typeof stat.availableOutgoingBitrate === "number");
+  const available = (pairs.find((stat) => stat.nominated === true && stat.state === "succeeded") ?? pairs.find((stat) => stat.nominated === true))
+    ?.availableOutgoingBitrate;
   const codec = rtp.codecId ? codecs.get(rtp.codecId) : undefined;
   const element = context.element ?? null;
   return {
     sample: {
       elapsedMs: Math.max(0, Math.round(context.elapsedMs)),
+      intervalMs,
       direction: context.direction,
       track: context.track,
       bitrateKbps,
@@ -131,6 +144,7 @@ export function screenTraceSample(
       codec: codec?.replace(/^video\//i, "").toLowerCase() ?? null,
       requestedWidth: send ? (context.requested?.width ?? null) : null,
       requestedHeight: send ? (context.requested?.height ?? null) : null,
+      requestedHint: send ? (context.requestedHint ?? null) : null,
       contentHint: send ? (context.contentHint ?? null) : null,
       qualityLimitationReason: send ? (rtp.qualityLimitationReason ?? null) : null,
       cpuLimitedMsDelta: send ? limitedMs(counter.cpuS, previous?.cpuS) : null,
@@ -194,10 +208,17 @@ export function analyzeScreenTrace(samples: readonly ScreenTraceSample[], askedH
   const send = samples.filter((sample) => sample.direction === "send");
   const recv = samples.filter((sample) => sample.direction === "recv");
   const share = (pick: (sample: ScreenTraceSample) => number | null): number | null => {
-    const values = send.map(pick).filter((value): value is number => value !== null);
-    if (values.length === 0) return null;
-    const limited = values.reduce((sum, value) => sum + value, 0);
-    return Math.min(1, Math.round((limited / (values.length * SCREEN_TRACE_INTERVAL_MS)) * 100) / 100);
+    // Divide by the real time covered, not by a nominal tick: rounds can be skipped or late.
+    let limited = 0;
+    let covered = 0;
+    for (const sample of send) {
+      const value = pick(sample);
+      if (value === null || sample.intervalMs === null || sample.intervalMs <= 0) continue;
+      limited += value;
+      covered += sample.intervalMs;
+    }
+    if (covered === 0) return null;
+    return Math.min(1, Math.round((limited / covered) * 100) / 100);
   };
   let upscaledSamples = 0;
   let recvResolutionChanges = 0;
@@ -230,5 +251,58 @@ export function analyzeScreenTrace(samples: readonly ScreenTraceSample[], askedH
     upscaledSamples,
     recvResolutionChanges,
     codecs: [...new Set(samples.map((sample) => sample.codec).filter((codec): codec is string => codec !== null))].sort(),
+  };
+}
+
+/** Short labels only: letters, digits, `._=()-` and spaces, capped. Anything else is dropped, not escaped. */
+export function traceLabel(value: unknown, max: number): string | null {
+  if (typeof value !== "string") return null;
+  const clean = value.replace(/[^A-Za-z0-9._ =()-]/g, "").slice(0, max);
+  return clean.length > 0 ? clean : null;
+}
+
+const finite = (value: unknown): number | null => (typeof value === "number" && Number.isFinite(value) ? value : null);
+const flag = (value: unknown): boolean | null => (typeof value === "boolean" ? value : null);
+
+/** Export boundary: rebuilds each sample from the allowed fields, so an extra property can never reach the JSON. */
+export function projectTraceSample(sample: ScreenTraceSample): ScreenTraceSample {
+  return {
+    elapsedMs: finite(sample.elapsedMs) ?? 0,
+    intervalMs: finite(sample.intervalMs),
+    direction: sample.direction === "send" ? "send" : "recv",
+    track: finite(sample.track) ?? 0,
+    bitrateKbps: finite(sample.bitrateKbps),
+    width: finite(sample.width),
+    height: finite(sample.height),
+    fps: finite(sample.fps),
+    codec: traceLabel(sample.codec, 20),
+    requestedWidth: finite(sample.requestedWidth),
+    requestedHeight: finite(sample.requestedHeight),
+    requestedHint: traceLabel(sample.requestedHint, 20),
+    contentHint: traceLabel(sample.contentHint, 20),
+    qualityLimitationReason: traceLabel(sample.qualityLimitationReason, 20),
+    cpuLimitedMsDelta: finite(sample.cpuLimitedMsDelta),
+    bandwidthLimitedMsDelta: finite(sample.bandwidthLimitedMsDelta),
+    targetBitrateKbps: finite(sample.targetBitrateKbps),
+    availableOutgoingBitrateKbps: finite(sample.availableOutgoingBitrateKbps),
+    implementation: traceLabel(sample.implementation, 60),
+    powerEfficient: flag(sample.powerEfficient),
+    packetsLostDelta: finite(sample.packetsLostDelta),
+    framesDroppedDelta: finite(sample.framesDroppedDelta),
+    freezeCountDelta: finite(sample.freezeCountDelta),
+    pliCountDelta: finite(sample.pliCountDelta),
+    elementWidth: finite(sample.elementWidth),
+    elementHeight: finite(sample.elementHeight),
+    devicePixelRatio: finite(sample.devicePixelRatio),
+  };
+}
+
+export function projectTraceView(view: ScreenTraceView): ScreenTraceView {
+  return {
+    elapsedMs: finite(view.elapsedMs) ?? 0,
+    layout: traceLabel(view.layout, 20) ?? "",
+    fullscreen: view.fullscreen === true,
+    focusedScreen: finite(view.focusedScreen),
+    devicePixelRatio: finite(view.devicePixelRatio),
   };
 }

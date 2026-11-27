@@ -19,11 +19,11 @@ A diferença entre o `.exe` e o navegador **não tem causa confirmada no código
 | # | Achado | Onde | Efeito |
 |---|---|---|---|
 | C1 | Com VP9 sem simulcast SVC, a tela recebe `scalabilityMode = 'L1T3'` e o SDK força `mediaStreamTrack.contentHint = 'motion'`, com o comentário de que o caminho de tela do Chrome com L1T3 limita a 5 fps. O `contentHint: "detail"` pedido em `screenCapture` é descartado na publicação. | `livekit-client/dist/livekit-client.esm.mjs:33150-33168`; pedido em `packages/media/src/screen-quality.ts:45`, codec em `:54` | O perfil "Texto nítido" nunca chega ao encoder como conteúdo de tela; a única diferença real entre os perfis é resolução/FPS/bitrate/degradação. |
-| C2 | Com L1T3 existe **uma** camada espacial: `adaptiveStream` não consegue entregar uma resolução menor ao card pequeno nem trocar para maior ao destacar. Ele só alterna camadas temporais e pausa o track invisível. | SDK `:33150-33171`; `packages/media/src/room-options.ts` | A troca de nitidez ao mudar grade, destaque e tela cheia **não** vem de troca de camada espacial em VP9. Se ela aparecer na medição, vem do encoder (QP/banda) ou de um receptor em VP8 de reserva. |
-| C3 | `backupCodec: true` publica VP8 com simulcast **além** do VP9 quando há na sala um receptor que não decodifica VP9 (Firefox/Safari antigos). | `screen-quality.ts:56`; SDK `:33176-33185` | Nesse caso o emissor codifica duas vezes 1440p: CPU dobra e aumenta a chance de `qualityLimitationReason = cpu`. |
-| C4 | `adaptiveStream` sem `pixelDensity` usa densidade **1** quando `devicePixelRatio ≤ 2`. Com Windows a 125–175 %, o SDK pede uma camada dimensionada pelo tamanho CSS, menor que os pixels físicos do card. | SDK `getPixelDensity`, `:16061-16076`; `room-options.ts` | Afeta só os caminhos com camadas espaciais (reserva VP8, `codec=h264`/`vp8`, simulcast). Não afeta o VP9 de produção (C2). |
-| C5 | Cada troca de lugar do card (palco ↔ faixa ↔ tela cheia) desmonta o `<video>` e faz novo `attach`. O SDK recalcula a visibilidade e as dimensões a cada `attach`. | `apps/desktop/src/meeting/Cards.tsx:210-220` (`VideoSink`), `:115` (faixa) | Pode haver um instante com dimensões pequenas ou zero até o `ResizeObserver` medir. Com camada espacial, isso pede a camada baixa por um momento. |
-| C6 | Com `adaptiveStream` ligado, `setVideoQuality` é recusado (`isManualOperationAllowed`): hoje não existe forma de fixar "alta qualidade" para a tela destacada. | SDK `:34204-34211` | Motivou o experimento `focusQuality=high`, que desliga `adaptiveStream` só nessa execução. |
+| C2 | Com L1T3 existe **uma** camada espacial: `adaptiveStream` não pode entregar ao card pequeno uma resolução espacial menor nem trocar para maior ao destacar. O SDK continua enviando dimensões e visibilidade ao SFU. | SDK `:33150-33171`, `:16038-16058`, `:34113-34121` | Uma variação de nitidez ao mudar o layout em VP9 **não** vem de troca de camada espacial. O efeito de camadas temporais e de pausa ainda não foi medido. |
+| C3 | `backupCodec: true` prepara uma reserva VP8 que só é publicada quando o servidor a solicita, e o SDK desliga o simulcast da reserva para tela. | `screen-quality.ts:56`; SDK `:33176-33198`, `:32331-32355`, `:24151-24175` | Corrigido na revisão F17-07: o código **não** demonstra duas codificações a 1440p nem CPU dobrada. O custo da reserva é hipótese (H3), e a coleta só lê o sender principal (`:23465-23472`), sem provar a presença da reserva. |
+| C4 | `adaptiveStream` sem `pixelDensity` usa densidade **1** quando `devicePixelRatio ≤ 2`. Com Windows a 125–175 %, o SDK pede camada pelo tamanho CSS, menor que os pixels físicos do card. | SDK `getPixelDensity`, `:16060-16076`, `:16038-16049` | Só pesa onde há camadas espaciais (`codec=vp8`/`h264` com simulcast). A reserva VP8 de tela não tem simulcast (C3), e o VP9 de produção não tem camadas (C2). |
+| C5 | Mover um card entre o palco e a faixa troca o ramo React e faz novo `attach`. Alternar a tela cheia mantém o card central montado e só muda o tamanho. | `apps/desktop/src/meeting/Cards.tsx:111-115`, `:210-220`; SDK `:15888-15921` | Confirmado apenas que há remontagem ou redimensionamento. A queda transitória de camada é hipótese (H5). |
+| C6 | `setVideoQuality` é aceito com `adaptiveStream` quando a publicação é desejada, mas o SDK ainda usa a menor dimensão entre a camada pedida e a adaptativa. `HIGH` já é o padrão sem pedido explícito. | SDK `:34204-34211`, `:34314-34366` | Corrigido na revisão F17-07: hoje não há como **forçar** a camada alta sem desligar `adaptiveStream`. O experimento `focusQuality=high` faz isso para a sala inteira, câmeras incluídas. |
 | C7 | A telemetria anterior cobria só os 15 s iniciais do **envio** (F15-06). Não havia dado do receptor, da resolução decodificada, de perdas, de frames descartados, do tempo limitado nem do layout/DPR. | `packages/media/src/session.ts` (`collectScreenRampSample`) | Sem isso não dá para atribuir a causa. Corrigido na F17-02 (seção 4). |
 
 O render está correto para texto: `.card.share video` usa `object-fit: contain` (`apps/desktop/src/App.css:1603`), sem `transform`, `filter` nem escala CSS no vídeo. O jitter buffer zero (`lowerScreenLatency`, `session.ts:286`) atua só no vídeo da tela. Ele aumenta as travadas sob perda, mas não reduz a nitidez.
@@ -34,7 +34,7 @@ O render está correto para texto: `.card.share video` usa `object-fit: contain`
 |---|---|---|
 | H1 | Texto borrado intermitente = QP alto sob banda oscilante com `contentHint=motion` (C1). | `bandwidthLimitedMsDelta` e `targetBitrateKbps` oscilando, `width/height` estáveis, `contentHint = motion`. Comparar com `contentHint=detail` e `codec=vp8`/`h264`. |
 | H2 | No `.exe`, o encoder VP9 roda em software (`libvpx`) e fica limitado por CPU a 1440p30. No navegador da mesma máquina, ou em outra máquina, há margem. | `cpuLimitedShare`, `implementation`, `powerEfficient` no envio do `.exe` × navegador. |
-| H3 | Um receptor na sala sem VP9 ativa a reserva VP8 (C3), e o emissor dobra a CPU. | Mais de um codec em `codecs` e `cpuLimited` alto só nessas sessões. |
+| H3 | Um receptor sem VP9 faz o SFU pedir a reserva VP8 e o emissor gasta mais CPU. | Não dá para separar só pela coleta do emissor (C3): é preciso correlacionar o codec recebido pelo receptor com o `cpuLimited` do emissor. |
 | H4 | O receptor do `.exe` com escala do Windows > 100 % recebe uma camada menor que os pixels físicos (C4). Só vale para VP8/H.264. | `upscaled > 0` com `devicePixelRatio > 1`; repetir com `pixelDensity=screen`. |
 | H5 | Trocas de layout causam queda breve (C5) ou keyframe atrasado por causa do jitter buffer zero. | `screenViews` alinhado com `recvSizeChanges`, `freezeCountDelta`, `pliCountDelta`. |
 | H6 | "Melhor no navegador" é efeito de ambiente (outra máquina, outra rede, outra escala) e não do WebView2. | Mesma máquina e mesma rede, uma exportação de cada cliente, lado a lado no `screen-trace-report`. |
@@ -76,9 +76,9 @@ Limitações: os testes provam o parser, os deltas, os limites, a privacidade e 
 | `codec=h264` | H.264 (encoder de hardware provável no Windows) | H2: CPU × nitidez |
 | `resolution=1080p15` / `1440p15` | só tamanho e FPS | custo da resolução no encoder |
 | `simulcast=off` | sem camadas (relevante com VP8/H.264) | efeito de camadas |
-| `adaptiveStream=off` / `dynacast=off` | receptor/emissor | H4/H5 |
+| `adaptiveStream=off` / `dynacast=off` | receptor / emissor. O SDK religa o `dynacast` para publicar a reserva VP9: a execução sai rotulada `(overridden)` | H4/H5 |
 | `pixelDensity=screen` | conta o DPR real | H4 |
-| `focusQuality=high` | sem adaptiveStream e com camada alta fixa na tela remota | "alta qualidade explícita" |
+| `focusQuality=high` | desliga `adaptiveStream` na sala inteira (câmeras incluídas) e pede `HIGH` nas telas | efeito de forçar a camada alta, sem isolar a tela em foco |
 
 Para ativar, no DevTools do WebView2 ou do navegador: `localStorage.setItem("openmeet.screenExperiment", "codec=h264")`, depois recarregar e entrar na sala. Para voltar à produção: `localStorage.removeItem("openmeet.screenExperiment")`. As variáveis de sala (`adaptiveStream`, `dynacast`, `pixelDensity`, `focusQuality`) valem no **receptor**. As de publicação valem no **emissor**.
 
@@ -116,3 +116,19 @@ Critério de saída: uma causa atribuída com dados, de H1 a H6, e uma proposta 
 
 - **Grok:** conferir as linhas do SDK citadas em C1–C6 contra `livekit-client` 2.23.0; rodar os experimentos de `codec` na bancada automatizada quando ela existir; preparar F17-06 só depois das exportações.
 - **Codex/Claude (revisão independente):** privacidade dos campos novos do diagnóstico (G6/G17); garantir que `roomOptions(null)` e `screenPublish(mode, null)` continuam idênticos ao ADR 0029; avaliar se `noteScreenView` em `MeetingApp.tsx` dispara só nas trocas reais; avaliar o custo do `getStats` periódico.
+
+## 11. Resultado da revisão F17-07 (Codex) e correções
+
+A revisão está em [`F17-codex-review.md`](F17-codex-review.md). Os 9 achados foram tratados assim:
+
+1. **`dynacast=off` religado pelo SDK.** `checkDynacastExperiment` lê `room.options.dynacast` depois de publicar. Quando o SDK religou, a execução sai rotulada `dynacast=off (overridden)` e registra um evento.
+2. **C6 incorreto e `focusQuality`.** C6 foi corrigido. O experimento agora está descrito como desligamento global de `adaptiveStream`.
+3. **Rodadas sobrepostas.** Agora há uma rodada por vez (`screenTraceBusy`) e uma geração por chamada, verificada depois de cada `await`. Os contadores de tracks encerrados são removidos, e os índices não são reutilizados.
+4. **Deltas misturados.** O contador fica preso ao `id` do fluxo RTP (fluxo novo não gera delta) e cada amostra carrega `intervalMs` real. O analisador divide pelo tempo coberto, e a banda vem só do par indicado e bem-sucedido.
+5. **Lista de campos na exportação.** `projectTraceSample` e `projectTraceView` reconstroem cada registro campo a campo. Os rótulos passam por `traceLabel`, que só aceita caracteres permitidos. Há teste com propriedades extras.
+6. **`contentHint` perdido.** O hint é reaplicado em todo `LocalTrackPublished` de tela, inclusive na republicação. A resolução e o hint pedidos só entram no traço depois da publicação confirmada, e cada amostra traz `requestedHint` junto do efetivo.
+7. **C3.** Corrigido conforme o SDK; H3 foi reescrita.
+8. **C2/C5.** Reduzidos ao que o código demonstra.
+9. **Troca entre duas telas em foco.** `noteScreenView` recebe o ID do card, que fica só em memória, e exporta um número local (`focusedScreen`).
+
+Testes da mídia depois das correções: **99/99** (Windows 11, 2026-11-27).

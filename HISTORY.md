@@ -1005,3 +1005,10 @@ O bundle web levava "atalhos globais" (texto do DesktopOffer, desde f3042ba) e "
 - Windows 11, 2026-11-27: `pnpm format:check`, `pnpm lint`, `pnpm typecheck` e `pnpm build` PASS. `pnpm test`: workspace 27/27, shared 79/79, mídia 96/96 (+9), servidor 128/128 PASS; desktop falhou uma vez em `test/update.test.mjs:79` (teste de temporização de 10 ms, sem relação com mídia, sob carga do run paralelo) e passou 50/50 em duas reexecuções isoladas de `pnpm --filter @openmeet/desktop test`.
 - Estados: F17-01 a F17-05 IMPLEMENTED (experimentos NOT_RUN), F17-06 PENDING, F17-07 READY, F17-08 WAITING_VALIDATION. Bancada com `livekit-server` local não automatizada. Nenhuma prova de qualidade no WebView2.
 - Próximo passo humano: roteiro da seção 9 do relatório (`.exe` × navegador na mesma máquina, linha de base + `contentHint=detail`, `codec=vp8`, `codec=h264`).
+
+## 2026-11-27 — F17-07 revisão Codex e correções
+
+- Revisão independente com `codex exec -s read-only` (codex-cli 0.172.0) sobre `git diff main...HEAD` (`0652d23`): 7 achados médios e 2 baixos, transcritos em `docs/reviews/F17-codex-review.md`. Confirmados como corretos: C1, C4, equivalência com o ADR 0029 e privacidade no fluxo normal.
+- Correções: rodada única com geração por chamada no coletor; deltas presos ao fluxo RTP com `intervalMs` real; banda só do par indicado; exportação reconstruída campo a campo (`projectTraceSample`/`projectTraceView`, `traceLabel`); `contentHint` reaplicado em toda republicação de tela; pedido registrado só após publicação confirmada; `dynacast=off` sobrescrito pelo SDK sai rotulado `(overridden)`; troca entre telas em foco com índice local. Relatório: C2, C3, C5, C6 e H3 corrigidos; seção 11 lista a resolução de cada achado.
+- Windows 11, 2026-11-27: `pnpm format:check`, `lint`, `typecheck`, `test` e `build` PASS. Testes: workspace 27/27, shared 79/79, mídia 99/99, servidor 128/128, desktop 50/50.
+- Estado: F17-07 com correções aplicadas, falta uma segunda leitura do Codex sobre o novo diff. F17-08 continua WAITING_VALIDATION.

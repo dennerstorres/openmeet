@@ -77,7 +77,7 @@ test("F17-02: send sample keeps requested vs. real size, hint, limits and deltas
       targetBitrate: 3_000_000,
     }),
     toStatLike({ type: "codec", id: "c1", mimeType: "video/VP9" }),
-    toStatLike({ type: "candidate-pair", availableOutgoingBitrate: 3_500_000 }),
+    toStatLike({ type: "candidate-pair", nominated: true, state: "succeeded", availableOutgoingBitrate: 3_500_000 }),
   ];
   const first = screenTraceSample(report(1_000, 1), { ...ctx, elapsedMs: 0, now: 1_000 }, null);
   assert.equal(first.sample?.bitrateKbps, null);
@@ -156,6 +156,7 @@ test("F17-02: bounded buffers and element measure", () => {
 function sample(partial: Partial<ScreenTraceSample>): ScreenTraceSample {
   return {
     elapsedMs: 0,
+    intervalMs: null,
     direction: "recv",
     track: 0,
     bitrateKbps: null,
@@ -165,6 +166,7 @@ function sample(partial: Partial<ScreenTraceSample>): ScreenTraceSample {
     codec: null,
     requestedWidth: null,
     requestedHeight: null,
+    requestedHint: null,
     contentHint: null,
     qualityLimitationReason: null,
     cpuLimitedMsDelta: null,
@@ -196,6 +198,7 @@ test("F17-03 bench: the analyzer separates the audit hypotheses on replayed trac
       height: 1440,
       requestedWidth: 2560,
       requestedHeight: 1440,
+      intervalMs: 2_000,
       cpuLimitedMsDelta: 1_600,
       bandwidthLimitedMsDelta: 0,
     }),
@@ -235,7 +238,7 @@ test("F17-02: diagnostic export carries trace, views and experiment label only a
     reconnect: EMPTY_RECONNECT,
     screenExperiment: "codec=h264",
     screenTrace: [sample({ width: 1920, height: 1080 })],
-    screenViews: [{ elapsedMs: 10, layout: "spotlight", fullscreen: true, focusedScreen: true, devicePixelRatio: 1.25 }],
+    screenViews: [{ elapsedMs: 10, layout: "spotlight", fullscreen: true, focusedScreen: 0, devicePixelRatio: 1.25 }],
     secrets: ["tok-secret"],
   };
   assert.equal(buildDiagnosticExport(input, false), null);
@@ -248,6 +251,67 @@ test("F17-02: diagnostic export carries trace, views and experiment label only a
   assert.equal(exported.screenExperiment, "production");
   assert.deepEqual(exported.screenTrace, []);
   // No view is kept outside a call.
-  session.noteScreenView({ layout: "grid", fullscreen: false, focusedScreen: false });
+  session.noteScreenView({ layout: "grid", fullscreen: false, focusedScreenId: null });
   assert.deepEqual(JSON.parse(session.exportDiagnostic(true, "x") ?? "{}").screenViews, []);
+});
+
+test("F17-07: the export rebuilds trace and views from allowed fields and cleans labels", () => {
+  const dirty = { ...sample({ codec: "vp9", implementation: "libvpx <img src=x> 10.0.0.1" }), sdp: "v=0", ip: "10.0.0.1" } as ScreenTraceSample;
+  const json = buildDiagnosticExport(
+    {
+      exportedAt: "x",
+      phase: "connected",
+      disconnectReason: null,
+      appVersion: null,
+      userAgent: null,
+      stats: emptyStats(),
+      events: [],
+      reconnect: EMPTY_RECONNECT,
+      screenExperiment: "codec=h264 (overridden)",
+      screenTrace: [dirty],
+      screenViews: [{ elapsedMs: 1, layout: "grid<script>", fullscreen: false, focusedScreen: 1, devicePixelRatio: 1, trackSid: "TR_x" } as never],
+      secrets: [],
+    },
+    true,
+  );
+  const parsed = JSON.parse(json ?? "{}");
+  assert.equal("sdp" in parsed.screenTrace[0], false);
+  assert.equal("ip" in parsed.screenTrace[0], false);
+  assert.equal(parsed.screenTrace[0].implementation, "libvpx img src=x 10.0.0.1");
+  assert.equal("trackSid" in parsed.screenViews[0], false);
+  assert.equal(parsed.screenViews[0].layout, "gridscript");
+  assert.equal(parsed.screenExperiment, "codec=h264 (overridden)");
+});
+
+test("F17-07: a new RTP stream never yields a delta, and only the selected pair gives bandwidth", () => {
+  const ctx = { direction: "send" as const, track: 0 };
+  const first = screenTraceSample([toStatLike({ type: "outbound-rtp", id: "A", kind: "video", bytesSent: 100 })], { ...ctx, elapsedMs: 0, now: 0 }, null);
+  const other = screenTraceSample(
+    [toStatLike({ type: "outbound-rtp", id: "B", kind: "video", bytesSent: 900 })],
+    { ...ctx, elapsedMs: 2_000, now: 2_000 },
+    first.counter,
+  );
+  assert.equal(other.sample?.bitrateKbps, null);
+  assert.equal(other.sample?.intervalMs, null);
+  const same = screenTraceSample(
+    [toStatLike({ type: "outbound-rtp", id: "B", kind: "video", bytesSent: 1_150 })],
+    { ...ctx, elapsedMs: 4_500, now: 4_500 },
+    other.counter,
+  );
+  assert.equal(same.sample?.intervalMs, 2_500);
+  assert.equal(same.sample?.bitrateKbps, 1);
+  const pairs = [
+    toStatLike({ type: "outbound-rtp", id: "B", kind: "video" }),
+    toStatLike({ type: "candidate-pair", nominated: false, state: "failed", availableOutgoingBitrate: 9_000_000 }),
+    toStatLike({ type: "candidate-pair", nominated: true, state: "succeeded", availableOutgoingBitrate: 2_000_000 }),
+  ];
+  assert.equal(screenTraceSample(pairs, { ...ctx, elapsedMs: 0, now: 0 }, null).sample?.availableOutgoingBitrateKbps, 2_000);
+});
+
+test("F17-07: limited share divides by the real time covered", () => {
+  const verdict = analyzeScreenTrace([
+    sample({ direction: "send", intervalMs: 4_000, cpuLimitedMsDelta: 2_000 }),
+    sample({ direction: "send", intervalMs: null, cpuLimitedMsDelta: 2_000 }),
+  ]);
+  assert.equal(verdict.cpuLimitedShare, 0.5);
 });

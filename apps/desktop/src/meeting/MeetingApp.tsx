@@ -827,11 +827,12 @@ export function MeetingApp() {
   const browsingAway = inCall && state.activeServerId !== null && state.activeServerId !== state.selectedServerId;
   const caption = screenCaption(localScreenSurface(media.tiles), media.screen);
   const isFullscreen = inCall && fullscreen && layout === "spotlight";
-  const focusedScreen = cards.find((card) => card.id === placement.featuredId)?.kind === "share";
+  const focusedCard = cards.find((card) => card.id === placement.featuredId);
+  const focusedScreenId = focusedCard?.kind === "share" ? focusedCard.id : null;
   // F17-02: layout, full screen and focus change the layer adaptiveStream asks for; the trace keeps each change.
   useEffect(() => {
-    if (inCall) sessionRef.current?.noteScreenView({ layout, fullscreen: isFullscreen, focusedScreen });
-  }, [inCall, layout, isFullscreen, focusedScreen]);
+    if (inCall) sessionRef.current?.noteScreenView({ layout, fullscreen: isFullscreen, focusedScreenId });
+  }, [inCall, layout, isFullscreen, focusedScreenId]);
   const activeServer = state.servers.find((server) => server.id === state.activeServerId);
   const toggleMicrophone = () => {
     const next = inCall ? !media.microphone : !micOnJoin;
