@@ -1,6 +1,6 @@
 # PLAN — roadmap executável (fonte de verdade)
 
-F07-19 — Release 0.2.26: IN_PROGRESS em 2026-11-27, por pedido explícito do usuário. Escopo: integrar a F17 (telemetria de tela consentida e interruptores de experimento, sem mudar padrões de mídia do ADR 0029; G17 aprovado tecnicamente pelo Codex), versão `0.2.26` nos quatro manifests, gates locais, fast-forward na `main`, tag `v0.2.26`, push atômico, publicação e conferência dos assets. Instalação e F17-08 permanecem `WAITING_VALIDATION`.
+F07-19 — Release 0.2.26: WAITING_VALIDATION em 2026-11-27, por pedido explícito do usuário. Commit `270dfb9`, fast-forward, `main` e tag `v0.2.26` enviados; release 46081595217 PASS e assets conferidos. Escopo: integrar a F17 (telemetria de tela consentida e interruptores de experimento, sem mudar padrões de mídia do ADR 0029; G17 aprovado tecnicamente pelo Codex), versão `0.2.26` nos quatro manifests, gates locais, fast-forward na `main`, tag `v0.2.26`, push atômico, publicação e conferência dos assets. Instalação e F17-08 permanecem `WAITING_VALIDATION`.
 
 F07-18 — Release 0.2.25: WAITING_VALIDATION em 2026-11-07. Commit `3729971`, integração fast-forward, `main` e tag `v0.2.25` enviados; workflow de release 42430073901 PASS. Instalador, assinatura, `latest.json` e `SHA256SUMS` publicados e conferidos; SHA-256 `e4033df6485bed4570774ce2641790c692c713d93884a63cb062514e9e301f1b`. Instalação e validação visual do painel permanecem pendentes.
 

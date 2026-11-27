@@ -2,7 +2,7 @@
 
 ## F07-19 — Release 0.2.26
 
-READY → IN_PROGRESS em 2026-11-27, por pedido explícito do usuário. Escopo: publicar a F17 (branch `audit/F17-screen-quality`: auditoria, telemetria por track consentida, bancada offline e interruptores `openmeet.screenExperiment`), sem alterar padrões de produção de mídia. Quatro manifests em `0.2.26`, gates locais, fast-forward na `main`, tag `v0.2.26` e workflow existente. Conferir instalador, assinatura, `latest.json` e `SHA256SUMS`; instalação e F17-08 ficam `WAITING_VALIDATION`.
+READY → IN_PROGRESS → WAITING_VALIDATION em 2026-11-27, por pedido explícito do usuário. Release 46081595217 PASS; instalador, assinatura, `latest.json` e `SHA256SUMS` conferidos. Escopo: publicar a F17 (branch `audit/F17-screen-quality`: auditoria, telemetria por track consentida, bancada offline e interruptores `openmeet.screenExperiment`), sem alterar padrões de produção de mídia. Quatro manifests em `0.2.26`, gates locais, fast-forward na `main`, tag `v0.2.26` e workflow existente. Conferir instalador, assinatura, `latest.json` e `SHA256SUMS`; instalação e F17-08 ficam `WAITING_VALIDATION`.
 
 ## F07-18 — Release 0.2.25
 

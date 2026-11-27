@@ -1034,3 +1034,7 @@ O bundle web levava "atalhos globais" (texto do DesktopOffer, desde f3042ba) e "
 - Pedido explícito do usuário para subir a F17 e gerar nova release do `.exe` (release pública escolhida). Escopo: F17 (G17 aprovado tecnicamente, padrões do ADR 0029 inalterados) e versão `0.2.26` nos quatro manifests. A F16 (PR #2) não entra nesta release.
 - Antes, teste local do usuário com `.exe` release da branch (`tauri build --no-bundle`), sozinho na sala: compartilhamento aparentemente nítido; não conta como F17-08 (sem receptor pelo SFU nem exportação).
 - Windows 11, 2026-11-27: `pnpm format:check`, `lint`, `typecheck` e `build` PASS. Testes: workspace 27/27, shared 79/79, mídia 102/102, servidor 128/128, desktop 50/50. `cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml` PASS com Rust 1.98.1.
+- Commit `270dfb9` (branch `audit/F17-screen-quality`) integrado por fast-forward na `main`; `main` e tag anotada `v0.2.26` enviadas atomicamente.
+- GitHub Actions: workflow de release `46081595217` PASS (`windows-installer` 7m39s e `publish` 7s).
+- Assets baixados em diretório temporário exclusivo: `OpenMeet_0.2.26_x64-setup.exe` (8.406.071 bytes), `.sig`, `latest.json` e `SHA256SUMS`. SHA-256 do instalador `1b5d6bbd5242e7b6b95d253b9181bccd31c5b85e0d1341b47829ec4707c15a28`, igual ao `SHA256SUMS`; manifesto declara `0.2.26`, aponta para a URL correta e contém a mesma assinatura do `.sig`.
+- Estado `WAITING_VALIDATION`: instalador e atualização automática não executados aqui; F17-08 segue pendente de chamada real `.exe` × navegador com exportação.
