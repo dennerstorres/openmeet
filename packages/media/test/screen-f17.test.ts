@@ -277,9 +277,9 @@ test("F17-07: the export rebuilds trace and views from allowed fields and cleans
   const parsed = JSON.parse(json ?? "{}");
   assert.equal("sdp" in parsed.screenTrace[0], false);
   assert.equal("ip" in parsed.screenTrace[0], false);
-  assert.equal(parsed.screenTrace[0].implementation, "libvpx img src=x 10.0.0.1");
+  assert.equal(parsed.screenTrace[0].implementation, "libvpx img src=x ");
   assert.equal("trackSid" in parsed.screenViews[0], false);
-  assert.equal(parsed.screenViews[0].layout, "gridscript");
+  assert.equal(parsed.screenViews[0].layout, "");
   assert.equal(parsed.screenExperiment, "codec=h264 (overridden)");
 });
 
@@ -314,4 +314,34 @@ test("F17-07: limited share divides by the real time covered", () => {
     sample({ direction: "send", intervalMs: null, cpuLimitedMsDelta: 2_000 }),
   ]);
   assert.equal(verdict.cpuLimitedShare, 0.5);
+});
+
+test("F17-07 second pass: secrets are redacted before labels are cleaned, legacy traces give no NaN, selected pair wins", () => {
+  const base = {
+    exportedAt: "x",
+    phase: "connected",
+    disconnectReason: null,
+    appVersion: null,
+    userAgent: null,
+    stats: emptyStats(),
+    events: [],
+    reconnect: EMPTY_RECONNECT,
+  };
+  const json =
+    buildDiagnosticExport(
+      { ...base, screenExperiment: "codec=sample/key", screenTrace: [sample({ implementation: "x sample/key" })], secrets: ["sample/key"] },
+      true,
+    ) ?? "";
+  assert.equal(json.includes("samplekey"), false);
+  assert.equal(json.includes("sample/key"), false);
+  const legacy = { ...sample({ direction: "send", cpuLimitedMsDelta: 1_000 }) } as Partial<ScreenTraceSample>;
+  delete legacy.intervalMs;
+  assert.equal(analyzeScreenTrace([legacy as ScreenTraceSample]).cpuLimitedShare, null);
+  const stats = [
+    toStatLike({ type: "outbound-rtp", id: "R", kind: "video" }),
+    toStatLike({ type: "transport", selectedCandidatePairId: "P2" }),
+    toStatLike({ type: "candidate-pair", id: "P1", nominated: true, state: "succeeded", availableOutgoingBitrate: 9_000_000 }),
+    toStatLike({ type: "candidate-pair", id: "P2", nominated: true, state: "succeeded", availableOutgoingBitrate: 1_000_000 }),
+  ];
+  assert.equal(screenTraceSample(stats, { direction: "send", track: 0, elapsedMs: 0, now: 0 }, null).sample?.availableOutgoingBitrateKbps, 1_000);
 });

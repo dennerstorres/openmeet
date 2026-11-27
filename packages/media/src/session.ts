@@ -318,7 +318,10 @@ export class LiveKitPocSession {
     });
     this.room.on(RoomEvent.LocalTrackPublished, (publication: LocalTrackPublication) => {
       // F17-04: LiveKit sets "motion" again on every VP9 (re)publish, including after a signal restart.
-      if (publication.source === Track.Source.ScreenShare) this.applyScreenHintExperiment(publication.track);
+      if (publication.source === Track.Source.ScreenShare) {
+        this.applyScreenHintExperiment(publication.track);
+        this.checkDynacastExperiment();
+      }
       if (publication.track) {
         this.rememberTrack(
           publication.track,

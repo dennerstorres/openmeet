@@ -111,9 +111,9 @@ export function buildDiagnosticExport(input: DiagnosticExportInput, consent: boo
       outboundHeight: input.stats.outboundHeight,
     },
     screenRamp: (input.screenRamp ?? []).map((sample) => ({ ...sample })),
-    screenExperiment: traceLabel(input.screenExperiment ?? "production", 60),
-    screenTrace: (input.screenTrace ?? []).map(projectTraceSample),
-    screenViews: (input.screenViews ?? []).map(projectTraceView),
+    screenExperiment: traceLabel(input.screenExperiment ?? "production", 60, (value) => redactText(value, secrets)),
+    screenTrace: (input.screenTrace ?? []).map((sample) => projectTraceSample(sample, (value) => redactText(value, secrets))),
+    screenViews: (input.screenViews ?? []).map((view) => projectTraceView(view)),
     events: input.events.map((event) => ({
       at: text(event.at),
       level: event.level,

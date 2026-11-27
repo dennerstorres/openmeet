@@ -127,8 +127,12 @@ export function screenTraceSample(
   };
   // The selected pair is the nominated, succeeded one; another pair's estimate is not this transport's.
   const pairs = stats.filter((stat) => stat.type === "candidate-pair" && typeof stat.availableOutgoingBitrate === "number");
-  const available = (pairs.find((stat) => stat.nominated === true && stat.state === "succeeded") ?? pairs.find((stat) => stat.nominated === true))
-    ?.availableOutgoingBitrate;
+  const selectedId = stats.find((stat) => stat.type === "transport" && stat.selectedCandidatePairId)?.selectedCandidatePairId;
+  const available = (
+    (selectedId ? pairs.find((stat) => stat.id === selectedId) : undefined) ??
+    pairs.find((stat) => stat.nominated === true && stat.state === "succeeded") ??
+    pairs.find((stat) => stat.nominated === true)
+  )?.availableOutgoingBitrate;
   const codec = rtp.codecId ? codecs.get(rtp.codecId) : undefined;
   const element = context.element ?? null;
   return {
@@ -213,7 +217,7 @@ export function analyzeScreenTrace(samples: readonly ScreenTraceSample[], askedH
     let covered = 0;
     for (const sample of send) {
       const value = pick(sample);
-      if (value === null || sample.intervalMs === null || sample.intervalMs <= 0) continue;
+      if (value === null || typeof sample.intervalMs !== "number" || !Number.isFinite(sample.intervalMs) || sample.intervalMs <= 0) continue;
       limited += value;
       covered += sample.intervalMs;
     }
@@ -255,9 +259,13 @@ export function analyzeScreenTrace(samples: readonly ScreenTraceSample[], askedH
 }
 
 /** Short labels only: letters, digits, `._=()-` and spaces, capped. Anything else is dropped, not escaped. */
-export function traceLabel(value: unknown, max: number): string | null {
+export function traceLabel(value: unknown, max: number, redact: (text: string) => string = (text) => text): string | null {
   if (typeof value !== "string") return null;
-  const clean = value.replace(/[^A-Za-z0-9._ =()-]/g, "").slice(0, max);
+  // Redact known secrets first (the cleanup below would otherwise break their match), then drop IPv4-looking runs.
+  const clean = redact(value)
+    .replace(/\d{1,3}(?:\.\d{1,3}){3}/g, "")
+    .replace(/[^A-Za-z0-9._ =()-]/g, "")
+    .slice(0, max);
   return clean.length > 0 ? clean : null;
 }
 
@@ -265,7 +273,8 @@ const finite = (value: unknown): number | null => (typeof value === "number" && 
 const flag = (value: unknown): boolean | null => (typeof value === "boolean" ? value : null);
 
 /** Export boundary: rebuilds each sample from the allowed fields, so an extra property can never reach the JSON. */
-export function projectTraceSample(sample: ScreenTraceSample): ScreenTraceSample {
+export function projectTraceSample(sample: ScreenTraceSample, redact: (text: string) => string = (text) => text): ScreenTraceSample {
+  const label = (value: unknown, max: number): string | null => traceLabel(value, max, redact);
   return {
     elapsedMs: finite(sample.elapsedMs) ?? 0,
     intervalMs: finite(sample.intervalMs),
@@ -275,17 +284,17 @@ export function projectTraceSample(sample: ScreenTraceSample): ScreenTraceSample
     width: finite(sample.width),
     height: finite(sample.height),
     fps: finite(sample.fps),
-    codec: traceLabel(sample.codec, 20),
+    codec: label(sample.codec, 20),
     requestedWidth: finite(sample.requestedWidth),
     requestedHeight: finite(sample.requestedHeight),
-    requestedHint: traceLabel(sample.requestedHint, 20),
-    contentHint: traceLabel(sample.contentHint, 20),
-    qualityLimitationReason: traceLabel(sample.qualityLimitationReason, 20),
+    requestedHint: label(sample.requestedHint, 20),
+    contentHint: label(sample.contentHint, 20),
+    qualityLimitationReason: label(sample.qualityLimitationReason, 20),
     cpuLimitedMsDelta: finite(sample.cpuLimitedMsDelta),
     bandwidthLimitedMsDelta: finite(sample.bandwidthLimitedMsDelta),
     targetBitrateKbps: finite(sample.targetBitrateKbps),
     availableOutgoingBitrateKbps: finite(sample.availableOutgoingBitrateKbps),
-    implementation: traceLabel(sample.implementation, 60),
+    implementation: label(sample.implementation, 60),
     powerEfficient: flag(sample.powerEfficient),
     packetsLostDelta: finite(sample.packetsLostDelta),
     framesDroppedDelta: finite(sample.framesDroppedDelta),
@@ -300,7 +309,7 @@ export function projectTraceSample(sample: ScreenTraceSample): ScreenTraceSample
 export function projectTraceView(view: ScreenTraceView): ScreenTraceView {
   return {
     elapsedMs: finite(view.elapsedMs) ?? 0,
-    layout: traceLabel(view.layout, 20) ?? "",
+    layout: /^[a-z]{1,20}$/.test(String(view.layout)) ? view.layout : "",
     fullscreen: view.fullscreen === true,
     focusedScreen: finite(view.focusedScreen),
     devicePixelRatio: finite(view.devicePixelRatio),

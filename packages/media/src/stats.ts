@@ -7,6 +7,7 @@ export interface StatLike {
   jitter?: number;
   currentRoundTripTime?: number;
   nominated?: boolean;
+  selectedCandidatePairId?: string;
   state?: string;
   localCandidateId?: string;
   candidateType?: string;
@@ -100,6 +101,7 @@ interface RawStat {
   targetBitrate?: unknown;
   qualityLimitationReason?: unknown;
   qualityLimitationDurations?: unknown;
+  selectedCandidatePairId?: unknown;
   encoderImplementation?: unknown;
   decoderImplementation?: unknown;
   powerEfficientEncoder?: unknown;
@@ -236,6 +238,8 @@ export function toStatLike(stat: RawStat): StatLike {
   const decoder = asString(stat.decoderImplementation);
   if (encoder) like.encoderImplementation = encoder.slice(0, 60);
   if (decoder) like.decoderImplementation = decoder.slice(0, 60);
+  const selectedPair = asString(stat.selectedCandidatePairId);
+  if (selectedPair) like.selectedCandidatePairId = selectedPair;
   if (typeof stat.powerEfficientEncoder === "boolean") like.powerEfficientEncoder = stat.powerEfficientEncoder;
   if (typeof stat.powerEfficientDecoder === "boolean") like.powerEfficientDecoder = stat.powerEfficientDecoder;
   return like;

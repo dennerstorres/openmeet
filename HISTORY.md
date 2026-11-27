@@ -1012,3 +1012,11 @@ O bundle web levava "atalhos globais" (texto do DesktopOffer, desde f3042ba) e "
 - Correções: rodada única com geração por chamada no coletor; deltas presos ao fluxo RTP com `intervalMs` real; banda só do par indicado; exportação reconstruída campo a campo (`projectTraceSample`/`projectTraceView`, `traceLabel`); `contentHint` reaplicado em toda republicação de tela; pedido registrado só após publicação confirmada; `dynacast=off` sobrescrito pelo SDK sai rotulado `(overridden)`; troca entre telas em foco com índice local. Relatório: C2, C3, C5, C6 e H3 corrigidos; seção 11 lista a resolução de cada achado.
 - Windows 11, 2026-11-27: `pnpm format:check`, `lint`, `typecheck`, `test` e `build` PASS. Testes: workspace 27/27, shared 79/79, mídia 99/99, servidor 128/128, desktop 50/50.
 - Estado: F17-07 com correções aplicadas, falta uma segunda leitura do Codex sobre o novo diff. F17-08 continua WAITING_VALIDATION.
+
+## 2026-11-27 — F17-07 segunda leitura Codex e correções
+
+- Segunda leitura (`codex exec -s read-only`) sobre `0f33b09`: 3 achados resolvidos, 6 parciais e 2 regressões médias novas (redação de `screenExperiment` enfraquecida e `NaN` ao analisar traços antigos), mais 1 baixa (número de foco ≠ número do track). Veredito: G17 ainda não aprovado. Transcrita em `docs/reviews/F17-codex-review.md`.
+- Corrigido: segredos redigidos antes da limpeza de rótulos; trechos com formato de IPv4 removidos dos rótulos; `layout` só aceita minúsculas; analisador ignora `intervalMs` ausente; banda segue `transport.selectedCandidatePairId`; `dynacast=off` verificado também em toda publicação de tela.
+- Em aberto (parciais aceitas como limitação documentada): pedido de resolução guardado na sessão, não por publicação; `stopScreenTrace` pode deixar um `getStats` antigo em voo, sem gravar; contador de envio sem `rtpId` trata IDs ausentes como iguais; foco e track usam numerações distintas; reserva VP8 não medida pelo sender principal.
+- Windows 11, 2026-11-27: `pnpm format:check`, `lint`, `typecheck`, `test` e `build` PASS. Testes: workspace 27/27, shared 79/79, mídia 100/100, servidor 128/128, desktop 50/50.
+- Estado: F17-07 aguardando terceira leitura ou aceite humano das limitações; F17-08 WAITING_VALIDATION.
