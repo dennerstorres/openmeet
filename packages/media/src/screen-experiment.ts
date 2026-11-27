@@ -59,6 +59,21 @@ export function describeScreenExperiment(experiment: ScreenExperiment | null): s
   }
 }
 
+const OVERRIDDEN = " (overridden)";
+
+/**
+ * F17-07 third pass: the exported label is rebuilt from the parsed experiment, never copied. Text that is not
+ * `production` or a valid experiment (optionally marked as overridden by the SDK) exports as `invalid`.
+ */
+export function screenExperimentLabel(value: unknown): string {
+  if (typeof value !== "string") return "production";
+  const overridden = value.endsWith(OVERRIDDEN);
+  const base = overridden ? value.slice(0, -OVERRIDDEN.length) : value;
+  if (base === "production") return overridden ? "invalid" : "production";
+  const parsed = parseScreenExperiment(base);
+  return parsed ? describeScreenExperiment(parsed) + (overridden ? OVERRIDDEN : "") : "invalid";
+}
+
 /** Reads the experiment from local storage; any failure (no storage, private mode) means production. */
 export function readScreenExperiment(storage?: Pick<Storage, "getItem"> | null): ScreenExperiment | null {
   try {

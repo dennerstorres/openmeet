@@ -125,14 +125,20 @@ export function screenTraceSample(
     const d = fresh ? delta(next, before) : null;
     return d === null ? null : Math.round(d * 1000);
   };
-  // The selected pair is the nominated, succeeded one; another pair's estimate is not this transport's.
-  const pairs = stats.filter((stat) => stat.type === "candidate-pair" && typeof stat.availableOutgoingBitrate === "number");
-  const selectedId = stats.find((stat) => stat.type === "transport" && stat.selectedCandidatePairId)?.selectedCandidatePairId;
-  const available = (
-    (selectedId ? pairs.find((stat) => stat.id === selectedId) : undefined) ??
-    pairs.find((stat) => stat.nominated === true && stat.state === "succeeded") ??
-    pairs.find((stat) => stat.nominated === true)
-  )?.availableOutgoingBitrate;
+  // Bandwidth needs a proven link to this RTP stream: its transport's selected pair (the pointer is the proof), or, with
+  // no pointer, a nominated pair of that same transport that has an estimate. No transportId on the RTP, no value.
+  const transportId = rtp.transportId;
+  const pairs = stats.filter((stat) => stat.type === "candidate-pair");
+  const selectedId = transportId ? stats.find((stat) => stat.type === "transport" && stat.id === transportId)?.selectedCandidatePairId : undefined;
+  const estimated = pairs.filter(
+    (stat) => stat.transportId !== undefined && stat.transportId === transportId && typeof stat.availableOutgoingBitrate === "number",
+  );
+  const available = !transportId
+    ? undefined
+    : (selectedId
+        ? pairs.find((stat) => stat.id === selectedId)
+        : (estimated.find((stat) => stat.nominated === true && stat.state === "succeeded") ?? estimated.find((stat) => stat.nominated === true))
+      )?.availableOutgoingBitrate;
   const codec = rtp.codecId ? codecs.get(rtp.codecId) : undefined;
   const element = context.element ?? null;
   return {
@@ -269,12 +275,51 @@ export function traceLabel(value: unknown, max: number, redact: (text: string) =
   return clean.length > 0 ? clean : null;
 }
 
+/**
+ * F17-07 third pass: the export carries no free text. Each label field is mapped onto a closed vocabulary, so an
+ * identifier can only reach the JSON if it is one of these words. Anything else becomes `other`.
+ */
+const CODECS = ["vp8", "vp9", "h264", "h265", "av1"] as const;
+const HINTS = ["motion", "detail", "text"] as const;
+const LIMITATIONS = ["none", "cpu", "bandwidth", "other"] as const;
+const LAYOUTS = ["spotlight", "grid"] as const;
+const IMPLEMENTATIONS = new Map(
+  [
+    "SimulcastEncoderAdapter",
+    "ExternalEncoder",
+    "ExternalDecoder",
+    "MediaFoundationVideoEncodeAccelerator",
+    "D3D11VideoDecoder",
+    "DXVAVideoDecodeAccelerator",
+    "VideoToolbox",
+    "OpenH264",
+    "FFmpeg",
+    "libvpx",
+    "libaom",
+    "dav1d",
+    "fallback",
+    "unknown",
+  ].map((name) => [name.toLowerCase(), name]),
+);
+
+export function closedLabel(value: unknown, allowed: readonly string[]): string | null {
+  if (typeof value !== "string" || value === "") return null;
+  const lower = value.toLowerCase();
+  return allowed.includes(lower) ? lower : "other";
+}
+
+/** Keeps only known library names, in order (e.g. `SimulcastEncoderAdapter+libvpx+libvpx`); otherwise `other`. */
+export function implementationLabel(value: unknown): string | null {
+  if (typeof value !== "string" || value === "") return null;
+  const names = (value.match(/[A-Za-z0-9]+/g) ?? []).map((word) => IMPLEMENTATIONS.get(word.toLowerCase())).filter((name) => name !== undefined);
+  return names.length > 0 ? names.slice(0, 6).join("+") : "other";
+}
+
 const finite = (value: unknown): number | null => (typeof value === "number" && Number.isFinite(value) ? value : null);
 const flag = (value: unknown): boolean | null => (typeof value === "boolean" ? value : null);
 
 /** Export boundary: rebuilds each sample from the allowed fields, so an extra property can never reach the JSON. */
-export function projectTraceSample(sample: ScreenTraceSample, redact: (text: string) => string = (text) => text): ScreenTraceSample {
-  const label = (value: unknown, max: number): string | null => traceLabel(value, max, redact);
+export function projectTraceSample(sample: ScreenTraceSample): ScreenTraceSample {
   return {
     elapsedMs: finite(sample.elapsedMs) ?? 0,
     intervalMs: finite(sample.intervalMs),
@@ -284,17 +329,17 @@ export function projectTraceSample(sample: ScreenTraceSample, redact: (text: str
     width: finite(sample.width),
     height: finite(sample.height),
     fps: finite(sample.fps),
-    codec: label(sample.codec, 20),
+    codec: closedLabel(sample.codec, CODECS),
     requestedWidth: finite(sample.requestedWidth),
     requestedHeight: finite(sample.requestedHeight),
-    requestedHint: label(sample.requestedHint, 20),
-    contentHint: label(sample.contentHint, 20),
-    qualityLimitationReason: label(sample.qualityLimitationReason, 20),
+    requestedHint: closedLabel(sample.requestedHint, HINTS),
+    contentHint: closedLabel(sample.contentHint, HINTS),
+    qualityLimitationReason: closedLabel(sample.qualityLimitationReason, LIMITATIONS),
     cpuLimitedMsDelta: finite(sample.cpuLimitedMsDelta),
     bandwidthLimitedMsDelta: finite(sample.bandwidthLimitedMsDelta),
     targetBitrateKbps: finite(sample.targetBitrateKbps),
     availableOutgoingBitrateKbps: finite(sample.availableOutgoingBitrateKbps),
-    implementation: label(sample.implementation, 60),
+    implementation: implementationLabel(sample.implementation),
     powerEfficient: flag(sample.powerEfficient),
     packetsLostDelta: finite(sample.packetsLostDelta),
     framesDroppedDelta: finite(sample.framesDroppedDelta),
@@ -309,7 +354,7 @@ export function projectTraceSample(sample: ScreenTraceSample, redact: (text: str
 export function projectTraceView(view: ScreenTraceView): ScreenTraceView {
   return {
     elapsedMs: finite(view.elapsedMs) ?? 0,
-    layout: /^[a-z]{1,20}$/.test(String(view.layout)) ? view.layout : "",
+    layout: typeof view.layout === "string" && (LAYOUTS as readonly string[]).includes(view.layout) ? view.layout : "",
     fullscreen: view.fullscreen === true,
     focusedScreen: finite(view.focusedScreen),
     devicePixelRatio: finite(view.devicePixelRatio),

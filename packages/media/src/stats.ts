@@ -8,6 +8,7 @@ export interface StatLike {
   currentRoundTripTime?: number;
   nominated?: boolean;
   selectedCandidatePairId?: string;
+  transportId?: string;
   state?: string;
   localCandidateId?: string;
   candidateType?: string;
@@ -102,6 +103,7 @@ interface RawStat {
   qualityLimitationReason?: unknown;
   qualityLimitationDurations?: unknown;
   selectedCandidatePairId?: unknown;
+  transportId?: unknown;
   encoderImplementation?: unknown;
   decoderImplementation?: unknown;
   powerEfficientEncoder?: unknown;
@@ -240,6 +242,8 @@ export function toStatLike(stat: RawStat): StatLike {
   if (decoder) like.decoderImplementation = decoder.slice(0, 60);
   const selectedPair = asString(stat.selectedCandidatePairId);
   if (selectedPair) like.selectedCandidatePairId = selectedPair;
+  const transportId = asString(stat.transportId);
+  if (transportId) like.transportId = transportId;
   if (typeof stat.powerEfficientEncoder === "boolean") like.powerEfficientEncoder = stat.powerEfficientEncoder;
   if (typeof stat.powerEfficientDecoder === "boolean") like.powerEfficientDecoder = stat.powerEfficientDecoder;
   return like;

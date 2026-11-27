@@ -1020,3 +1020,12 @@ O bundle web levava "atalhos globais" (texto do DesktopOffer, desde f3042ba) e "
 - Em aberto (parciais aceitas como limitação documentada): pedido de resolução guardado na sessão, não por publicação; `stopScreenTrace` pode deixar um `getStats` antigo em voo, sem gravar; contador de envio sem `rtpId` trata IDs ausentes como iguais; foco e track usam numerações distintas; reserva VP8 não medida pelo sender principal.
 - Windows 11, 2026-11-27: `pnpm format:check`, `lint`, `typecheck`, `test` e `build` PASS. Testes: workspace 27/27, shared 79/79, mídia 100/100, servidor 128/128, desktop 50/50.
 - Estado: F17-07 aguardando terceira leitura ou aceite humano das limitações; F17-08 WAITING_VALIDATION.
+
+## 2026-11-27 — F17-07 terceira leitura Codex e aprovação técnica do G17
+
+- Terceira leitura (`codex exec -s read-only`, codex-cli 0.172.0) sobre `519aea8`: regressões da segunda leitura resolvidas; veredito Não por rótulos livres exportados (`implementation`, `screenExperiment`, `layout`), mais uma média nova (banda de outro transporte) e duas baixas. Transcrita em `docs/reviews/F17-codex-review.md`.
+- Corrigido: exportação só com vocabulários fechados (codec, hints, limitação, layout; `implementation` reduzido a nomes de biblioteca conhecidos; `screenExperiment` reconstruído pelo parser, inválido → `invalid`); banda só com vínculo comprovado ao RTP via `transportId`/`selectedCandidatePairId`; aviso de `dynacast` sobrescrito registrado uma vez. Testes novos com identificadores sintéticos e múltiplos transportes.
+- Três confirmações curtas do Codex sobre a working tree; na última, todos os itens RESOLVIDOS, sem regressão nova. **Veredito: Sim** (exceto F17-08).
+- Windows 11, 2026-11-27: `pnpm format:check`, `lint`, `typecheck` e `build` PASS. Testes: workspace 27/27, shared 79/79, mídia 102/102, servidor 128/128, desktop 50/50. Observação: `pnpm test` completo travou uma vez no desktop com saída redirecionada para arquivo; rodado isolado (`pnpm --filter @openmeet/desktop test`) passou 50/50, e a rodada completa anterior com a mesma suíte também passou.
+- Estado: F17-07 APPROVED; G17 aprovado tecnicamente, exceto F17-08 (WAITING_VALIDATION, depende de chamada real `.exe` × navegador). Limitações aceitas listadas na revisão.
+

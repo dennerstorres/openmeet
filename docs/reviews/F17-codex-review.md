@@ -60,3 +60,53 @@ Na geração, a invalidação impede gravações antigas, mas `stopScreenTrace()
 No Windows, reexecutei os testes de mídia com o cache do `tsx` desativado e obtive **99/99**. O typecheck de mídia sem emissão, o Prettier nos quatro arquivos de produção alterados e `git diff --check 0652d23..HEAD` passaram. Nenhum arquivo foi alterado. A F17-08 permanece `WAITING_VALIDATION`.
 
 **Veredito — G17 pode passar para revisão aprovada, exceto F17-08? Não.** A fronteira de privacidade e a regressão no analisador são bloqueios independentes da validação humana.
+
+## Terceira leitura (2026-11-27, sobre `519aea8`)
+
+Executada com `codex exec -s read-only` sobre `git diff 0f33b09..HEAD`. O Codex reexecutou os 13 testes de `screen-f17.test.ts` no Windows (PASS) e `git diff --check` (PASS); nenhum arquivo alterado.
+
+### Status dos achados anteriores
+
+| Item | Status | Observação |
+|---|---|---|
+| 1. `dynacast` religado pelo SDK | PARCIAL | Verificado em toda publicação; publicação que falha após o SDK religar ainda pode escapar do marcador. |
+| 2. C6 / `focusQuality=high` | RESOLVIDO | — |
+| 3. Sobreposição e limpeza | PARCIAL | Track encerrado durante `getStats` na mesma geração ainda pode gerar amostra. |
+| 4. Deltas RTP e banda | PARCIAL | Chave `send` fixa, `rtpId` ausente tratado como igual, intervalo por `Date.now()`. |
+| 5. Sanitização da exportação | PARCIAL → **bloqueio** | `implementation`, `screenExperiment` e `layout` ainda aceitavam identificadores compostos por caracteres permitidos (G17 exige "sem identificadores"). |
+| 6. `contentHint` e pedido por publicação | PARCIAL | Pedido guardado na sessão. |
+| 7. C3/C4 e reserva VP8 | PARCIAL | Documentação resolvida; reserva não medida. |
+| 8. C2 e C5 | RESOLVIDO | — |
+| 9. Troca entre telas em foco | RESOLVIDO | — |
+| Regressão: redação de `screenExperiment` | RESOLVIDO | `screen-f17.test.ts:332`. |
+| Regressão: `NaN` em traço antigo | RESOLVIDO | `screen-trace.ts:220`. |
+| Baixa: número de foco ≠ número do track | NÃO RESOLVIDO | Aceita como limitação. |
+
+### Regressões novas de `519aea8`
+
+- **Média — banda do transporte errado.** O primeiro `transport` com `selectedCandidatePairId` era usado sem vínculo com o RTP amostrado; se o par apontado não tinha estimativa, o fallback pegava outro par.
+- **Baixa — `layout` `null` passava como `"null"` na validação e saía `null` no JSON.**
+- **Baixa — aviso de `dynacast=off` sobrescrito podia ser registrado duas vezes.**
+
+Limitações aceitas: o Codex confirmou que nenhuma das cinco exige bloqueio por si só.
+
+**Veredito — G17 pode ser aprovado, exceto F17-08? Não.** Bloqueio: rótulos livres na exportação.
+
+### Correções após a terceira leitura
+
+- Exportação sem texto livre: `codec`, `contentHint`, `requestedHint` e `qualityLimitationReason` mapeados para vocabulários fechados (`other` fora da lista); `implementation` reduzido aos nomes de biblioteca conhecidos (ex.: `SimulcastEncoderAdapter+libvpx`), senão `other`; `layout` só `spotlight`/`grid`, senão `""`; `screenExperiment` reconstruído pelo parser (`screenExperimentLabel`), texto inválido sai `invalid`. [screen-trace.ts](../../packages/media/src/screen-trace.ts) · [screen-experiment.ts](../../packages/media/src/screen-experiment.ts) · [report.ts](../../packages/media/src/report.ts)
+- Banda só com vínculo comprovado ao RTP: o par apontado por `selectedCandidatePairId` do transporte do próprio RTP (`transportId`) ou, sem ponteiro, par nominado do mesmo transporte com estimativa. RTP sem `transportId` ou par apontado sem estimativa dão `null`. [screen-trace.ts](../../packages/media/src/screen-trace.ts) · [stats.ts](../../packages/media/src/stats.ts)
+- Aviso de `dynacast` sobrescrito registrado uma vez. [session.ts](../../packages/media/src/session.ts)
+- Testes novos: vocabulários fechados com identificadores sintéticos e dois transportes. [screen-f17.test.ts](../../packages/media/test/screen-f17.test.ts)
+
+### Confirmações das correções (2026-11-27, working tree sobre `519aea8`)
+
+Três rodadas curtas de `codex exec -s read-only` sobre o `git diff` não commitado:
+
+1. Rótulos livres, `layout: null` e aviso duplicado **RESOLVIDOS**; vínculo banda↔RTP **PARCIAL** (média: RTP sem `transportId` com dois transportes; par sem `transportId` antes do par do transporte certo) e uma baixa nova (fallback sem ponteiro parava em par sem estimativa). Veredito: Não.
+2. Os dois casos e a baixa **RESOLVIDOS**; ainda PARCIAL porque `transports.length <= 1` atribuía banda a RTP sem `transportId`, e regressão nova: par apontado sem `transportId` próprio era descartado. Veredito: Não.
+3. Vínculo estrito (sem `transportId`, sem banda; o ponteiro é a prova). Os dois itens **RESOLVIDOS**, nenhuma regressão nova, rótulos fechados e ADR 0029 confirmados; 102 testes de mídia (15 da F17) PASS na reexecução do revisor.
+
+Limitações aceitas, confirmadas como não bloqueantes: pedido de resolução guardado na sessão; `getStats` antigo em voo após `stopScreenTrace` (sem gravar); `rtpId` ausente tratado como igual no contador; numeração de foco distinta da de track; reserva VP8 não medida; `dynacast` religado numa publicação que falha pode escapar do marcador.
+
+**Veredito final — G17 pode ser aprovado, exceto F17-08 (teste humano)? Sim.** F17-08 permanece `WAITING_VALIDATION`.

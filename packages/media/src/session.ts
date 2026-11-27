@@ -723,7 +723,7 @@ export class LiveKitPocSession {
   /** F17-05: LiveKit turns dynacast back on to publish a backup codec; say so instead of mislabeling the run. */
   private checkDynacastExperiment(): void {
     if (this.screenExperiment?.kind !== "dynacast" || this.screenExperiment.enabled) return;
-    if (this.room.options.dynacast) {
+    if (this.room.options.dynacast && !this.screenExperimentOverridden) {
       this.screenExperimentOverridden = true;
       this.note("info", "screen experiment dynacast=off overridden by the SDK (backup codec)");
     }

@@ -1,6 +1,7 @@
 import { redactText, type DiagnosticEvent } from "./diagnostics.js";
 import type { RtcSnapshot, ScreenRampSample } from "./stats.js";
-import { projectTraceSample, projectTraceView, traceLabel, type ScreenTraceSample, type ScreenTraceView } from "./screen-trace.js";
+import { screenExperimentLabel } from "./screen-experiment.js";
+import { projectTraceSample, projectTraceView, type ScreenTraceSample, type ScreenTraceView } from "./screen-trace.js";
 
 export interface ReconnectMark {
   startedAt: number;
@@ -111,8 +112,8 @@ export function buildDiagnosticExport(input: DiagnosticExportInput, consent: boo
       outboundHeight: input.stats.outboundHeight,
     },
     screenRamp: (input.screenRamp ?? []).map((sample) => ({ ...sample })),
-    screenExperiment: traceLabel(input.screenExperiment ?? "production", 60, (value) => redactText(value, secrets)),
-    screenTrace: (input.screenTrace ?? []).map((sample) => projectTraceSample(sample, (value) => redactText(value, secrets))),
+    screenExperiment: screenExperimentLabel(input.screenExperiment),
+    screenTrace: (input.screenTrace ?? []).map((sample) => projectTraceSample(sample)),
     screenViews: (input.screenViews ?? []).map((view) => projectTraceView(view)),
     events: input.events.map((event) => ({
       at: text(event.at),

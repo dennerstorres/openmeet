@@ -64,6 +64,7 @@ test("F17-02: send sample keeps requested vs. real size, hint, limits and deltas
   const report = (bytes: number, cpu: number) => [
     toStatLike({
       type: "outbound-rtp",
+      transportId: "T",
       kind: "video",
       bytesSent: bytes,
       frameWidth: 1920,
@@ -77,7 +78,7 @@ test("F17-02: send sample keeps requested vs. real size, hint, limits and deltas
       targetBitrate: 3_000_000,
     }),
     toStatLike({ type: "codec", id: "c1", mimeType: "video/VP9" }),
-    toStatLike({ type: "candidate-pair", nominated: true, state: "succeeded", availableOutgoingBitrate: 3_500_000 }),
+    toStatLike({ type: "candidate-pair", transportId: "T", nominated: true, state: "succeeded", availableOutgoingBitrate: 3_500_000 }),
   ];
   const first = screenTraceSample(report(1_000, 1), { ...ctx, elapsedMs: 0, now: 1_000 }, null);
   assert.equal(first.sample?.bitrateKbps, null);
@@ -277,7 +278,7 @@ test("F17-07: the export rebuilds trace and views from allowed fields and cleans
   const parsed = JSON.parse(json ?? "{}");
   assert.equal("sdp" in parsed.screenTrace[0], false);
   assert.equal("ip" in parsed.screenTrace[0], false);
-  assert.equal(parsed.screenTrace[0].implementation, "libvpx img src=x ");
+  assert.equal(parsed.screenTrace[0].implementation, "libvpx");
   assert.equal("trackSid" in parsed.screenViews[0], false);
   assert.equal(parsed.screenViews[0].layout, "");
   assert.equal(parsed.screenExperiment, "codec=h264 (overridden)");
@@ -301,9 +302,9 @@ test("F17-07: a new RTP stream never yields a delta, and only the selected pair 
   assert.equal(same.sample?.intervalMs, 2_500);
   assert.equal(same.sample?.bitrateKbps, 1);
   const pairs = [
-    toStatLike({ type: "outbound-rtp", id: "B", kind: "video" }),
-    toStatLike({ type: "candidate-pair", nominated: false, state: "failed", availableOutgoingBitrate: 9_000_000 }),
-    toStatLike({ type: "candidate-pair", nominated: true, state: "succeeded", availableOutgoingBitrate: 2_000_000 }),
+    toStatLike({ type: "outbound-rtp", id: "B", kind: "video", transportId: "T" }),
+    toStatLike({ type: "candidate-pair", transportId: "T", nominated: false, state: "failed", availableOutgoingBitrate: 9_000_000 }),
+    toStatLike({ type: "candidate-pair", transportId: "T", nominated: true, state: "succeeded", availableOutgoingBitrate: 2_000_000 }),
   ];
   assert.equal(screenTraceSample(pairs, { ...ctx, elapsedMs: 0, now: 0 }, null).sample?.availableOutgoingBitrateKbps, 2_000);
 });
@@ -338,10 +339,115 @@ test("F17-07 second pass: secrets are redacted before labels are cleaned, legacy
   delete legacy.intervalMs;
   assert.equal(analyzeScreenTrace([legacy as ScreenTraceSample]).cpuLimitedShare, null);
   const stats = [
-    toStatLike({ type: "outbound-rtp", id: "R", kind: "video" }),
-    toStatLike({ type: "transport", selectedCandidatePairId: "P2" }),
+    toStatLike({ type: "outbound-rtp", id: "R", kind: "video", transportId: "T" }),
+    toStatLike({ type: "transport", id: "T", selectedCandidatePairId: "P2" }),
     toStatLike({ type: "candidate-pair", id: "P1", nominated: true, state: "succeeded", availableOutgoingBitrate: 9_000_000 }),
     toStatLike({ type: "candidate-pair", id: "P2", nominated: true, state: "succeeded", availableOutgoingBitrate: 1_000_000 }),
   ];
   assert.equal(screenTraceSample(stats, { direction: "send", track: 0, elapsedMs: 0, now: 0 }, null).sample?.availableOutgoingBitrateKbps, 1_000);
+});
+
+test("F17-07 third pass: exported labels come from closed vocabularies only", () => {
+  const base = {
+    exportedAt: "x",
+    phase: "connected",
+    disconnectReason: null,
+    appVersion: null,
+    userAgent: null,
+    stats: emptyStats(),
+    events: [],
+    reconnect: EMPTY_RECONNECT,
+    secrets: [],
+  };
+  const exportOf = (screenExperiment: string, partial: Partial<ScreenTraceSample>, layout: unknown) =>
+    JSON.parse(
+      buildDiagnosticExport(
+        {
+          ...base,
+          screenExperiment,
+          screenTrace: [sample(partial)],
+          screenViews: [{ elapsedMs: 1, layout, fullscreen: false, focusedScreen: null, devicePixelRatio: 1 } as never],
+        },
+        true,
+      ) ?? "{}",
+    );
+  const leaky = exportOf(
+    "codec=h264 DESKTOP-ANA42",
+    {
+      codec: "vp9 host42",
+      contentHint: "motion user",
+      requestedHint: "detail",
+      qualityLimitationReason: "cpu",
+      implementation: "SimulcastEncoderAdapter (libvpx, DESKTOP-ANA42)",
+    },
+    "grid user",
+  );
+  assert.equal(leaky.screenExperiment, "invalid");
+  assert.equal(leaky.screenTrace[0].codec, "other");
+  assert.equal(leaky.screenTrace[0].contentHint, "other");
+  assert.equal(leaky.screenTrace[0].requestedHint, "detail");
+  assert.equal(leaky.screenTrace[0].qualityLimitationReason, "cpu");
+  assert.equal(leaky.screenTrace[0].implementation, "SimulcastEncoderAdapter+libvpx");
+  assert.equal(leaky.screenViews[0].layout, "");
+  assert.equal(JSON.stringify(leaky).includes("ANA42"), false);
+  assert.equal(JSON.stringify(leaky).includes("host42"), false);
+  const plain = exportOf("dynacast=off (overridden)", { codec: "VP9", implementation: "MyLaptopEncoder" }, null);
+  assert.equal(plain.screenExperiment, "dynacast=off (overridden)");
+  assert.equal(plain.screenTrace[0].codec, "vp9");
+  assert.equal(plain.screenTrace[0].implementation, "other");
+  assert.equal(plain.screenViews[0].layout, "");
+  assert.equal(exportOf("production", {}, "spotlight").screenViews[0].layout, "spotlight");
+  assert.equal(exportOf("production (overridden)", {}, "grid").screenExperiment, "invalid");
+});
+
+test("F17-07 third pass: bandwidth follows the sampled RTP stream's own transport", () => {
+  const ctx = { direction: "send" as const, track: 0, elapsedMs: 0, now: 0 };
+  const twoTransports = [
+    toStatLike({ type: "outbound-rtp", id: "R", kind: "video", transportId: "T2" }),
+    toStatLike({ type: "transport", id: "T1", selectedCandidatePairId: "P1" }),
+    toStatLike({ type: "transport", id: "T2", selectedCandidatePairId: "P2" }),
+    toStatLike({ type: "candidate-pair", id: "P1", transportId: "T1", nominated: true, state: "succeeded", availableOutgoingBitrate: 9_000_000 }),
+    toStatLike({ type: "candidate-pair", id: "P2", transportId: "T2", nominated: true, state: "succeeded", availableOutgoingBitrate: 3_000_000 }),
+  ];
+  assert.equal(screenTraceSample(twoTransports, ctx, null).sample?.availableOutgoingBitrateKbps, 3_000);
+  const noEstimate = [
+    toStatLike({ type: "outbound-rtp", id: "R", kind: "video", transportId: "T1" }),
+    toStatLike({ type: "transport", id: "T1", selectedCandidatePairId: "P1" }),
+    toStatLike({ type: "candidate-pair", id: "P1", transportId: "T1", nominated: true, state: "succeeded" }),
+    toStatLike({ type: "candidate-pair", id: "P9", transportId: "T1", nominated: true, state: "succeeded", availableOutgoingBitrate: 9_000_000 }),
+  ];
+  assert.equal(screenTraceSample(noEstimate, ctx, null).sample?.availableOutgoingBitrateKbps, null);
+  const unbound = [
+    toStatLike({ type: "outbound-rtp", id: "R", kind: "video" }),
+    toStatLike({ type: "transport", id: "T1", selectedCandidatePairId: "P1" }),
+    toStatLike({ type: "transport", id: "T2", selectedCandidatePairId: "P2" }),
+    toStatLike({ type: "candidate-pair", id: "P1", transportId: "T1", nominated: true, state: "succeeded", availableOutgoingBitrate: 9_000_000 }),
+  ];
+  assert.equal(screenTraceSample(unbound, ctx, null).sample?.availableOutgoingBitrateKbps, null);
+  const noPointer = [
+    toStatLike({ type: "outbound-rtp", id: "R", kind: "video", transportId: "T2" }),
+    toStatLike({ type: "candidate-pair", id: "PX", nominated: true, state: "succeeded", availableOutgoingBitrate: 9_000_000 }),
+    toStatLike({ type: "candidate-pair", id: "P2", transportId: "T2", nominated: true, state: "succeeded", availableOutgoingBitrate: 3_000_000 }),
+  ];
+  assert.equal(screenTraceSample(noPointer, ctx, null).sample?.availableOutgoingBitrateKbps, 3_000);
+  const firstWithout = [
+    toStatLike({ type: "outbound-rtp", id: "R", kind: "video", transportId: "T1" }),
+    toStatLike({ type: "candidate-pair", id: "P1", transportId: "T1", nominated: true, state: "succeeded" }),
+    toStatLike({ type: "candidate-pair", id: "P2", transportId: "T1", nominated: true, state: "succeeded", availableOutgoingBitrate: 3_000_000 }),
+  ];
+  assert.equal(screenTraceSample(firstWithout, ctx, null).sample?.availableOutgoingBitrateKbps, 3_000);
+  const pointerOnly = [
+    toStatLike({ type: "outbound-rtp", id: "R", kind: "video", transportId: "T1" }),
+    toStatLike({ type: "transport", id: "T1", selectedCandidatePairId: "P1" }),
+    toStatLike({ type: "candidate-pair", id: "P1", nominated: true, state: "succeeded", availableOutgoingBitrate: 4_000_000 }),
+  ];
+  assert.equal(screenTraceSample(pointerOnly, ctx, null).sample?.availableOutgoingBitrateKbps, 4_000);
+  for (const transports of [[], [toStatLike({ type: "transport", id: "T1", selectedCandidatePairId: "P1" })]]) {
+    const orphan = [
+      toStatLike({ type: "outbound-rtp", id: "R", kind: "video" }),
+      ...transports,
+      toStatLike({ type: "candidate-pair", id: "P2", transportId: "T2", nominated: true, state: "succeeded", availableOutgoingBitrate: 9_000_000 }),
+    ];
+    assert.equal(screenTraceSample(orphan, ctx, null).sample?.availableOutgoingBitrateKbps, null);
+  }
 });
